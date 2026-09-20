@@ -84,7 +84,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
 
           {/* Controls */}
           <div className="flex items-center gap-2">
-            {isImage && (
+            {isImage && (!isDrive || targetUrl.startsWith('blob:') || targetUrl.startsWith('data:')) && (
               <div className="hidden sm:flex items-center gap-1 bg-slate-700/60 p-1 rounded-lg border border-slate-600">
                 <button
                   type="button"
@@ -148,18 +148,29 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
         {/* Modal Content / Preview Area */}
         <div className="flex-1 overflow-auto p-4 sm:p-6 flex items-center justify-center min-h-[360px] max-h-[calc(92vh-140px)] bg-slate-950/60">
           {isImage ? (
-            <div className="overflow-auto max-w-full max-h-full flex items-center justify-center p-2">
-              <img
-                src={resolvedImageSrc}
-                alt={fileName}
-                style={{
-                  transform: `scale(${zoom}) rotate(${rotation}deg)`,
-                  transition: 'transform 0.2s ease-in-out'
-                }}
-                className="max-h-[64vh] max-w-full object-contain rounded-lg shadow-md select-none"
-                loading="lazy"
-              />
-            </div>
+            (isDrive && driveId && !targetUrl.startsWith('blob:') && !targetUrl.startsWith('data:')) ? (
+              <div className="w-full h-[64vh] flex flex-col bg-slate-900 rounded-lg border border-slate-700 overflow-hidden shadow-inner">
+                <iframe
+                  src={`https://drive.google.com/file/d/${driveId}/preview`}
+                  title={fileName}
+                  className="w-full h-full border-0 rounded-lg bg-slate-900"
+                  allow="autoplay"
+                />
+              </div>
+            ) : (
+              <div className="overflow-auto max-w-full max-h-full flex items-center justify-center p-2">
+                <img
+                  src={resolvedImageSrc}
+                  alt={fileName}
+                  style={{
+                    transform: `scale(${zoom}) rotate(${rotation}deg)`,
+                    transition: 'transform 0.2s ease-in-out'
+                  }}
+                  className="max-h-[64vh] max-w-full object-contain rounded-lg shadow-md select-none"
+                  loading="lazy"
+                />
+              </div>
+            )
           ) : isPdf ? (
             <div className="w-full h-[64vh] flex flex-col bg-slate-900/90 rounded-lg border border-slate-700 overflow-hidden shadow-inner">
               {isDrive ? (

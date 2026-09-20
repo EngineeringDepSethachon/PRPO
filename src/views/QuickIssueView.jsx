@@ -16,6 +16,7 @@ import {
 import SearchableSelect from '../components/common/SearchableSelect';
 import Pagination from '../components/common/Pagination';
 import { safeStringCompare, formatThaiDateTime, parseSafeDate } from '../utils/formatters';
+import { healMACForProduct } from '../utils/macMigration';
 
 const ISSUE_REASONS = [
   'เบิกใช้ในสายการผลิต (Production Line)',
@@ -104,6 +105,9 @@ export default function QuickIssueView({
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
+  const [isRecalculating, setIsRecalculating] = useState(false);
+  const [customUnitCost, setCustomUnitCost] = useState(null);
+  const [costUpdateToast, setCostUpdateToast] = useState('');
 
   // Statistics & Analytics Filter State
   const [statsUnitFilter, setStatsUnitFilter] = useState('ALL'); // 'ALL' | 'ห้อง K1' | ...
@@ -112,7 +116,7 @@ export default function QuickIssueView({
   const [statsCustomEnd, setStatsCustomEnd] = useState('');
   const [statsDeptFilter, setStatsDeptFilter] = useState(() => hasMultiDeptAccess ? 'ALL' : (userAccessibleDepts[0] || user?.department || 'PD'));
   const [statsSearchQuery, setStatsSearchQuery] = useState('');
-  const [statsViewMode, setStatsViewMode] = useState('UNITS'); // 'UNITS' (Card breakdown) | 'MATRIX' (Item x Unit table) | 'LOGS' (Detailed table)
+  const [statsViewMode, setStatsViewMode] = useState('MATRIX'); // 'MATRIX' (Item x Unit table) | 'LOGS' (Detailed table)
 
   // Pagination for Stats views (MATRIX and LOGS)
   const [matrixPage, setMatrixPage] = useState(1);
@@ -304,6 +308,47 @@ export default function QuickIssueView({
 
     return 0;
   }, [selectedProduct, stockLogs]);
+
+  // Reset custom cost override and feedback when selected product changes
+  useEffect(() => {
+    setCostUpdateToast('');
+    setCustomUnitCost(null);
+  }, [selectedProdId]);
+
+  const currentUnitCost = useMemo(() => {
+    if (customUnitCost && customUnitCost.productId === selectedProdId) {
+      return customUnitCost.cost;
+    }
+    return effectiveUnitCost;
+  }, [customUnitCost, selectedProdId, effectiveUnitCost]);
+
+  const handleRecalculateCost = async () => {
+    if (!selectedProduct || isRecalculating) return;
+    setIsRecalculating(true);
+    setCostUpdateToast('');
+    try {
+      const targetKey = selectedProduct.id || selectedProduct.code || selectedProduct.name;
+      const healed = await healMACForProduct(targetKey);
+      const newCost = Number(healed?.averageCost ?? healed?.avgCost ?? 0);
+      if (healed && newCost > 0) {
+        setCustomUnitCost({ productId: selectedProduct.id, cost: newCost });
+        setCostUpdateToast(`อัปเดตต้นทุนแล้ว: ฿${newCost.toFixed(2)}/${sUnit}`);
+        if (typeof onRefresh === 'function') {
+          await onRefresh();
+        }
+      } else {
+        setCostUpdateToast('ไม่พบประวัติรับเข้าสำหรับคำนวณ');
+      }
+    } catch (err) {
+      console.error('[QuickIssueView] Error recalculating MAC:', err);
+      setCostUpdateToast('เกิดข้อผิดพลาดในการคำนวณ');
+    } finally {
+      setIsRecalculating(false);
+      setTimeout(() => {
+        setCostUpdateToast('');
+      }, 4000);
+    }
+  };
 
   // Recent OUT stock logs for this department (Live sidebar)
   const recentIssueLogs = useMemo(() => {
@@ -1150,8 +1195,29 @@ export default function QuickIssueView({
                 </h3>
               </div>
             ) : (
-              <div className="pb-4 border-b border-slate-100 text-slate-400 text-xs italic">
-                กรุณาเลือกสินค้าเพื่อดูข้อมูลสต็อก
+              <div className="pb-4 border-b border-slate-100 space-y-3">
+                <div className="text-slate-400 text-xs italic">
+                  กรุณาเลือกสินค้าเพื่อดูข้อมูลสต็อก
+                </div>
+                <div className="bg-blue-50/80 rounded-2xl p-3.5 border border-blue-100 flex items-start justify-between gap-3">
+                  <div>
+                    <span className="text-[10px] font-medium text-blue-600 uppercase tracking-wider block">มูลค่าเงินที่เบิกครั้งนี้</span>
+                    <p className="font-mono text-base font-bold text-blue-700 mt-0.5">฿0.00</p>
+                  </div>
+                  <div className="flex flex-col items-end">
+                    <span className="text-[9px] font-medium text-slate-400 block">(คำนวณจากต้นทุนเฉลี่ย)</span>
+                    <p className="font-mono text-[11px] text-slate-400 mt-0.5">฿0.00 / ชิ้น</p>
+                    <button
+                      type="button"
+                      disabled={true}
+                      className="mt-2 text-xs font-semibold text-blue-600 bg-white border border-blue-200 px-3 py-1.5 rounded-lg shadow-2xs flex items-center gap-1.5 opacity-50 cursor-not-allowed"
+                      title="กรุณาเลือกสินค้าก่อนคำนวณต้นทุน"
+                    >
+                      <RefreshCw className="w-3.5 h-3.5" />
+                      <span>คำนวณต้นทุนเฉลี่ยใหม่</span>
+                    </button>
+                  </div>
+                </div>
               </div>
             )}
 
@@ -1226,18 +1292,34 @@ export default function QuickIssueView({
                   </div>
                 </div>
 
-                <div className="bg-indigo-50/80 rounded-2xl p-3 border border-indigo-100 flex items-center justify-between mt-3">
+                <div className="bg-blue-50/80 rounded-2xl p-3.5 border border-blue-100 flex items-start justify-between mt-3 gap-3">
                   <div>
-                    <span className="text-[10px] font-medium text-indigo-500 uppercase tracking-wider block">มูลค่าเงินที่เบิกครั้งนี้</span>
-                    <p className="font-mono text-sm font-bold text-indigo-700 mt-0.5">
-                      ฿{(effectiveUnitCost * qtyNumber).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    <span className="text-[10px] font-medium text-blue-600 uppercase tracking-wider block">มูลค่าเงินที่เบิกครั้งนี้</span>
+                    <p className="font-mono text-base font-bold text-blue-700 mt-0.5">
+                      ฿{(currentUnitCost * qtyNumber).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
+                    {costUpdateToast && (
+                      <span className="inline-flex items-center gap-1 mt-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                        <Check className="w-3 h-3 text-emerald-600 shrink-0" />
+                        <span>{costUpdateToast}</span>
+                      </span>
+                    )}
                   </div>
-                  <div className="text-right">
+                  <div className="flex flex-col items-end">
                     <span className="text-[9px] font-medium text-slate-400 block">(คำนวณจากต้นทุนเฉลี่ย)</span>
-                    <p className="font-mono text-[11px] text-slate-500 mt-0.5">
-                      ฿{effectiveUnitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {sUnit}
+                    <p className="font-mono text-[11px] text-slate-600 font-semibold mt-0.5">
+                      ฿{currentUnitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {sUnit}
                     </p>
+                    <button
+                      type="button"
+                      disabled={!selectedProduct || isRecalculating}
+                      onClick={handleRecalculateCost}
+                      className="mt-2 text-xs font-semibold text-blue-600 bg-white hover:bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-lg transition-all shadow-2xs flex items-center gap-1.5 disabled:opacity-50 disabled:cursor-not-allowed cursor-pointer"
+                      title="คำนวณต้นทุนเฉลี่ยถ่วงน้ำหนักใหม่ตามประวัติรับเข้าจริง"
+                    >
+                      <RefreshCw className={`w-3.5 h-3.5 ${isRecalculating ? 'animate-spin' : ''}`} />
+                      <span>{isRecalculating ? 'กำลังคำนวณ...' : 'คำนวณต้นทุนเฉลี่ยใหม่'}</span>
+                    </button>
                   </div>
                 </div>
               </div>
@@ -1333,23 +1415,11 @@ export default function QuickIssueView({
               <h3 className="text-sm font-bold text-slate-800">ตัวกรองสถิติการใช้งาน (Filters)</h3>
             </div>
 
-            {/* View Mode Switcher */}
-            <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60 self-start md:self-auto">
-              <button
-                type="button"
-                onClick={() => setStatsViewMode('UNITS')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
-                  statsViewMode === 'UNITS'
-                    ? 'bg-white text-slate-900 shadow-xs font-bold'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <LayoutGrid className="w-3.5 h-3.5" />
-                <span>จำแนกตามหน่วย ({displayedUnits.length} หน่วย)</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setStatsViewMode('MATRIX')}
+              {/* View Mode Switcher */}
+              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl border border-slate-200/60 self-start md:self-auto">
+                <button
+                  type="button"
+                  onClick={() => setStatsViewMode('MATRIX')}
                 className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center gap-1.5 cursor-pointer ${
                   statsViewMode === 'MATRIX'
                     ? 'bg-white text-slate-900 shadow-xs font-bold'
@@ -1609,139 +1679,6 @@ export default function QuickIssueView({
 
         </div>
 
-        {/* ── View Mode 1: 5 Unit Comparison Cards & Breakdown ── */}
-        {statsViewMode === 'UNITS' && (
-          <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div>
-                <h3 className="text-base font-bold text-slate-900 flex items-center gap-2">
-                  <LayoutGrid className="w-5 h-5 text-indigo-600" />
-                  <span>การใช้งานแยกตามหน่วยทั้ง {displayedUnits.length} หน่วย (Unit Breakdown)</span>
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  สรุปรายละเอียดว่าแต่ละห้องมีการเบิกสินค้าอะไรบ้าง และปริมาณการใช้งานในแต่ละห้อง
-                </p>
-              </div>
-
-              <button
-                type="button"
-                onClick={handleExportCSV}
-                className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-50 text-slate-700 rounded-xl border border-slate-200 text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
-              >
-                <Download className="w-3.5 h-3.5 text-slate-500" />
-                <span>ส่งออกข้อมูล (CSV)</span>
-              </button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {displayedUnits.map(unit => {
-                const uData = analytics.unitList.find(u => u.name === unit.name) || {
-                  name: unit.name,
-                  count: 0,
-                  totalQty: 0,
-                  topItems: [],
-                  uniqueItemCount: 0
-                };
-                const isCurrentFilter = statsUnitFilter === unit.name;
-                const dot = unit.dot || 'bg-slate-500';
-                const badgeBg = unit.badgeBg || 'bg-slate-200 text-slate-800';
-
-                return (
-                  <div
-                    key={unit.id || unit.name}
-                    className={`bg-white rounded-2xl border transition-all p-5 flex flex-col justify-between space-y-4 shadow-xs ${
-                      isCurrentFilter 
-                        ? 'border-indigo-600 ring-2 ring-indigo-500/10 shadow-sm' 
-                        : 'border-slate-200/80 hover:border-slate-300'
-                    }`}
-                  >
-                    {/* Header */}
-                    <div>
-                      <div className="flex items-center justify-between gap-2 pb-3 border-b border-slate-100">
-                        <div className="flex items-center gap-2.5">
-                          <span className={`w-3 h-3 rounded-full ${dot}`} />
-                          <h4 className="font-bold text-sm text-slate-900">{unit.name}</h4>
-                          <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold font-mono ${unit.department === 'PD' ? 'bg-blue-50 text-blue-700' : 'bg-amber-50 text-amber-700'}`}>
-                            {unit.department}
-                          </span>
-                        </div>
-                        <span className={`px-2 py-0.5 rounded-full text-[11px] font-bold font-mono ${badgeBg}`}>
-                          {uData.count} ครั้ง
-                        </span>
-                      </div>
-
-                      {/* Stat summary */}
-                      <div className="grid grid-cols-2 gap-2 mt-3 text-xs">
-                        <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                          <span className="text-[10px] text-slate-500 block">ปริมาณเบิกรวม</span>
-                          <span className="text-base font-black text-slate-900 font-mono mt-0.5 block">
-                            {uData.totalQty.toLocaleString()}
-                          </span>
-                        </div>
-                        <div className="p-2.5 bg-slate-50 rounded-xl border border-slate-100">
-                          <span className="text-[10px] text-slate-500 block">จำนวนชนิดสินค้า</span>
-                          <span className="text-base font-black text-indigo-700 font-mono mt-0.5 block">
-                            {uData.uniqueItemCount} ชนิด
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Top items consumed in this unit */}
-                    <div className="space-y-2 flex-1">
-                      <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider flex items-center justify-between">
-                        <span>สินค้าที่เบิกในห้องนี้</span>
-                        <span>จำนวน</span>
-                      </p>
-
-                      {uData.topItems.length > 0 ? (
-                        <div className="space-y-1.5 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                          {uData.topItems.map((item, idx) => (
-                            <div key={item.code} className="flex items-center justify-between text-xs p-2 rounded-lg bg-slate-50/70 hover:bg-slate-100/80 transition-colors">
-                              <div className="min-w-0 pr-2 flex-1">
-                                <div className="flex items-center gap-1.5">
-                                  <span className="text-[10px] font-mono text-slate-400 font-semibold">{idx + 1}.</span>
-                                  <span className="font-semibold text-slate-800 truncate block" title={item.name}>
-                                    {item.name}
-                                  </span>
-                                </div>
-                                <span className="text-[10px] font-mono text-slate-400 block ml-3.5">
-                                  {item.code} • เบิก {item.count} ครั้ง
-                                </span>
-                              </div>
-                              <span className="font-mono font-bold text-slate-800 text-xs shrink-0 bg-white px-2 py-0.5 rounded border border-slate-200/60">
-                                {item.qty.toLocaleString()} {item.unit}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="py-6 text-center text-xs text-slate-400 bg-slate-50/50 rounded-xl border border-slate-100 border-dashed">
-                          ยังไม่มีประวัติการเบิกในห้องนี้
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Action Footer */}
-                    <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setStatsUnitFilter(unit?.name || unit?.id || '');
-                          setStatsViewMode('MATRIX');
-                        }}
-                        className="text-xs font-bold text-indigo-600 hover:text-indigo-800 flex items-center gap-1 cursor-pointer transition-colors"
-                      >
-                        <span>ดูตารางสินค้าของ {unit?.name || unit?.id}</span>
-                        <ChevronRight className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
 
         {/* ── View Mode 2: Detailed Matrix (Unit × Product Aggregation) ── */}
         {statsViewMode === 'MATRIX' && (

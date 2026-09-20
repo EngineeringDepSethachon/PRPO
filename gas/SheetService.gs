@@ -1041,7 +1041,7 @@ const SCHEMA_DEFINITIONS = Object.freeze({
     'settledBy', 'settledAt', 'actualItems', 'activityLog', 
     'createdAt', 'completedAt', 'updatedAt',
     'budgetPeriod', 'committedAmount', 'actualPaidAmount', 'paymentStatus',
-    'claimEvidence', 'disputeInfo'
+    'claimEvidence', 'disputeInfo', 'claimData', 'claimDetails', 'claimReason', 'claimDescription'
   ],
   [SHEET_NAMES.STOCK_LOGS]: [
     'id', 'timestamp', 'date', 'type', 'productId', 'productCode', 'productName', 'name',

@@ -663,11 +663,14 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
       return 2;
     }
 
-    // Step 1: "สั่งซื้อแล้ว" (ORDERED)
+    // Step 1: "สั่งซื้อแล้ว" (ORDERED / WAITING_DELIVERY_ROUND_2)
+    // กฎสำคัญ: WAITING_DELIVERY_ROUND_2 ต้องอยู่ที่ step 1 เสมอ
+    // เพราะของยังไม่มาถึงมือผู้รับ — Online Purchaser กำลังรอร้านค้าส่งของรอบ 2
     if (
       s === 'ordered' || ws === 'ordered' ||
       s === 'ordered_pending_delivery' || ws === 'ordered_pending_delivery' ||
       s === 'waiting_delivery' || ws === 'waiting_delivery' ||
+      s === 'waiting_delivery_round_2' || ws === 'waiting_delivery_round_2' ||
       s.startsWith('ordered') || ws.startsWith('ordered')
     ) {
       return 1;

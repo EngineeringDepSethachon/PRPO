@@ -2157,6 +2157,13 @@ export const apiService = {
     return true;
   },
 
+  async getImageBase64(fileId) {
+    if (isGAS()) {
+      return callGAS('apiGetImageBase64', { fileId });
+    }
+    return '';
+  },
+
   async makeAllDriveFilesPublic() {
     if (isGAS()) {
       return callGAS('apiMakeAllDriveFilesPublic');

@@ -2227,48 +2227,13 @@ export const storageService = {
         createdAt: m.createdAt || new Date().toISOString()
       };
 
-      const docQuery = String(m.documentNo || m.docNo || m.grnNumber || '').trim().toUpperCase();
-      const existingIdx = currentLogs.findIndex(l => {
-        // Canonical GRN-first: prefer documentNo, then try grnNumber/grnNo/grNumber.
-        // Skip docNo if it looks like a raw PO number (starts with 'PO-') to avoid false mismatches
-        // from legacy entries that stored GRN in documentNo but PO in docNo.
-        const lDocNo = String(l.documentNo || '').trim().toUpperCase();
-        const lGrn = String(l.grnNumber || l.grnNo || l.grNumber || '').trim().toUpperCase();
-        const lDocFallback = String(l.docNo || '').trim().toUpperCase();
-        // Resolve canonical doc key: prefer documentNo/grnNumber over raw docNo
-        const lDoc = lDocNo || lGrn || (lDocFallback.startsWith('GRN-') ? lDocFallback : '');
-        if (!lDoc || !docQuery || lDoc !== docQuery) return false;
-        const lPId = String(l.productId || '').trim().toUpperCase();
-        const lPCode = String(l.productCode || l.itemCode || '').trim().toUpperCase();
-        const lDept = String(l.department || '').trim().toUpperCase();
-        if (mDept && lDept && !matchDepartment(lDept, mDept)) return false;
-        if (pId && lPId) return lPId === pId;
-        return Boolean(pCode && lPCode === pCode);
-
-      });
-
-      if (existingIdx !== -1) {
-        // Upgrade / enrich existing record with dual-UOM canonical invariants
-        const existing = currentLogs[existingIdx];
-        const enrichedRecord = {
-          ...existing,
-          ...logRecord,
-          id: existing.id,
-          date: existing.date || logRecord.date,
-          createdAt: existing.createdAt || logRecord.createdAt,
-          balance: m.balanceAfter !== undefined ? Number(m.balanceAfter) : (existing.balance !== undefined ? Number(existing.balance) : newBalance),
-          balanceAfter: m.balanceAfter !== undefined ? Number(m.balanceAfter) : (existing.balanceAfter !== undefined ? Number(existing.balanceAfter) : (existing.balance !== undefined ? Number(existing.balance) : newBalance))
-        };
-        currentLogs[existingIdx] = enrichedRecord;
-        newLogs.push(enrichedRecord);
-      } else {
-        if (prod) {
-          prod.stockBalance = newBalance;
-          products[prodIdx] = prod;
-        }
-        currentLogs.unshift(logRecord);
-        newLogs.push(logRecord);
+      // Strict Append Only - ห้ามเขียนทับประวัติเดิมเด็ดขาด
+      if (prod) {
+        prod.stockBalance = newBalance;
+        products[prodIdx] = prod;
       }
+      currentLogs.unshift(logRecord);
+      newLogs.push(logRecord);
     });
 
     if (newLogs.length > 0) {

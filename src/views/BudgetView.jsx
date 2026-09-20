@@ -364,7 +364,301 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
 
   // Load budget transaction log (refund entries) scoped to permitted departments & active period
   const budgetTransactions = useMemo(() => {
-    const allTxs = storageService.getBudgetTransactions() || [];
+    // 1. Get Static Txs (Filter only Manual Adjustments & Allocations)
+    let staticTxs = storageService.getBudgetTransactions() || [];
+    const validStaticTypes = new Set(['MONTHLY_ALLOCATION', 'SET_BUDGET', 'TOP_UP', 'BUDGET_ADJUSTMENT_DOWN', 'BUDGET_ADJUSTMENT_UP', 'PR_RELEASE', 'REFUND_SETTLEMENT', 'BUDGET_ROLLBACK', 'BUDGET_RESTORED_CLAIM_REFUND']);
+    let allTxs = staticTxs.filter(tx => validStaticTypes.has(String(tx.type || tx.transactionType || tx.actionType || '').toUpperCase()));
+
+    // 2. Derive Stateful Ledger from PRs & POs
+    const poByPrId = {};
+    if (pos) {
+      pos.forEach(po => {
+        if (['CANCELLED'].includes(String(po.status).toUpperCase())) return;
+        const prId = String(po.refPrNo || po.prNo || po.prId || po.referencePr || '').trim();
+        if (prId) {
+          if (!poByPrId[prId]) poByPrId[prId] = [];
+          poByPrId[prId].push(po);
+        }
+      });
+    }
+
+    const processedPoIds = new Set();
+
+    if (prs) {
+      prs.forEach(pr => {
+        if (!pr || ['REJECTED', 'CANCELLED'].includes(String(pr.status).toUpperCase())) return;
+        const prId = String(pr.prNo || pr.id).trim();
+        const prDate = pr.requestedDate || pr.createdAt || new Date().toISOString();
+        const prTotal = Number(pr.totalEstimate || pr.totalAmount || pr.estimatedTotal || 0);
+        
+        const linkedPOs = poByPrId[prId] || [];
+        
+        if (linkedPOs.length === 0) {
+          // Rule 1: No POs -> PR Commitment
+          if (prTotal > 0 && ['SUBMITTED', 'REVIEWED', 'APPROVED'].includes(String(pr.status).toUpperCase())) {
+            allTxs.push({
+              id: `VTX-PR-${prId}`,
+              type: 'PR_COMMITMENT',
+              department: pr.department,
+              dept: pr.department,
+              amount: prTotal,
+              docType: 'PR',
+              docNo: prId,
+              referenceDoc: prId,
+              date: prDate,
+              createdAt: prDate,
+              actor: pr.requesterName || pr.requester || 'System',
+              notes: `ผูกพัน PR อนุมัติแล้วรอสั่งซื้อ (${prId})`,
+              period: prDate.substring(0, 7)
+            });
+          }
+        } else {
+          // Has POs -> Replace PR Commitment with PO state
+          let sumPoCommitment = 0;
+          let sumPoActual = 0;
+          let sumPoTotalOriginal = 0;
+
+          linkedPOs.forEach(po => {
+            const poId = String(po.poNo || po.id).trim();
+            processedPoIds.add(poId);
+            const poDate = po.issueDate || po.createdAt || prDate;
+            const poTotal = Number(po.grandTotal ?? po.totalAmount ?? po.total ?? 0);
+            const poStatusUpper = String(po.status || '').toUpperCase();
+            const isCompleted = ['CLOSED', 'COMPLETED', 'RECEIVED', 'FULLY_RECEIVED', 'COMPLETED_WITH_REFUND', 'RESOLVED'].includes(poStatusUpper) || Boolean(po.isClosed);
+            
+            sumPoTotalOriginal += poTotal;
+
+            if (isCompleted) {
+              // Level 2 Variance (PO vs Actual Paid)
+              let poRefund = 0;
+              if (po.totalRefunded !== undefined && po.totalRefunded !== null) {
+                poRefund = Number(po.totalRefunded);
+              } else if (po.refundAmount !== undefined && po.refundAmount !== null) {
+                poRefund = Number(po.refundAmount);
+              } else if (po.storeClaims && typeof po.storeClaims === 'object') {
+                Object.values(po.storeClaims).forEach(c => {
+                  if (c?.isResolved && (c.type === 'REFUND' || c.resolutionType === 'REFUND' || c.actionType === 'REFUND' || String(c.note || '').includes('คืนเงิน'))) {
+                    poRefund += Number(c.refundAmount || 0);
+                  }
+                });
+              }
+              if (poRefund === 0 && Array.isArray(po.items)) {
+                po.items.forEach(it => {
+                  if (it.refundAmount) poRefund += Number(it.refundAmount);
+                  else if (it.claimResolution === 'REFUND') {
+                    const q = Number(it.refundedQty || it.damagedQty || it.shortageQty || 0);
+                    const p = Number(it.actualPrice || it.unitPrice || it.price || 0);
+                    poRefund += (q * p);
+                  }
+                });
+              }
+
+              const netPoAmount = Math.max(0, poTotal - poRefund);
+              sumPoActual += netPoAmount;
+
+              // Actual Spend Line
+              if (netPoAmount > 0) {
+                allTxs.push({
+                  id: `VTX-PO-ACT-${poId}`,
+                  type: 'ACTUAL_SPEND',
+                  department: po.department || pr.department,
+                  dept: po.department || pr.department,
+                  amount: netPoAmount,
+                  docType: 'PO',
+                  docNo: poId,
+                  referenceDoc: `${prId} ➔ ${poId}`,
+                  date: poDate,
+                  createdAt: poDate,
+                  actor: po.creatorName || po.requesterName || 'System',
+                  notes: `ใช้จ่ายจริง PO: ${poId} (สุทธิ)`,
+                  period: poDate.substring(0, 7)
+                });
+              }
+
+              // Level 2 Adjustment Line (Discount/Refund from PO)
+              if (poTotal > netPoAmount) {
+                allTxs.push({
+                  id: `VTX-PO-ADJ-${poId}`,
+                  type: 'BUDGET_ADJUSTMENT_DOWN',
+                  department: po.department || pr.department,
+                  dept: po.department || pr.department,
+                  amount: poTotal - netPoAmount,
+                  docType: 'PO',
+                  docNo: poId,
+                  referenceDoc: poId,
+                  date: poDate,
+                  createdAt: poDate,
+                  actor: po.creatorName || 'System',
+                  notes: `ส่วนลด/คืนเงินจาก PO: ${poId} (ยอดสั่ง ฿${poTotal.toLocaleString()} -> จ่ายจริง ฿${netPoAmount.toLocaleString()})`,
+                  period: poDate.substring(0, 7)
+                });
+              }
+
+            } else {
+              // PO In Progress
+              sumPoCommitment += poTotal;
+              if (poTotal > 0) {
+                allTxs.push({
+                  id: `VTX-PO-COM-${poId}`,
+                  type: 'COMMITMENT',
+                  department: po.department || pr.department,
+                  dept: po.department || pr.department,
+                  amount: poTotal,
+                  docType: 'PO',
+                  docNo: poId,
+                  referenceDoc: `${prId} ➔ ${poId}`,
+                  date: poDate,
+                  createdAt: poDate,
+                  actor: po.creatorName || po.requesterName || 'System',
+                  notes: `ผูกพัน PO: ${poId} (กำลังดำเนินการ)`,
+                  period: poDate.substring(0, 7)
+                });
+              }
+            }
+          });
+
+          // Level 1 Variance (PR Estimate vs Sum of POs)
+          // Evaluate only if PR is COMPLETED (all POs issued) or CLOSED.
+          const isPrFullyConsumed = ['COMPLETED', 'CLOSED', 'FULLY_ISSUED'].includes(String(pr.status).toUpperCase()) || (linkedPOs.length > 0 && linkedPOs.every(p => ['CLOSED', 'COMPLETED', 'RECEIVED', 'FULLY_RECEIVED'].includes(String(p.status).toUpperCase())));
+          
+          if (isPrFullyConsumed) {
+            const variance = prTotal - sumPoTotalOriginal;
+            if (variance > 0) {
+              allTxs.push({
+                id: `VTX-PR-ADJ-DN-${prId}`,
+                type: 'BUDGET_ADJUSTMENT_DOWN',
+                department: pr.department,
+                dept: pr.department,
+                amount: variance,
+                docType: 'PR',
+                docNo: prId,
+                referenceDoc: prId,
+                date: prDate,
+                createdAt: prDate,
+                actor: pr.requesterName || 'System',
+                notes: `คืนงบประมาณประหยัดจาก PR: ${prId} (ตั้งงบ ฿${prTotal.toLocaleString()} -> สั่งซื้อ ฿${sumPoTotalOriginal.toLocaleString()})`,
+                period: prDate.substring(0, 7)
+              });
+            } else if (variance < 0) {
+              allTxs.push({
+                id: `VTX-PR-ADJ-UP-${prId}`,
+                type: 'BUDGET_ADJUSTMENT_UP',
+                department: pr.department,
+                dept: pr.department,
+                amount: Math.abs(variance),
+                docType: 'PR',
+                docNo: prId,
+                referenceDoc: prId,
+                date: prDate,
+                createdAt: prDate,
+                actor: pr.requesterName || 'System',
+                notes: `ดึงงบเพิ่มจาก PR: ${prId} (ตั้งงบ ฿${prTotal.toLocaleString()} -> สั่งซื้อ ฿${sumPoTotalOriginal.toLocaleString()})`,
+                period: prDate.substring(0, 7)
+              });
+            }
+          }
+        }
+      });
+    }
+
+    // 3. Handle Direct POs (No PR linked)
+    if (pos) {
+      pos.forEach(po => {
+        const poId = String(po.poNo || po.id).trim();
+        if (processedPoIds.has(poId) || ['CANCELLED'].includes(String(po.status).toUpperCase())) return;
+        
+        const poDate = po.issueDate || po.createdAt || new Date().toISOString();
+        const poTotal = Number(po.grandTotal ?? po.totalAmount ?? po.total ?? 0);
+        const poStatusUpper = String(po.status || '').toUpperCase();
+        const isCompleted = ['CLOSED', 'COMPLETED', 'RECEIVED', 'FULLY_RECEIVED', 'COMPLETED_WITH_REFUND', 'RESOLVED'].includes(poStatusUpper) || Boolean(po.isClosed);
+
+        if (isCompleted) {
+          // Level 2 Variance (Direct PO)
+          let poRefund = 0;
+          if (po.totalRefunded !== undefined && po.totalRefunded !== null) {
+            poRefund = Number(po.totalRefunded);
+          } else if (po.refundAmount !== undefined && po.refundAmount !== null) {
+            poRefund = Number(po.refundAmount);
+          } else if (po.storeClaims && typeof po.storeClaims === 'object') {
+            Object.values(po.storeClaims).forEach(c => {
+              if (c?.isResolved && (c.type === 'REFUND' || c.resolutionType === 'REFUND' || c.actionType === 'REFUND' || String(c.note || '').includes('คืนเงิน'))) {
+                poRefund += Number(c.refundAmount || 0);
+              }
+            });
+          }
+          if (poRefund === 0 && Array.isArray(po.items)) {
+            po.items.forEach(it => {
+              if (it.refundAmount) poRefund += Number(it.refundAmount);
+              else if (it.claimResolution === 'REFUND') {
+                const q = Number(it.refundedQty || it.damagedQty || it.shortageQty || 0);
+                const p = Number(it.actualPrice || it.unitPrice || it.price || 0);
+                poRefund += (q * p);
+              }
+            });
+          }
+
+          const netPoAmount = Math.max(0, poTotal - poRefund);
+
+          if (netPoAmount > 0) {
+            allTxs.push({
+              id: `VTX-DPO-ACT-${poId}`,
+              type: 'ACTUAL_SPEND',
+              department: po.department,
+              dept: po.department,
+              amount: netPoAmount,
+              docType: 'PO',
+              docNo: poId,
+              referenceDoc: poId,
+              date: poDate,
+              createdAt: poDate,
+              actor: po.creatorName || po.requesterName || 'System',
+              notes: `ใช้จ่ายจริง Direct PO: ${poId} (สุทธิ)`,
+              period: poDate.substring(0, 7)
+            });
+          }
+
+          if (poTotal > netPoAmount) {
+            allTxs.push({
+              id: `VTX-DPO-ADJ-${poId}`,
+              type: 'BUDGET_ADJUSTMENT_DOWN',
+              department: po.department,
+              dept: po.department,
+              amount: poTotal - netPoAmount,
+              docType: 'PO',
+              docNo: poId,
+              referenceDoc: poId,
+              date: poDate,
+              createdAt: poDate,
+              actor: po.creatorName || 'System',
+              notes: `ส่วนลด/คืนเงิน Direct PO: ${poId} (ลดลง ฿${(poTotal - netPoAmount).toLocaleString()})`,
+              period: poDate.substring(0, 7)
+            });
+          }
+        } else {
+          if (poTotal > 0) {
+            allTxs.push({
+              id: `VTX-DPO-COM-${poId}`,
+              type: 'COMMITMENT',
+              department: po.department,
+              dept: po.department,
+              amount: poTotal,
+              docType: 'PO',
+              docNo: poId,
+              referenceDoc: poId,
+              date: poDate,
+              createdAt: poDate,
+              actor: po.creatorName || po.requesterName || 'System',
+              notes: `ผูกพัน Direct PO: ${poId}`,
+              period: poDate.substring(0, 7)
+            });
+          }
+        }
+      });
+    }
+
+    // Sort descending by date
+    allTxs.sort((a, b) => new Date(b.createdAt || b.date || 0).getTime() - new Date(a.createdAt || a.date || 0).getTime());
+    // -------------------------------------------
     return allTxs.filter(tx => {
       const txDept = String(tx.dept || tx.department || '').replace(/^ฝ่าย\s*/i, '').trim().toUpperCase();
       const matchDept = deptsToShow.includes(txDept);
@@ -1454,8 +1748,8 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                 {budgetTransactions.filter(tx => {
                   const txType = String(tx.type || tx.transactionType || tx.actionType || '').toUpperCase();
                   if (ledgerFilter === 'ACTUAL_SPEND') return ['ACTUAL_SPEND', 'PO_SPEND', 'DIRECT_SPEND'].includes(txType);
-                  if (ledgerFilter === 'COMMITMENT') return ['PR_COMMITMENT', 'COMMITMENT', 'RESERVED'].includes(txType);
-                  if (ledgerFilter === 'REFUND') return ['PR_RELEASE', 'PO_CANCEL_REFUND', 'CLAIM_REFUND', 'REFUND_SETTLEMENT', 'BUDGET_ROLLBACK', 'BUDGET_RESTORED_CLAIM_REFUND', 'TOP_UP', 'MONTHLY_ALLOCATION', 'SET_BUDGET'].includes(txType);
+                  if (ledgerFilter === 'COMMITMENT') return ['PR_COMMITMENT', 'COMMITMENT', 'PO_COMMITMENT', 'RESERVED'].includes(txType);
+                  if (ledgerFilter === 'REFUND') return ['PR_RELEASE', 'PO_CANCEL_REFUND', 'CLAIM_REFUND', 'REFUND_SETTLEMENT', 'BUDGET_ROLLBACK', 'BUDGET_RESTORED_CLAIM_REFUND', 'TOP_UP', 'MONTHLY_ALLOCATION', 'SET_BUDGET', 'BUDGET_ADJUSTMENT_DOWN', 'BUDGET_ADJUSTMENT_UP'].includes(txType);
                   return true; // ALL
                 }).length === 0 ? (
                   <tr>
@@ -1467,8 +1761,8 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                   budgetTransactions.filter(tx => {
                     const txType = String(tx.type || tx.transactionType || tx.actionType || '').toUpperCase();
                     if (ledgerFilter === 'ACTUAL_SPEND') return ['ACTUAL_SPEND', 'PO_SPEND', 'DIRECT_SPEND'].includes(txType);
-                    if (ledgerFilter === 'COMMITMENT') return ['PR_COMMITMENT', 'COMMITMENT', 'RESERVED'].includes(txType);
-                    if (ledgerFilter === 'REFUND') return ['PR_RELEASE', 'PO_CANCEL_REFUND', 'CLAIM_REFUND', 'REFUND_SETTLEMENT', 'BUDGET_ROLLBACK', 'BUDGET_RESTORED_CLAIM_REFUND', 'TOP_UP', 'MONTHLY_ALLOCATION', 'SET_BUDGET'].includes(txType);
+                    if (ledgerFilter === 'COMMITMENT') return ['PR_COMMITMENT', 'COMMITMENT', 'PO_COMMITMENT', 'RESERVED'].includes(txType);
+                    if (ledgerFilter === 'REFUND') return ['PR_RELEASE', 'PO_CANCEL_REFUND', 'CLAIM_REFUND', 'REFUND_SETTLEMENT', 'BUDGET_ROLLBACK', 'BUDGET_RESTORED_CLAIM_REFUND', 'TOP_UP', 'MONTHLY_ALLOCATION', 'SET_BUDGET', 'BUDGET_ADJUSTMENT_DOWN', 'BUDGET_ADJUSTMENT_UP'].includes(txType);
                     return true;
                   }).map(tx => {
                     const amountNum = Number(tx.amount ?? tx.refundAmount ?? tx.creditAmount ?? 0);
@@ -1486,41 +1780,52 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                     const isActualSpend = rawType === 'ACTUAL_SPEND';
                     const isCommitment = rawType === 'PR_COMMITMENT';
 
-                    let badgeText = '[ปรับปรุงงบประมาณ]';
+                    let badgeText = 'ปรับปรุงงบประมาณ';
                     let badgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
-                    let typeDisplay = tx.typeLabel || tx.type || 'ADJUST';
+                    let isIncome = false;
+                    let isExpense = false;
 
-                    if (isRefund || isClaimRefund) {
-                      badgeText = '[คืนงบประมาณ]';
+                    if (rawType === 'BUDGET_ADJUSTMENT_DOWN') {
+                      badgeText = 'คืนงบประมาณ (ประหยัด)';
                       badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                      typeDisplay = rawType;
+                      isIncome = true;
+                    } else if (rawType === 'BUDGET_ADJUSTMENT_UP') {
+                      badgeText = 'เพิ่มเงินงบประมาณ (เกินงบ)';
+                      badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
+                      isExpense = true;
+                    } else if (isRefund || isClaimRefund) {
+                      badgeText = 'คืนงบประมาณ';
+                      badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
+                      isIncome = true;
                     } else if (isMonthlyAlloc) {
-                      badgeText = '[จัดสรรงบประมาณ]';
+                      badgeText = 'จัดสรรงบประมาณ';
                       badgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
-                      typeDisplay = 'MONTHLY_ALLOCATION';
+                      isIncome = true;
                     } else if (isTopUp) {
-                      badgeText = '[เติมงบประมาณ]';
+                      badgeText = 'เติมงบประมาณ';
                       badgeClass = 'bg-teal-50 text-teal-700 border-teal-200';
-                      typeDisplay = 'TOP_UP';
+                      isIncome = true;
                     } else if (isActualSpend) {
-                      badgeText = '[ตัดจ่ายจริง]';
+                      badgeText = 'ใช้จ่ายจริง';
                       badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
-                      typeDisplay = 'ACTUAL_SPEND';
+                      isExpense = true;
                     } else if (isCommitment) {
-                      badgeText = '[ผูกพันงบ]';
+                      badgeText = 'ผูกพันงบประมาณ';
                       badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
-                      typeDisplay = 'PR_COMMITMENT';
+                      isExpense = true;
                     } else if (amountNum < 0) {
-                      badgeText = '[ปรับลดยอดงบประมาณ]';
+                      badgeText = 'ปรับลดยอดงบประมาณ';
                       badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
+                      isExpense = true;
+                    } else {
+                      isIncome = true;
                     }
 
-                    // Strict amount sign formatting: Never hardcode '+' to prevent '+-'
-                    const isPositive = amountNum > 0;
-                    const isNegative = amountNum < 0;
-                    const signPrefix = isPositive ? '+฿' : isNegative ? '-฿' : '฿';
-                    const absAmountFormatted = Math.abs(amountNum).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
-                    const amountColor = isPositive ? 'text-emerald-600' : isNegative ? 'text-rose-600' : 'text-slate-600';
+                    // Strict amount sign formatting based on transaction nature (Income vs Expense)
+                    const absAmount = Math.abs(amountNum);
+                    const signPrefix = isIncome ? '+฿' : isExpense ? '-฿' : '฿';
+                    const absAmountFormatted = absAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const amountColor = isIncome ? 'text-emerald-600' : isExpense ? 'text-rose-600' : 'text-slate-600';
 
                     return (
                       <tr key={tx.id || tx.transactionId || Math.random()} className="hover:bg-slate-50/80 transition-colors">
@@ -1530,7 +1835,6 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                         <td className="py-3.5 px-4">
                           <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${badgeClass}`}>
                             <span>{badgeText}</span>
-                            <span className="text-[10px] opacity-80">({typeDisplay})</span>
                           </span>
                         </td>
                         <td className="py-3.5 px-4 font-semibold text-slate-800">

@@ -9,6 +9,26 @@ import { resolveDriveImageUrl, getDriveFileViewUrl, handleDriveImageError } from
  * Supports multi-image browsing, keyboard navigation (Left/Right/Esc), 
  * thumbnail filmstrip, and responsive centered rendering.
  */
+export const resolveImageUrl = (urlOrId) => {
+  if (!urlOrId) return '';
+  if (urlOrId.startsWith('data:image')) return urlOrId; // Base64
+  
+  // ดึง Google Drive File ID จาก URL รูปแบบต่างๆ
+  const match = urlOrId.match(/\/d\/([a-zA-Z0-9_-]+)/) || 
+                urlOrId.match(/id=([a-zA-Z0-9_-]+)/) || 
+                [null, urlOrId];
+  const fileId = match[1];
+
+  // แปลงเป็น Direct Thumbnail Endpoint ที่รองรับการแสดงผลใน <img>
+  if (fileId && !urlOrId.startsWith('http')) {
+    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`;
+  }
+  if (fileId && urlOrId.includes('drive.google.com')) {
+    return `https://drive.google.com/thumbnail?id=${fileId}&sz=w1600`;
+  }
+  return urlOrId;
+};
+
 export default function ImageLightboxModal({
   isOpen,
   images = [],
@@ -17,6 +37,9 @@ export default function ImageLightboxModal({
   onClose
 }) {
   const [currentIndex, setCurrentIndex] = useState(initialIndex);
+  const [imageErrors, setImageErrors] = useState({});
+  const [base64Urls, setBase64Urls] = useState({});
+  const [loadingBase64, setLoadingBase64] = useState({});
 
   // Sync initialIndex when modal opens or initialIndex changes
   useEffect(() => {
@@ -152,13 +175,88 @@ export default function ImageLightboxModal({
         )}
 
         {/* The Image Itself */}
-        <div className="relative max-h-[70vh] max-w-full flex items-center justify-center">
-          <img
-            src={currentImage.url}
-            alt={currentImage.name || 'preview'}
-            className="max-h-[70vh] max-w-full object-contain rounded-2xl shadow-2xl border border-slate-800 bg-slate-900/50 transition-all duration-200"
-            onError={(e) => handleDriveImageError(e, currentImage.raw || currentImage.url)}
-          />
+        <div className="relative max-h-[70vh] max-w-full flex items-center justify-center min-h-[300px] min-w-[300px]">
+          {imageErrors[currentIndex] ? (
+            <div className="flex flex-col items-center justify-center p-8 bg-slate-900 rounded-2xl shadow-2xl border border-slate-800 text-center space-y-4 min-w-[300px]">
+              <div className="w-16 h-16 rounded-full bg-slate-800 flex items-center justify-center text-slate-500">
+                <ImageIcon className="w-8 h-8 opacity-50" />
+              </div>
+              <div>
+                <p className="text-slate-300 font-medium mb-1">ไม่สามารถโหลดรูปภาพได้</p>
+                <p className="text-slate-500 text-sm mb-4">รูปอาจถูกตั้งค่าเป็นส่วนตัวหรือเป็นไฟล์เอกสาร</p>
+                {currentImage.driveViewUrl ? (
+                  <a
+                    href={currentImage.driveViewUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>เปิดดูใน Google Drive</span>
+                  </a>
+                ) : (
+                  <a
+                    href={currentImage.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                    <span>เปิดไฟล์แนบต้นฉบับ</span>
+                  </a>
+                )}
+              </div>
+            </div>
+          ) : (
+            <>
+              {loadingBase64[currentIndex] && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/50 rounded-2xl backdrop-blur-sm">
+                  <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+              )}
+              <img
+                src={base64Urls[currentIndex] || currentImage.url}
+                alt={currentImage.name || 'preview'}
+                className={`max-h-[70vh] max-w-full object-contain rounded-2xl shadow-2xl border border-slate-800 bg-slate-900/50 transition-all duration-200 ${loadingBase64[currentIndex] ? 'opacity-50' : 'opacity-100'}`}
+                onError={async (e) => {
+                  const target = e.currentTarget;
+                  
+                  // 1. First fallback: Use Google UserContent (lh3)
+                  if (!target.dataset.triedFallback) {
+                    target.dataset.triedFallback = 'true';
+                    const oldSrc = target.src;
+                    handleDriveImageError(e, currentImage.raw || currentImage.url);
+                    // If src actually changed, return and let browser retry
+                    if (target.src !== oldSrc) return;
+                  } 
+                  
+                  // 2. Second fallback: Fetch Base64 data securely via backend
+                  if (!target.dataset.triedBase64 && currentImage.fileId && !base64Urls[currentIndex]) {
+                    target.dataset.triedBase64 = 'true';
+                    setLoadingBase64(prev => ({ ...prev, [currentIndex]: true }));
+                    try {
+                      const { apiService } = await import('../../services/apiService');
+                      const b64 = await apiService.getImageBase64(currentImage.fileId);
+                      if (b64 && (b64.startsWith('data:image/') || b64.startsWith('data:application/'))) {
+                        setBase64Urls(prev => ({ ...prev, [currentIndex]: b64 }));
+                      } else {
+                        setImageErrors(prev => ({ ...prev, [currentIndex]: true }));
+                      }
+                    } catch (err) {
+                      console.warn('Base64 fallback failed:', err);
+                      setImageErrors(prev => ({ ...prev, [currentIndex]: true }));
+                    } finally {
+                      setLoadingBase64(prev => ({ ...prev, [currentIndex]: false }));
+                    }
+                  } 
+                  // 3. Complete failure
+                  else {
+                    setImageErrors(prev => ({ ...prev, [currentIndex]: true }));
+                  }
+                }}
+              />
+            </>
+          )}
         </div>
 
         {/* Right / Next Button */}
@@ -215,15 +313,46 @@ function useMemoImages(rawImages, defaultTitle) {
     const list = Array.isArray(rawImages) ? rawImages : [rawImages];
     return list.map((item, idx) => {
       const rawInput = typeof item === 'string' ? item : (item.previewUrl || item.url || item.dataUrl || item.directUrl || item.fileUrl || item);
-      const resolvedUrl = resolveDriveImageUrl(rawInput, 'w1600');
-      const driveViewUrl = getDriveFileViewUrl(rawInput);
-      const name = (typeof item === 'object' && item.name) ? item.name : (defaultTitle ? `${defaultTitle} (${idx + 1})` : `รูปที่ ${idx + 1}`);
+      let resolvedUrl = resolveImageUrl(typeof rawInput === 'string' ? rawInput : rawInput?.url || '');
+      
+      // Fallback if resolveImageUrl didn't produce a full URL
+      if (!resolvedUrl || !resolvedUrl.startsWith('http')) {
+        resolvedUrl = resolveDriveImageUrl(rawInput, 'w1600');
+      }
+      
+      const candidateUrl = typeof item === 'string' ? item : (item?.localUrl || item?.previewUrl || item?.dataUrl || item?.url || item?.fileUrl || '');
+      const isLocal = typeof candidateUrl === 'string' && (candidateUrl.startsWith('blob:') || candidateUrl.startsWith('data:image/'));
+
+      // Extract Google Drive File ID if present
+      let fileId = null;
+      if (!isLocal) {
+        if (typeof item === 'object' && item !== null && item.fileId && typeof item.fileId === 'string' && !item.fileId.includes('BASE64') && !item.fileId.includes('STORED_IN_DRIVE')) {
+          fileId = item.fileId;
+        } else if (typeof rawInput === 'string') {
+          const match = rawInput.match(/\/d\/([a-zA-Z0-9_-]{20,})/) || rawInput.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
+          if (match) fileId = match[1];
+        } else if (rawInput && typeof rawInput === 'object') {
+          if (rawInput.fileId) fileId = rawInput.fileId;
+          else if (rawInput.url) {
+            const match = String(rawInput.url).match(/\/d\/([a-zA-Z0-9_-]{20,})/) || String(rawInput.url).match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
+            if (match) fileId = match[1];
+          }
+        }
+      }
+
+      const driveViewUrl = fileId ? `https://drive.google.com/file/d/${fileId}/view` : getDriveFileViewUrl(rawInput);
+      const name = (typeof item === 'object' && (item.name || item.fileName || item.title))
+        ? (item.name || item.fileName || item.title)
+        : (defaultTitle ? `${defaultTitle} (${idx + 1})` : `รูปที่ ${idx + 1}`);
+
       return {
         raw: item,
-        url: resolvedUrl || (typeof item === 'string' ? item : (item.url || item.previewUrl || '')),
+        url: isLocal ? candidateUrl : (resolvedUrl || (typeof item === 'string' ? item : (item.url || item.previewUrl || ''))),
         driveViewUrl,
+        fileId,
+        isLocal,
         name
       };
-    }).filter(it => Boolean(it.url));
+    }).filter(it => Boolean(it.url) || Boolean(it.fileId));
   }, [rawImages, defaultTitle]);
 }

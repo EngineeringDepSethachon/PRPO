@@ -323,8 +323,8 @@ describe('Domain Suite: Budget Management & Financial Ledger', () => {
       // Check Department format is "ฝ่าย PD"
       expect(html).toContain('ฝ่าย PD');
 
-      // Check Type is BUDGET_ROLLBACK
-      expect(html).toContain('BUDGET_ROLLBACK');
+      // Check Type is คืนงบประมาณ
+      expect(html).toContain('คืนงบประมาณ');
 
       // Check Remark
       expect(html).toContain('คืนเงินค่าสินค้าเสียหาย/ของขาดจาก PO-PD-2026-001');

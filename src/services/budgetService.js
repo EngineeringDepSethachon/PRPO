@@ -276,7 +276,11 @@ export const budgetService = {
 
     // Prevent duplicate entries
     const existingTxs = storageService.getBudgetTransactions() || [];
-    const isDuplicate = existingTxs.some(ex => ex.idempotencyKey === idempotencyKey || (ex.type === tx.type && ex.docRef === tx.docRef));
+    const isDuplicate = existingTxs.some(ex => {
+      if (ex.idempotencyKey && idempotencyKey && ex.idempotencyKey === idempotencyKey) return true;
+      if (ex.type === tx.type && (ex.docNo === tx.docNo || ex.referenceDoc === tx.referenceDoc)) return true;
+      return false;
+    });
     if (isDuplicate) return tx;
 
     storageService.appendBudgetTransaction(tx);

@@ -95,7 +95,7 @@ export const workflowEngine = {
       if (['ORDERED', 'ORDERED_PENDING_DELIVERY', 'ISSUED', 'PARTIAL', 'IN_DELIVERY', 'PARTIAL_RECEIVED', 'WAITING_DELIVERY_ROUND_2'].includes(po.status)) {
         
         // 1.5 BLOCKER: If PO has CLAIM_PENDING or unresolved claims, Requesters CANNOT act on it unless it's WAITING_DELIVERY_ROUND_2.
-        const hasUnresolvedClaim = po.status === 'CLAIM_PENDING' || po.status === 'PARTIALLY_RECEIVED_IN_CLAIM' || po.hasUnresolvedClaim === true || (po.items && po.items.some(it => it.hasDispute || it.ngQty > 0 || it.shortageQty > 0));
+        const hasUnresolvedClaim = po.status === 'CLAIM_PENDING' || po.status === 'PARTIALLY_RECEIVED_IN_CLAIM' || po.claimStatus === 'PENDING_CLAIM' || po.claimStatus === 'IN_CLAIM' || po.hasUnresolvedClaim === true || (po.items && po.items.some(it => it.hasDispute || it.ngQty > 0 || it.shortageQty > 0));
         if (hasUnresolvedClaim && po.status !== 'WAITING_DELIVERY_ROUND_2') {
           return false;
         }
@@ -300,14 +300,15 @@ export const workflowEngine = {
 
       let isClaimAction = false;
       if (isClaim && !isDone) {
+        const isOnlineProcurement = po.isOnlinePurchase === true || po.purchaseChannel === 'ONLINE';
         if (isAdmin) {
           isClaimAction = true;
-        } else if (po.purchaseChannel === 'SELF') {
+        } else if (!isOnlineProcurement) {
           const isDeptMember = hasDepartmentAccess(currentRole, po.department);
           isClaimAction = (isOwnerOfPO || isDeptMember) && !isOnlinePurchaser;
-        } else if (po.purchaseChannel === 'ONLINE' && isOnlinePurchaser) {
+        } else if (isOnlineProcurement && isOnlinePurchaser) {
           isClaimAction = true;
-        } else if (po.purchaseChannel === 'ONLINE' && !isOnlinePurchaser) {
+        } else if (isOnlineProcurement && !isOnlinePurchaser) {
           const isDeptMember = hasDepartmentAccess(currentRole, po.department);
           isWaiting = (isOwnerOfPO || isDeptMember);
         }
@@ -1929,6 +1930,22 @@ export const workflowEngine = {
         requesterId: pr.requesterId || null,
         requesterSignature: pr.requesterSignature || null,
         department: pr.department,
+        // ─── Stakeholders snapshot (Requester / Reviewer / Approver) ───
+        // บันทึกข้อมูลผู้เกี่ยวข้องทั้งหมดจาก PR ลงใน PO ใหม่ เพื่อให้
+        // isUserStakeholder ทำงานได้โดยไม่ต้องค้นย้อนหลัง parent PR
+        stakeholders: {
+          requesterId: pr.requesterId || null,
+          requesterName: pr.requestedBy || pr.requesterName || pr.applicantName1 || '',
+          reviewerNames: pr.reviewerName
+            ? [pr.reviewerName]
+            : (pr.reviewedBy && typeof pr.reviewedBy === 'object' && pr.reviewedBy.name
+              ? [pr.reviewedBy.name]
+              : (typeof pr.reviewedBy === 'string' && pr.reviewedBy ? [pr.reviewedBy] : [])),
+          reviewerIds: pr.reviewerId ? [pr.reviewerId] : [],
+          approverNames: [user?.employeeName || (user?.name && user.name !== 'Admin System' ? user.name : '') || ''].filter(Boolean),
+          approverIds: [user?.id || user?.uid || ''].filter(Boolean),
+          department: pr.department,
+        },
         vendorId: vId,
         vendorName: vName,
         vendor: vendorObj || vName,
@@ -2906,7 +2923,7 @@ export const workflowEngine = {
 
     if (['RESEND', 'REPLACEMENT'].includes(resolution.type)) {
       po.status = 'WAITING_DELIVERY_ROUND_2';
-      po.claimStatus = 'REPLACEMENT_PENDING';
+      po.claimStatus = 'RESOLVED_WAITING_DELIVERY';
       po.refundAmount = 0;
       noteMsg = `[${channel} CLAIM RESOLVED] ดำเนินการ: ${resolution.type} — จัดซื้อใหม่/ส่งสินค้าทดแทน (รอบที่ ${po.claimRound}), คาดรับวันที่: ${resolution.expectedDate || '-'} — ${resolution.note} โดย ${user.name}`;
       
@@ -2942,8 +2959,13 @@ export const workflowEngine = {
 
     } else if (['CLOSE_WITH_REFUND', 'REFUND', 'CANCEL'].includes(resolution.type)) {
       if (!resolution.storeKey || resolution.allStoresResolved) {
-        po.status = 'COMPLETED';
-        po.claimStatus = resolution.type === 'CANCEL' ? 'CANCELLED' : 'REFUNDED';
+        if (resolution.hasPendingDeliveries) {
+          po.status = 'WAITING_DELIVERY_ROUND_2';
+          po.claimStatus = 'RESOLVED_WAITING_DELIVERY';
+        } else {
+          po.status = 'COMPLETED';
+          po.claimStatus = resolution.type === 'CANCEL' ? 'CANCELLED' : 'RESOLVED_REFUNDED';
+        }
       } else {
         po.status = (po.status && po.status !== 'COMPLETED' && po.status !== 'CLOSED') ? po.status : 'CLAIM_PENDING';
         po.claimStatus = 'IN_CLAIM';
@@ -2976,10 +2998,15 @@ export const workflowEngine = {
       }
 
       noteMsg = `[${channel} CLAIM RESOLVED] จัดซื้อเจรจาเคลมสำเร็จ ได้รับเงินคืน ฿${refundAmt.toLocaleString()} เข้าแผนก | ${resolution.note || ''} โดย ${user.name}`;
-    } else if (resolution.type === 'CLOSE_NO_ACTION' || resolution.type === 'WRITE_OFF') {
+    } else if (resolution.type === 'CLOSE_NO_ACTION' || resolution.type === 'WRITE_OFF' || resolution.type === 'ACCEPT_CONDITION') {
       if (!resolution.storeKey || resolution.allStoresResolved) {
-        po.status = resolution.type === 'WRITE_OFF' ? 'CLOSED' : 'COMPLETED';
-        po.claimStatus = resolution.type === 'WRITE_OFF' ? 'WRITE_OFF' : 'CLOSE_NO_ACTION';
+        if (resolution.hasPendingDeliveries) {
+          po.status = 'WAITING_DELIVERY_ROUND_2';
+          po.claimStatus = 'RESOLVED_WAITING_DELIVERY';
+        } else {
+          po.status = 'COMPLETED';
+          po.claimStatus = resolution.type === 'WRITE_OFF' ? 'RESOLVED_WRITE_OFF' : 'CLOSE_NO_ACTION';
+        }
       } else {
         po.status = (po.status && po.status !== 'COMPLETED' && po.status !== 'CLOSED') ? po.status : 'CLAIM_PENDING';
         po.claimStatus = 'IN_CLAIM';

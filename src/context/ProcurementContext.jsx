@@ -148,9 +148,11 @@ export async function recordGoodsReceipt(poId, grnPayload = {}) {
     const disputeAction = isWaitNextRound ? 'WAIT_NEXT_ROUND' : (hasDispute ? 'CLAIM' : 'NONE');
 
     if (hasDispute) hasAnyClaim = true;
+    if (shortageQty > 0 || hasDispute || thisDamaged > 0 || newDamaged > 0 || (newReceived + refundedQty < orderedQty)) {
+      allReceived = false;
+    }
     if (shortageQty > 0) {
       hasAnyShortage = true;
-      allReceived = false;
     }
 
     roundSummary.push({
@@ -179,9 +181,9 @@ export async function recordGoodsReceipt(poId, grnPayload = {}) {
       remainingQty: shortageQty,
       refundedQty,
       refundAmount: refundAmount || item.refundAmount,
-      isSettled: isItemRefunded ? true : item.isSettled,
-      claimResolution: isItemRefunded ? 'REFUND' : item.claimResolution,
-      replacementPendingQty: item.replacementPendingQty,
+      isSettled: isItemRefunded ? true : (hasDispute ? false : item.isSettled),
+      claimResolution: isItemRefunded ? 'REFUND' : (hasDispute ? null : item.claimResolution),
+      replacementPendingQty: hasDispute ? 0 : item.replacementPendingQty,
       isDamaged,
       hasDispute,
       disputeAction,
@@ -204,7 +206,7 @@ export async function recordGoodsReceipt(poId, grnPayload = {}) {
     nextStatus = 'COMPLETED';
   }
 
-  const isCompletedReceipt = allReceived || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED';
+  const isCompletedReceipt = !hasAnyClaim && grnPayload.statusOverride !== 'CLAIM_PENDING' && (allReceived || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED');
   if (isCompletedReceipt && !grnPayload.statusOverride) {
     nextStatus = 'COMPLETED';
   }
@@ -233,15 +235,48 @@ export async function recordGoodsReceipt(poId, grnPayload = {}) {
     statusAfterRound: nextStatus
   };
 
-  const updatedPO = {
-    ...currentPO,
-    items: updatedItems,
-    status: nextStatus,
-    hasGRN: true,
-    hasDispute: hasAnyClaim,
-    isInClaim: hasAnyClaim,
-    claimStatus: hasAnyClaim ? 'PENDING_CLAIM' : (currentPO.claimStatus || 'NONE'),
-    grnHistory: [...(currentPO.grnHistory || []), grnEntry],
+    const updatedStoreClaims = { ...(currentPO.storeClaims || {}) };
+    if (hasAnyClaim || grnPayload.statusOverride === 'CLAIM_PENDING') {
+      currentItems.forEach((item, idx) => {
+        const matchKey = item.productId || item.id || item.code || String(idx);
+        const inc = receiptMap.get(matchKey) || receiptMap.get(item.productId) || {};
+        const dam = Number(inc.damagedQty ?? inc.claimedQty ?? inc.ngQty) || 0;
+        const sho = Number(inc.shortageQty) || 0;
+        const sAct = inc.shortageAction || '';
+        const isDisputed = dam > 0 || (sho > 0 && sAct === 'CLAIM_SHORTAGE');
+        if (isDisputed) {
+          const sName = (item.actualStoreName || item.storeName || currentPO.actualStoreName || currentPO.storeName || currentPO.shopName || currentPO.vendorName || '').trim();
+          const plat = (item.storePlatform || item.platform || currentPO.storePlatform || currentPO.platform || 'Shopee').trim();
+          const sKey = sName ? `${plat}_${sName.toLowerCase()}` : (item.storeKey || `Shopee_item_${idx}`);
+          const resetEntry = {
+            isResolved: false,
+            status: 'PENDING_CLAIM',
+            claimStatus: 'PENDING_CLAIM',
+            type: null,
+            actionType: null,
+            reason: dam > 0 ? 'สินค้าชำรุด / แตกหักเสียหาย' : 'ร้านส่งของไม่ครบตามกล่อง (ขาดส่ง)',
+            description: inc.defectReason || inc.note || '',
+            defectNote: inc.defectReason || inc.note || ''
+          };
+          if (sKey) updatedStoreClaims[sKey] = resetEntry;
+          if (sName && sName !== sKey) updatedStoreClaims[sName] = resetEntry;
+        }
+      });
+    }
+
+    const updatedPO = {
+      ...currentPO,
+      items: updatedItems,
+      status: nextStatus,
+      hasGRN: true,
+      hasDispute: hasAnyClaim,
+      isInClaim: hasAnyClaim,
+      hasUnresolvedClaim: hasAnyClaim,
+      isCompleted: !hasAnyClaim && allReceived,
+      isClosed: !hasAnyClaim && (allReceived || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED'),
+      claimStatus: hasAnyClaim ? 'PENDING_CLAIM' : (currentPO.claimStatus || 'NONE'),
+      storeClaims: updatedStoreClaims,
+      grnHistory: [...(currentPO.grnHistory || []), grnEntry],
     ...(isCompletedReceipt ? {
       receivingInfo: {
         receiverName,
@@ -267,46 +302,9 @@ export async function recordGoodsReceipt(poId, grnPayload = {}) {
   pos[targetIdx] = updatedPO;
   storageService.savePOs(pos);
 
-  if (isGAS()) {
-    try {
-      const gasPoPayload = {
-        id: updatedPO.id,
-        poNo: updatedPO.poNo,
-        department: updatedPO.department,
-        status: updatedPO.status,
-        grNumber: grnNumber,
-        items: updatedPO.items,
-        history: updatedPO.history,
-        timeline: updatedPO.timeline,
-        activityLog: updatedPO.activityLog,
-        grnHistory: updatedPO.grnHistory,
-        ngItems: updatedPO.ngItems,
-        receivedBy: receiverName,
-        receiverName,
-        receivedAt: receivedAtIso,
-        receivingInfo: {
-          receiverName,
-          receiverSignature: receiverSig,
-          receivedAt: receivedAtIso
-        },
-        prId: updatedPO.prId,
-        prNo: updatedPO.prNo,
-        prNumber: updatedPO.prNumber
-      };
-      await callGAS('apiReceivePO', gasPoPayload);
-    } catch (gasErr) {
-      console.warn('[ProcurementContext] GAS apiReceivePO error:', gasErr.message);
-    }
-  } else {
-    try {
-      await apiService.receiveGoods(poId, incomingItems, grnPayload.receivedBy || { name: 'Staff', title: 'Inspector' }, grnPayload.note || '', {
-        grNumber: grnNumber,
-        grId: grnNumber
-      });
-    } catch {
-      // Graceful offline fallback
-    }
-  }
+  // STRICT SSOT: We no longer call apiReceivePO or apiService.receiveGoods here.
+  // Stock is handled exclusively by storageService.logStockMovements.
+  // PO saving is handled by the caller (e.g. ReceivingModal) via apiService.updatePO/callGAS('apiReceivePO').
 
   return { success: true, po: updatedPO, grn: grnEntry };
 }

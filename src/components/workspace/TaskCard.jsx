@@ -135,6 +135,7 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
         : `${task.items[0].name} (+${task.items.length - 1} รายการ)`)
     : (isPR ? 'ใบขอซื้อ' : 'ใบสั่งซื้อ'));
 
+  const isClaimActionPending = !isPR && task.isClaim === true && (activeTab === 'todo' || activeTab === 'action');
   const isPartialPO = !isPR && ['PARTIAL', 'PARTIAL_RECEIVED', 'WAITING_DELIVERY_ROUND_2'].includes(task.status) && (activeTab === 'todo' || activeTab === 'action');
   if (isPartialPO) {
     if (task.status === 'WAITING_DELIVERY_ROUND_2') {
@@ -282,22 +283,27 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
           </p>
         </div>
 
-        {isPartialPO ? (
-          <div className="flex gap-2 shrink-0">
-            {task.purchaseChannel !== 'ONLINE' && task.claimStatus !== 'PENDING' && task.claimStatus !== 'IN_CLAIM' && (
-              <button
-                type="button"
-                className="h-8 px-3.5 rounded-xl bg-amber-100 hover:bg-amber-200 text-amber-800 text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95 cursor-pointer"
-              >
-                ส่งเคลม / ติดต่อร้าน
-              </button>
+        {isClaimActionPending ? (
+          <button
+            type="button"
+            className="h-8 px-3.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95 whitespace-nowrap cursor-pointer shrink-0 max-w-[160px]"
+          >
+            <span className="truncate">จัดการเคลม / ติดต่อร้าน</span>
+            <span className="text-xs shrink-0">➔</span>
+          </button>
+        ) : isPartialPO ? (
+          <div className="flex items-center gap-2 shrink-0 max-w-[160px]">
+            {task.purchaseChannel !== 'ONLINE' && task.status !== 'WAITING_DELIVERY_ROUND_2' && task.claimStatus !== 'PENDING' && task.claimStatus !== 'IN_CLAIM' && (
+              <span className="text-[10px] font-medium text-amber-600 underline cursor-pointer hover:text-amber-800 whitespace-nowrap hidden sm:inline-block">
+                ส่งเคลม
+              </span>
             )}
             <button
               type="button"
-              className="h-8 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95 whitespace-nowrap cursor-pointer"
+              className="h-8 px-3.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center justify-between gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95 cursor-pointer w-full"
             >
-              <span>{task.status === 'WAITING_DELIVERY_ROUND_2' ? 'ตรวจรับรอบ 2 (สินค้าทดแทน)' : 'ตรวจรับรอบ 2'}</span>
-              <span className="text-xs">➔</span>
+              <span className="truncate">{task.status === 'WAITING_DELIVERY_ROUND_2' ? 'ตรวจรับรอบ 2' : 'ตรวจรับรอบ 2'}</span>
+              <span className="text-xs shrink-0">➔</span>
             </button>
           </div>
         ) : (

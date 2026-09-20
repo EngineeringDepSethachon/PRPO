@@ -3,6 +3,11 @@ import { workflowEngine } from '../services/workflowEngine';
 import { useAppContext } from '../context/AppContext';
 import { PR_STATUS, PO_STATUS } from '../config/constants';
 import { hasDepartmentAccess } from '../utils/permissions';
+import {
+  isCompletedTask as wsIsCompletedTask,
+  isInProgressTask as wsIsInProgressTask,
+  isToDoTask as wsIsToDoTask,
+} from '../services/workspaceService';
 import { 
   AlertCircle, Clock, CheckCircle2, ArrowRight, FileText, 
   Sparkles, Building2, Store, Loader2, Info, Calendar,
@@ -136,114 +141,17 @@ export default function WorkspaceView({
     return isNaN(doneDate.getTime()) ? true : doneDate >= THIRTY_DAYS_AGO;
   };
 
-  // Helper: ตรวจสอบงานที่ฉันต้องทำ (To Do)
-  const isTaskForMe = (task, user) => {
-    if (!user) return false;
-    if (task.docType === 'PR') {
-      const isDone = ['PO_ISSUED', 'APPROVED', 'CLOSED', 'CANCELLED', 'completed', 'received'].includes(task.status);
-      if (isDone) return false;
-      return workflowEngine.canAction(user, task);
-    }
-    if (task.docType === 'PO') {
-      const isDone = ['CLOSED', 'CANCELLED', 'RECEIVED', 'COMPLETED', 'COMPLETED_WITH_REFUND'].includes(task.status);
-      if (isDone) return false;
-      const isClaim = ['CLAIM_PENDING', 'CLAIM_REPORTED', 'CLAIM_IN_PROGRESS', 'PARTIALLY_RECEIVED_IN_CLAIM'].includes(task.status) || task.hasUnresolvedClaim;
-      if (isClaim) {
-        if (user?.id === 'ADMIN' || user?.roleId === 'ADMIN' || Number(user?.level || 1) >= 99) return true;
-        if (task.purchaseChannel === 'ONLINE' && (user?.roleId === 'ONLINE_PURCHASER' || user?.canOnlinePurchase)) return true;
-        // Block Requesters from seeing CLAIM_PENDING in To Do
-        return false;
-      }
-      return workflowEngine.canAction(user, task);
-    }
-    return false;
-  };
 
-  // Helper: ตรวจสอบงานที่เสร็จสิ้นแล้ว (Completed) - ปรับปรุงไม่ให้ Fallback ดูของคนอื่น
-  const isCompletedTask = (task, user) => {
-    const isPR = task.docType === 'PR';
-    
-    // สถานะที่เป็นงานจบ: COMPLETED, CLOSED, FORCE_CLOSED, REJECTED, CANCELLED
-    // หรือ PR ที่ถูกนำไปเปิด PO และรับของเสร็จสิ้นครบถ้วนแล้ว
-    let isDone = false;
-    if (isPR) {
-      isDone = ['COMPLETED', 'CLOSED', 'FORCE_CLOSED', 'REJECTED', 'CANCELLED', 'PO_ISSUED', 'APPROVED', 'completed', 'received'].includes(task.status);
-    } else {
-      isDone = ['COMPLETED', 'CLOSED', 'FORCE_CLOSED', 'REJECTED', 'CANCELLED', 'RECEIVED', 'COMPLETED_WITH_REFUND'].includes(task.status);
-    }
-    
-    if (!isDone) return false;
+  // ผลักวัน isTaskForMe → wsIsToDoTask (เจ้าเดียว To-Do ทั้งระบบ)
+  // กฎเหล็ก: REQUESTER + CLAIM_PENDING/WAITING_DELIVERY_ROUND_2 → false เสมอ (บล็อกใน workspaceService แล้ว)
+  const isTaskForMe = (task, user) => wsIsToDoTask(task, user);
 
-    // Admin sees all completed tasks
-    if (user?.id === 'ADMIN' || user?.roleId === 'ADMIN' || Number(user?.level || 1) >= 99) return true;
-    
-    // For normal users, only show in their completed tab if they were directly involved
-    const wasRequester = 
-      isUserMatched(task.requestedBy, user) || 
-      isUserMatched(task.applicantName1, user) || 
-      isUserMatched(task.createdBy, user) || 
-      task.requesterId === user?.id;
-      
-    const wasInLog = task.activityLog?.some(l => 
-      isUserMatched(l.user, user) || 
-      (user?.title && l.role === user.title)
-    );
-    
-    return wasRequester || wasInLog;
-  };
+  // ── Delegate to workspaceService (canonical implementations) ──
+  // isCompletedTask: ใช้ isUserStakeholder ครอบคลุมทุก role + allPRs backward compat
+  const isCompletedTask = (task, user) => wsIsCompletedTask(task, user, prs);
 
-  // 1.1 ขยายขอบเขตการตรวจสอบผู้เกี่ยวข้อง (Participant Matching)
-  const isUserParticipant = (doc, currentUser) => {
-    if (!doc || !currentUser) return false;
-    // 1. ผู้สร้างคำขอ (Requester)
-    const isRequester = 
-      isUserMatched(doc.createdBy, currentUser) || 
-      isUserMatched(doc.requestedBy, currentUser) ||
-      isUserMatched(doc.applicantName1, currentUser) ||
-      isUserMatched(doc.requesterEmail, currentUser) || 
-      isUserMatched(doc.requesterName, currentUser) ||
-      doc.requesterId === currentUser?.id;
-      
-    // 2. ผู้รีวิว/ตรวจสอบ (Reviewer/Assistant)
-    const isReviewer = 
-      isUserMatched(doc.reviewedBy, currentUser) || 
-      (Array.isArray(doc.reviewers) && doc.reviewers.some(r => isUserMatched(r, currentUser)));
-      
-    // 3. ผู้อนุมัติ (Approver)
-    const isApprover = isUserMatched(doc.approvedBy, currentUser);
-    
-    // 4. ประวัติการทำงาน (Timeline/History)
-    const isHistoryMatch = 
-      (Array.isArray(doc.history) && doc.history.some(h => isUserMatched(h.user || h.by || h.name, currentUser))) ||
-      (Array.isArray(doc.timeline) && doc.timeline.some(t => isUserMatched(t.user || t.by || t.name, currentUser))) ||
-      (Array.isArray(doc.activityLog) && doc.activityLog.some(l => isUserMatched(l.user, currentUser) || (currentUser?.title && l.role === currentUser.title)));
-      
-    return isRequester || isReviewer || isApprover || isHistoryMatch;
-  };
-
-  // Helper: ตรวจสอบงานที่รอผู้อื่นดำเนินการ (In Progress)
-  const isInProgressTask = (task, user) => {
-    // 1. ณ ปัจจุบัน ผู้ใช้ไม่มี Action ที่ต้องกดทำรายการเอง (ไม่อยู่ในแท็บ To Do)
-    if (isTaskForMe(task, user)) return false;
-    
-    // 2. เอกสารยังไม่จบวงจร (ไม่เป็น COMPLETED, CLOSED, ฯลฯ)
-    const isPR = task.docType === 'PR';
-    let isDone = false;
-    if (isPR) {
-      isDone = ['COMPLETED', 'CLOSED', 'FORCE_CLOSED', 'REJECTED', 'CANCELLED', 'PO_ISSUED', 'APPROVED', 'completed', 'received'].includes(task.status);
-    } else {
-      isDone = ['COMPLETED', 'CLOSED', 'FORCE_CLOSED', 'REJECTED', 'CANCELLED', 'RECEIVED', 'COMPLETED_WITH_REFUND'].includes(task.status);
-    }
-    if (isDone) return false;
-
-    // Admin sees everything not done
-    const roleId = String(user?.roleId || user?.id || '').toUpperCase();
-    const userLevel = Number(user?.level || 1);
-    if (roleId === 'ADMIN' || user?.role === 'admin' || userLevel >= 99) return true;
-
-    // 3. ผู้ใช้มีส่วนร่วมกับเอกสาร (Participant)
-    return isUserParticipant(task, user);
-  };
+  // isInProgressTask: ใช้ isUserStakeholder + deduplication via allPOs
+  const isInProgressTask = (task, user) => wsIsInProgressTask(task, user, prs, pos);
 
   // 2. กรองข้อมูลตาม Tab ปัจจุบัน โดยไม่พึ่งพา Side-Effect State (Pure useMemo)
   const currentTabTasks = useMemo(() => {

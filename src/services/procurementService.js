@@ -20,7 +20,7 @@ export const isPendingPurchaseOrder = (po) => {
   // 2. หรือยังไม่มีการบันทึกการสั่งซื้อจริง (Fallback check)
   // 🛡️ ต้องไม่ใช่ใบที่อยู่ระหว่างรอเคลม และไม่ใช่ใบที่สั่งซื้อแล้ว (เช่น ORDERED, IN_TRANSIT, IN_DELIVERY)
   const isClaimStatus = po.status === 'CLAIM_PENDING' || po.status === 'IN_CLAIM' || po.status === 'PARTIALLY_RECEIVED_IN_CLAIM' || po.isInClaim;
-  const isOrderedStatus = s === 'ORDERED' || s === 'ORDERED_PENDING_DELIVERY' || s === 'IN_TRANSIT' || s === 'IN_DELIVERY' || s === 'PARTIALLY_RECEIVED' || s === 'PARTIAL_RECEIVED' || s === 'PARTIALLY_RECEIVED_WAITING_DELIVERY';
+  const isOrderedStatus = s === 'ORDERED' || s === 'ORDERED_PENDING_DELIVERY' || s === 'IN_TRANSIT' || s === 'IN_DELIVERY' || s === 'PARTIALLY_RECEIVED' || s === 'PARTIAL_RECEIVED' || s === 'PARTIALLY_RECEIVED_WAITING_DELIVERY' || s === 'WAITING_DELIVERY_ROUND_2' || s.startsWith('WAITING_DELIVERY');
   return !po.purchasedAt && !po.orderedAt && !po.isPurchased && !isClaimStatus && !isOrderedStatus && !hasUnresolvedClaim(po);
 };
 
@@ -40,9 +40,8 @@ export const isPendingClaimOrder = (po) => {
 export const calculateProcurementBadgeCount = (orders = []) => {
   if (!Array.isArray(orders)) return 0;
   return orders.filter(po => {
-    // กรองเฉพาะ PO ประเภทออนไลน์
-    const isOnlinePO = po.purchaseType === 'ONLINE' || po.purchaseChannel === 'ONLINE' || po.isOnline || (po.platform && po.platform !== '-');
-    if (!isOnlinePO) return false;
+    // กรองเฉพาะ PO ที่มี purchaseChannel === 'ONLINE' (ให้ตรงกับ OnlineTaskView.jsx)
+    if (po.purchaseChannel !== 'ONLINE') return false;
 
     return isPendingPurchaseOrder(po) || isPendingClaimOrder(po);
   }).length;

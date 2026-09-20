@@ -69,13 +69,15 @@ export function hasUnresolvedClaim(po) {
   const s = String(po.status || '').toLowerCase();
   const statusUpper = s.toUpperCase();
 
-  // If PO is already closed/completed/cancelled/resolved, it must NEVER be in CLAIM
-  if (isOrderClosed(statusUpper) || po.claimStatus === 'RESOLVED' || po.claimStatus === 'REFUNDED') {
+  const isExplicitClaimStatus = s === 'claim_pending' || s === 'in_claim' || s === 'partially_received_in_claim' || Boolean(po.isInClaim) || po.claimStatus === 'PENDING_CLAIM' || po.claimStatus === 'IN_CLAIM' || Boolean(po.hasUnresolvedClaim);
+
+  // If PO is already closed/completed/cancelled/resolved, it must NEVER be in CLAIM unless explicitly in claim
+  if (!isExplicitClaimStatus && (isOrderClosed(statusUpper) || po.claimStatus === 'RESOLVED' || po.claimStatus === 'REFUNDED')) {
     return false;
   }
 
   // If dispute flags are cleared, PO is no longer in claim
-  if (po.hasDispute === false && !po.isInClaim && !s.includes('claim')) {
+  if (po.hasDispute === false && !po.isInClaim && !isExplicitClaimStatus && !s.includes('claim')) {
     return false;
   }
 
@@ -95,6 +97,11 @@ export function hasUnresolvedClaim(po) {
   // Identify genuine claim items (excluding WAIT_NEXT_ROUND and received in full)
   const items = Array.isArray(po.items) ? po.items : [];
   const realClaimItems = items.filter(i => {
+    // Only permanently settled items (REFUND/WRITE_OFF) are excluded from claims
+    // Items with REPLACEMENT that still have damagedQty > 0 or active disputes must NOT be ignored
+    const isPermanentSettled = i.claimResolution === 'REFUND' || i.claimResolution === 'WRITE_OFF';
+    if (isPermanentSettled) return false;
+
     const damaged = Number(i.damagedQty ?? i.defectQty ?? i.claimedQty ?? 0);
     const shortage = Number(i.shortageQty ?? 0);
     const isWaitNext = i.shortageAction === 'WAIT_NEXT_ROUND' || 
@@ -105,11 +112,11 @@ export function hasUnresolvedClaim(po) {
     if (shortage > 0 && !isWaitNext) {
       return true;
     }
+    if (i.hasDispute && !isWaitNext) return true;
     return false;
   });
 
   const hasLegacyDisputeFlag = Boolean(po.hasDispute || po.isInClaim || po.disputeDetails);
-  const isExplicitClaimStatus = s === 'claim_pending' || s === 'in_claim' || s === 'partially_received_in_claim' || Boolean(po.isInClaim);
   if (!isExplicitClaimStatus && realClaimItems.length === 0 && !(hasLegacyDisputeFlag && poHasGRN)) {
     return false;
   }

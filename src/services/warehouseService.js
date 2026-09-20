@@ -126,6 +126,18 @@ export const warehouseService = {
     const timestamp = grnPayload.receivedDate || new Date().toLocaleString('th-TH');
     const isoTimestamp = new Date().toISOString();
 
+    const isOnlinePO = Boolean(
+      targetPO.purchaseChannel === 'ONLINE' ||
+      targetPO.purchaseType === 'ONLINE' ||
+      targetPO.isOnlinePO ||
+      targetPO.storeName ||
+      grnPayload.isOnlinePO ||
+      grnPayload.hasClaimRequest ||
+      grnPayload.isClaim ||
+      grnPayload.disputeAction === 'CLAIM' ||
+      grnPayload.button === 'claim'
+    );
+
     const incomingItems = grnPayload.receivingItems || grnPayload.items || [];
     const processedLogs = [];
     const processedProducts = [];
@@ -258,13 +270,16 @@ export const warehouseService = {
       const actualReceived = prevReceived + thisReceived;
       const actualDamaged = prevDamaged + thisDamaged;
       const actualShortage = Math.max(0, orderedQty - actualReceived - refundedQty - actualDamaged);
-      const shortageAction = inc.shortageAction || (inc.shortageReason === 'SPLIT_SHIPMENT' ? 'WAIT_NEXT_ROUND' : (actualShortage > 0 ? 'CLAIM_SHORTAGE' : ''));
-      const isWaitNextRound = shortageAction === 'WAIT_NEXT_ROUND' || inc.shortageReason === 'SPLIT_SHIPMENT' || inc.disputeAction === 'WAIT_NEXT_ROUND';
+      const shortageAction = (isOnlinePO && actualShortage > 0)
+        ? 'CLAIM_SHORTAGE'
+        : (inc.shortageAction || (inc.shortageReason === 'SPLIT_SHIPMENT' ? 'WAIT_NEXT_ROUND' : (actualShortage > 0 ? 'CLAIM_SHORTAGE' : '')));
+      const isWaitNextRound = !isOnlinePO && (shortageAction === 'WAIT_NEXT_ROUND' || inc.shortageReason === 'SPLIT_SHIPMENT' || inc.disputeAction === 'WAIT_NEXT_ROUND');
 
       const isDamaged = actualDamaged > 0;
-      const hasDispute = (actualDamaged > 0) || (actualShortage > 0 && shortageAction === 'CLAIM_SHORTAGE');
-      const disputeAction = isWaitNextRound ? 'WAIT_NEXT_ROUND' : (hasDispute ? 'CLAIM' : 'NONE');
-      const disputedQty = hasDispute ? (actualDamaged + (shortageAction === 'CLAIM_SHORTAGE' ? actualShortage : 0)) : actualDamaged;
+      const isShortage = actualShortage > 0;
+      const hasDispute = isOnlinePO ? (isDamaged || isShortage) : (isDamaged || (isShortage && shortageAction === 'CLAIM_SHORTAGE'));
+      const disputeAction = isOnlinePO ? (hasDispute ? 'CLAIM' : 'NONE') : (isWaitNextRound ? 'WAIT_NEXT_ROUND' : (hasDispute ? 'CLAIM' : 'NONE'));
+      const disputedQty = hasDispute ? (actualDamaged + ((isOnlinePO || shortageAction === 'CLAIM_SHORTAGE') ? actualShortage : 0)) : actualDamaged;
 
       return {
         ...poItem,
@@ -292,32 +307,43 @@ export const warehouseService = {
     });
 
     // Update PO activity & status (Rule 1: Lock PO to CLAIM_PENDING on defects or shortage)
-    const anyItemHasDispute = targetPO.items.some(it => it.hasDispute);
-    const anyItemDefectOrShortage = targetPO.items.some(it => 
-      (Number(it.damagedQty || it.ngQty || 0) > 0) || 
-      (Number(it.shortageQty || 0) > 0 && it.shortageAction !== 'WAIT_NEXT_ROUND' && it.shortageReason !== 'SPLIT_SHIPMENT')
-    );
-    const isClaimRequired = anyItemHasDispute || anyItemDefectOrShortage;
-    const allItemsFullyReceived = targetPO.items.every(it => it.shortageQty === 0 && it.damagedQty === 0);
-    const anyWaitingRound2 = targetPO.items.some(it => it.shortageAction === 'WAIT_NEXT_ROUND' || it.shortageReason === 'SPLIT_SHIPMENT');
+    const hasDefect = targetPO.items.some(it => Number(it.damagedQty || it.ngQty || 0) > 0);
+    const hasShortage = targetPO.items.some(it => Number(it.shortageQty || 0) > 0);
+    const allItemsFullyReceived = targetPO.items.every(it => Number(it.shortageQty || 0) === 0 && Number(it.damagedQty || 0) === 0);
+
+    const isClaimRequired = isOnlinePO 
+      ? (hasDefect || hasShortage) 
+      : (hasDefect || targetPO.items.some(it => it.hasDispute || (Number(it.shortageQty || 0) > 0 && it.shortageAction === 'CLAIM_SHORTAGE')));
 
     targetPO.hasGRN = true;
-    targetPO.hasDispute = isClaimRequired;
-    targetPO.isInClaim = isClaimRequired;
+    targetPO.hasDispute = Boolean(isClaimRequired);
+    targetPO.isInClaim = Boolean(isClaimRequired);
 
-    // กฎเหล็ก: เมื่อพบของชำรุด (ngQty > 0) หรือของขาด (shortageQty > 0) ให้ตั้งสถานะ PO เป็น CLAIM_PENDING เท่านั้น
-    // ห้ามตั้งเป็น WAITING_DELIVERY_ROUND_2, PARTIALLY_DELIVERED, หรือสถานะรอบ 2 ใด ๆ ทั้งสิ้นในขั้นตอนนี้
-    if (isClaimRequired) {
-      targetPO.status = 'CLAIM_PENDING';
-      targetPO.claimStatus = 'PENDING_CLAIM';
-    } else if (grnPayload.statusOverride) {
-      targetPO.status = grnPayload.statusOverride;
-    } else if (anyWaitingRound2) {
-      targetPO.status = 'WAITING_DELIVERY_ROUND_2';
-    } else if (allItemsFullyReceived) {
-      targetPO.status = 'COMPLETED';
+    // กฎเหล็ก: ไม่ว่าจะเป็นของเสีย หรือของขาดส่ง ตราบใดที่มีของไม่ครบ = ต้องเข้า CLAIM_PENDING เท่านั้น!
+    // ห้ามแตะกิ่ง WAITING_DELIVERY_ROUND_2 เด็ดขาดในจังหวะบันทึก GRN!
+    // สถานะ WAITING_DELIVERY_ROUND_2 มีสิทธิ์เกิดขึ้นได้ที่เดียวคือ "ฝ่ายจัดซื้อออนไลน์กดเลือก 'ร้านค้าส่งสินค้าใหม่ทดแทน' ในหน้า Online Procurement Hub" เท่านั้น!
+    if (isOnlinePO) {
+      if (hasDefect || hasShortage) {
+        targetPO.status = 'CLAIM_PENDING';
+        targetPO.claimStatus = 'PENDING_CLAIM';
+      } else if (grnPayload.statusOverride) {
+        targetPO.status = grnPayload.statusOverride;
+      } else if (allItemsFullyReceived) {
+        targetPO.status = 'COMPLETED';
+      } else {
+        targetPO.status = 'PARTIAL';
+      }
     } else {
-      targetPO.status = 'PARTIAL';
+      if (hasDefect || (hasShortage && targetPO.items.some(it => it.hasDispute || it.shortageAction === 'CLAIM_SHORTAGE'))) {
+        targetPO.status = 'CLAIM_PENDING';
+        targetPO.claimStatus = 'PENDING_CLAIM';
+      } else if (grnPayload.statusOverride) {
+        targetPO.status = grnPayload.statusOverride;
+      } else if (allItemsFullyReceived) {
+        targetPO.status = 'COMPLETED';
+      } else {
+        targetPO.status = 'PARTIAL';
+      }
     }
 
     // Rule 2: บันทึกหลักฐานการตรวจรับ (Evidence Persistence)

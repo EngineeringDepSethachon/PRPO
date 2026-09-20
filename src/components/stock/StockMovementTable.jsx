@@ -256,7 +256,12 @@ export default function StockMovementTable({
       return [initialSyntheticLog];
     }
 
-    return rawProductLogs;
+    // ตัดข้อมูลซ้ำซ้อน (Deduplication) ของประวัติสต็อก
+    const uniqueLogs = Array.from(
+      new Map(rawProductLogs.map(item => [item.id || `${item.timestamp}_${item.type}_${item.documentNo}`, item])).values()
+    );
+
+    return uniqueLogs;
   }, [rawProductLogs, selectedProduct]);
 
   // Persist self-healed initial balance log to storage & backend if missing
@@ -551,7 +556,15 @@ export default function StockMovementTable({
                 <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
                   <span className="font-mono font-semibold">[{selectedProduct.code}] {selectedProduct.name}</span>
                   <span>•</span>
-                  <span>คงเหลือ: <span className="font-bold text-indigo-600 font-mono tabular-nums">{selectedProduct.stockBalance}</span> {selectedProduct.unit}</span>
+                  <span>คงเหลือ: <span className="font-bold text-indigo-600 font-mono tabular-nums">{selectedProduct.stockBalance}</span> {selectedProduct.stockUnit || selectedProduct.baseUom || selectedProduct.unit || 'ชิ้น'}</span>
+                  {Number(selectedProduct.conversionRate || selectedProduct.conversionRatio) > 1 && (selectedProduct.purchaseUnit || selectedProduct.purchaseUom) && (
+                    <>
+                      <span>•</span>
+                      <span className="text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded font-sans">
+                        (1 {selectedProduct.purchaseUnit || selectedProduct.purchaseUom} = {Number(selectedProduct.conversionRate || selectedProduct.conversionRatio).toLocaleString()} {selectedProduct.stockUnit || selectedProduct.baseUom || selectedProduct.unit || 'ชิ้น'})
+                      </span>
+                    </>
+                  )}
                   {selectedProduct.locationName && (
                     <>
                       <span>•</span>
@@ -730,6 +743,20 @@ export default function StockMovementTable({
                     const rawNote = log.notes || log.note || log.remark || log.remarks || '';
                     const noteText = String(rawNote).trim();
                     const isNoteLong = noteText.length > 25;
+                    const itemStockUnit = selectedProduct?.stockUnit || selectedProduct?.baseUom || selectedProduct?.unit || log.stockUnit || log.unit || 'ชิ้น';
+                    const purchaseUnit = log.purchaseUnit || log.purchaseUom || (selectedProduct?.purchaseUnit && selectedProduct?.purchaseUnit !== itemStockUnit ? selectedProduct?.purchaseUnit : null);
+                    const conversionRate = Number(log.conversionRate || log.conversionRatio || selectedProduct?.conversionRate || selectedProduct?.conversionRatio || 1);
+
+                    let dualUomText = null;
+                    if (purchaseUnit && purchaseUnit !== itemStockUnit && conversionRate > 1) {
+                      const purchaseQty = log.receivedQty !== undefined && log.receivedQty !== null && Number(log.receivedQty) > 0
+                        ? Number(log.receivedQty)
+                        : (Math.abs(Number(log.changeQty ?? log.quantity ?? log.qty ?? 0)) / conversionRate);
+                      if (purchaseQty > 0) {
+                        const formattedPurchaseQty = Number.isInteger(purchaseQty) ? purchaseQty : Number(purchaseQty.toFixed(2));
+                        dualUomText = `${formattedPurchaseQty.toLocaleString()} ${purchaseUnit}`;
+                      }
+                    }
 
                     return (
                       <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
@@ -774,14 +801,33 @@ export default function StockMovementTable({
                         <td className={`py-3 px-3 text-right font-mono font-bold tabular-nums whitespace-nowrap ${
                           isIncoming ? 'text-emerald-700' : 'text-rose-700'
                         }`}>
-                          {isIncoming
-                            ? `+${Math.abs(Number(log.changeQty ?? log.quantity ?? log.qty ?? 0)).toLocaleString()}`
-                            : `-${Math.abs(Number(log.changeQty ?? log.quantity ?? log.qty ?? 0)).toLocaleString()}`}
+                          <div className="flex items-baseline justify-end gap-1">
+                            <span>
+                              {isIncoming
+                                ? `+${Math.abs(Number(log.changeQty ?? log.quantity ?? log.qty ?? 0)).toLocaleString()}`
+                                : `-${Math.abs(Number(log.changeQty ?? log.quantity ?? log.qty ?? 0)).toLocaleString()}`}
+                            </span>
+                            <span className="text-xs font-normal font-sans opacity-90">
+                              {itemStockUnit}
+                            </span>
+                            {dualUomText && (
+                              <span className="text-[11px] font-normal font-sans text-slate-400 ml-0.5" title={`แปลงจากหน่วยสั่งซื้อ: ${dualUomText}`}>
+                                ({dualUomText})
+                              </span>
+                            )}
+                          </div>
                         </td>
 
                         {/* 5. Balance */}
                         <td className="py-3 px-3 text-right font-mono font-bold text-slate-900 tabular-nums whitespace-nowrap">
-                          {Number(log.balanceAfter ?? log.balance ?? 0).toLocaleString()}
+                          <div className="flex items-baseline justify-end gap-1">
+                            <span>
+                              {Number(log.balanceAfter ?? log.balance ?? 0).toLocaleString()}
+                            </span>
+                            <span className="text-xs font-normal font-sans text-slate-500">
+                              {itemStockUnit}
+                            </span>
+                          </div>
                         </td>
 
                         {/* 6. PO Number */}

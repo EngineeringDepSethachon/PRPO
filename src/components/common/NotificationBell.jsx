@@ -29,13 +29,8 @@ export default function NotificationBell({ currentRole, onClick, count, classNam
     return (raw || []).filter(n => notificationService.isNotificationTarget(n, currentRole));
   }, [contextNotifications, serviceNotifs, currentRole]);
 
-  // Reactive Task Sync with "งานของฉัน" (My Tasks)
-  const userTasks = useMemo(() => {
-    if (!context?.prs && !context?.pos) return null;
-    return workflowEngine.getUserTasks(currentRole, context?.prs, context?.pos);
-  }, [currentRole, context?.prs, context?.pos]);
-
-  const taskTotal = userTasks?.counts?.total;
+  // Reactive Task Sync with "งานของฉัน" (My Tasks) - Single Source of Truth
+  const taskTotal = context?.globalTodoCount;
 
   const unreadCount = useMemo(() => {
     if (count !== undefined) return count;

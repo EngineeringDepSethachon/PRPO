@@ -10,6 +10,7 @@ import { modalService } from '../services/modalService';
 import { getUserDepartments, matchDepartment } from '../utils/permissions';
 import { getUnifiedProductList } from '../views/PRCreateView';
 import { normalizeRole, useAuth } from './AuthContext';
+import { isToDoTask } from '../services/workspaceService';
 
 export const AppContext = createContext(null);
 
@@ -109,14 +110,6 @@ export function AppProvider({ children }) {
   const [prs, setPRs] = useState([]);
   const [pos, setPOs] = useState([]);
   const [stockLogs, setStockLogs] = useState([]);
-  const [notifications, setNotifications] = useState([]);
-  const [readNotifIds, setReadNotifIds] = useState(() => {
-    try {
-      const auth = authService.getCurrentSession() || DEFAULT_EMPLOYEE_ACCOUNTS[0];
-      const name = auth?.name || auth?.username;
-      return notificationService.getReadNotificationIds?.(name) || [];
-    } catch { return []; }
-  });
   const [budgetSummary, setBudgetSummary] = useState(null);
   const [budgetTransactions, setBudgetTransactions] = useState([]);
 
@@ -141,7 +134,6 @@ export function AppProvider({ children }) {
       const cachedPRs = storageService.getPRs() || [];
       const cachedPOs = storageService.getPOs() || [];
       const cachedLogs = storageService.getStockLogs() || [];
-      const cachedNotifs = storageService.getNotifications() || [];
       const cachedTxs = storageService.getBudgetTransactions() || [];
 
       if (cachedProds.length > 0) setProducts(getUnifiedProductList(cachedProds));
@@ -153,7 +145,6 @@ export function AppProvider({ children }) {
       if (cachedPRs.length > 0) setPRs(cachedPRs);
       if (cachedPOs.length > 0) setPOs(cachedPOs);
       if (cachedLogs.length > 0) setStockLogs(cachedLogs);
-      if (cachedNotifs.length > 0) setNotifications(cachedNotifs);
       if (cachedTxs.length > 0) setBudgetTransactions(cachedTxs);
       
       const cachedSummary = workflowEngine.calculateBudgetSummary();
@@ -183,8 +174,7 @@ export function AppProvider({ children }) {
           vendors: vendorsData,
           storageLocations: locsData,
           usageUnits: unitsData,
-          budgetTransactions: txsData,
-          notifications: notisData
+          budgetTransactions: txsData
         } = bootstrapData;
 
         // Prioritize master products list (prodsData), enrich with inventory stock (invData)
@@ -836,9 +826,11 @@ export function AppProvider({ children }) {
       const hasDispute = isDamaged || (shortageQty > 0 && disputeAction !== 'WAIT_NEXT_ROUND');
 
       if (hasDispute) hasAnyClaim = true;
+      if (shortageQty > 0 || hasDispute || thisDamaged > 0 || newDamaged > 0 || (newReceived + refundedQty < orderedQty)) {
+        allReceived = false;
+      }
       if (shortageQty > 0) {
         hasAnyShortage = true;
-        allReceived = false;
       }
 
       roundSummary.push({
@@ -855,6 +847,8 @@ export function AppProvider({ children }) {
         defectReason: inc.defectReason || inc.note || ''
       });
 
+      const hasItemDispute = thisDamaged > 0 || (shortageQty > 0 && disputeAction !== 'WAIT_NEXT_ROUND');
+
       return {
         ...item,
         orderedQty,
@@ -867,9 +861,9 @@ export function AppProvider({ children }) {
         remainingQty: shortageQty,
         refundedQty,
         refundAmount: refundAmount || item.refundAmount,
-        isSettled: isItemRefunded ? true : item.isSettled,
-        claimResolution: isItemRefunded ? 'REFUND' : item.claimResolution,
-        replacementPendingQty: item.replacementPendingQty,
+        isSettled: isItemRefunded ? true : (hasItemDispute ? false : item.isSettled),
+        claimResolution: isItemRefunded ? 'REFUND' : (hasItemDispute ? null : item.claimResolution),
+        replacementPendingQty: hasItemDispute ? 0 : item.replacementPendingQty,
         isDamaged,
         hasDispute,
         disputeAction,
@@ -885,12 +879,14 @@ export function AppProvider({ children }) {
     } else if (hasAnyClaim) {
       nextStatus = 'PARTIALLY_RECEIVED_IN_CLAIM';
     } else if (hasAnyShortage) {
-      nextStatus = grnPayload.waitingRound2 ? 'WAITING_DELIVERY_ROUND_2' : 'PARTIAL';
+      // กฎเหล็ก: waitingRound2 flag ใน GRN payload ห้ามบังคับสถานะไป WAITING_DELIVERY_ROUND_2
+      // WAITING_DELIVERY_ROUND_2 เกิดได้เฟ้นแฟลละงที่เดียว: Online Purchaser กด "ส่งสินค้าทดแทน" ใน Online Hub
+      nextStatus = 'PARTIAL';
     } else if (allReceived) {
       nextStatus = 'COMPLETED';
     }
 
-    const isCompletedReceipt = allReceived || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED';
+    const isCompletedReceipt = !hasAnyClaim && grnPayload.statusOverride !== 'CLAIM_PENDING' && (allReceived || nextStatus === 'CLOSED' || nextStatus === 'COMPLETED');
     if (isCompletedReceipt) {
       nextStatus = 'COMPLETED';
     }
@@ -919,11 +915,54 @@ export function AppProvider({ children }) {
       statusAfterRound: nextStatus
     };
 
+    const updatedStoreClaims = { ...(currentPO.storeClaims || {}) };
+    if (hasAnyClaim || grnPayload.statusOverride === 'CLAIM_PENDING') {
+      currentItems.forEach((item, idx) => {
+        const matchKey = item.productId || item.id || item.code || String(idx);
+        const inc = receiptMap.get(matchKey) || receiptMap.get(item.productId) || {};
+        const dam = Number(inc.damagedQty ?? inc.claimedQty ?? inc.ngQty) || 0;
+        const sho = Number(inc.shortageQty) || 0;
+        const sAct = inc.shortageAction || '';
+        const isDisputed = dam > 0 || (sho > 0 && sAct === 'CLAIM_SHORTAGE');
+        if (isDisputed) {
+          const sName = (item.actualStoreName || item.storeName || currentPO.actualStoreName || currentPO.storeName || currentPO.shopName || currentPO.vendorName || '').trim();
+          const plat = (item.storePlatform || item.platform || currentPO.storePlatform || currentPO.platform || 'Shopee').trim();
+          const sKey = sName ? `${plat}_${sName.toLowerCase()}` : (item.storeKey || `Shopee_item_${idx}`);
+          const resetEntry = {
+            isResolved: false,
+            status: 'PENDING_CLAIM',
+            claimStatus: 'PENDING_CLAIM',
+            type: null,
+            actionType: null,
+            reason: dam > 0 ? 'สินค้าชำรุด / แตกหักเสียหาย' : 'ร้านส่งของไม่ครบตามกล่อง (ขาดส่ง)',
+            description: inc.defectReason || inc.note || '',
+            defectNote: inc.defectReason || inc.note || ''
+          };
+          if (sKey) updatedStoreClaims[sKey] = resetEntry;
+          if (sName && sName !== sKey) updatedStoreClaims[sName] = resetEntry;
+        }
+      });
+    }
+
     const updatedPO = {
       ...currentPO,
       items: updatedItems,
       status: nextStatus,
+      storeClaims: updatedStoreClaims,
       grnHistory: [...(currentPO.grnHistory || []), grnEntry],
+      ...(hasAnyClaim || grnPayload.statusOverride === 'CLAIM_PENDING' ? {
+        claimStatus: 'PENDING_CLAIM',
+        hasDispute: true,
+        isInClaim: true,
+        hasUnresolvedClaim: true,
+        isCompleted: false,
+        isClosed: false
+      } : {}),
+      ...(grnPayload.claimEvidence ? {
+        claimEvidence: grnPayload.claimEvidence,
+        disputeInfo: grnPayload.claimEvidence,
+        claimData: grnPayload.claimEvidence
+      } : {}),
       ...(isCompletedReceipt ? {
         receivingInfo: {
           receiverName,
@@ -950,45 +989,9 @@ export function AppProvider({ children }) {
     storageService.savePOs(currentPOs);
     setPOs([...currentPOs]);
 
-    if (isGAS()) {
-      try {
-        const gasPoPayload = {
-          id: updatedPO.id,
-          poNo: updatedPO.poNo,
-          department: updatedPO.department,
-          status: updatedPO.status,
-          grNumber: grnNumber,
-          items: updatedPO.items,
-          history: updatedPO.history,
-          timeline: updatedPO.timeline,
-          activityLog: updatedPO.activityLog,
-          grnHistory: updatedPO.grnHistory,
-          ngItems: updatedPO.ngItems,
-          receivedBy: receiverName,
-          receiverName: receiverName,
-          receivedAt: receivedAtIso,
-          receivingInfo: {
-            receiverName,
-            receiverSignature: receiverSig,
-            receivedAt: receivedAtIso
-          },
-          prId: updatedPO.prId,
-          prNo: updatedPO.prNo,
-          prNumber: updatedPO.prNumber,
-          currentUser: currentRole
-        };
-        await callGAS('apiReceivePO', gasPoPayload);
-      } catch (gasErr) {
-        console.warn('[AppContext] GAS apiReceivePO error in handleRecordGoodsReceipt:', gasErr.message);
-      }
-    } else {
-      try {
-        await apiService.receiveGoods(poId, incomingItems, currentRole, grnPayload.note || '', {
-          grNumber: grnNumber,
-          grId: grnNumber
-        });
-      } catch {}
-    }
+    // STRICT SSOT: We no longer call apiReceivePO or apiService.receiveGoods here.
+    // Stock is handled exclusively by storageService.logStockMovements.
+    // PO saving is handled by the caller (e.g. ReceivingModal) via apiService.updatePO/callGAS('apiReceivePO').
 
     setTimeout(() => { loadAllData(true); }, 1500);
     return { success: true, po: updatedPO, grn: grnEntry };
@@ -1517,51 +1520,15 @@ export function AppProvider({ children }) {
     };
   }, [currentUser, currentRole]);
 
-  const handleMarkNotificationAsRead = useCallback(async (id) => {
-    const userName = currentUser?.name || currentUser?.username || currentRole?.name || currentRole?.username;
-    
-    setReadNotifIds(prev => {
-      if (prev.includes(id)) return prev;
-      const next = [...prev, id];
-      if (notificationService?.saveReadNotificationIds) {
-        notificationService.saveReadNotificationIds(userName, next);
-      }
-      return next;
-    });
 
-    setNotifications(prev => prev.map(n => (n.id === id || n._id === id) ? { ...n, isRead: true, read: true, status: 'read' } : n));
-    
-    if (notificationService?.markAsRead) {
-      await notificationService.markAsRead(id, userName);
-    }
-  }, [currentUser, currentRole]);
-
-  const handleMarkAllNotificationsAsRead = useCallback(async () => {
-    const userName = currentUser?.name || currentUser?.username || currentRole?.name || currentRole?.username;
-    
-    setNotifications(prev => {
-      const updated = prev.map(n => ({ ...n, isRead: true, read: true, status: 'read' }));
-      setReadNotifIds(rPrev => {
-        const next = [...new Set([...rPrev, ...updated.map(n => n.id || n._id)])];
-        if (notificationService?.saveReadNotificationIds) {
-          notificationService.saveReadNotificationIds(userName, next);
-        }
-        return next;
-      });
-      return updated;
-    });
-
-    if (notificationService?.markAllAsRead) {
-      await notificationService.markAllAsRead(currentRole, null, userName);
-    }
-  }, [currentUser, currentRole]);
-
-  const handleClearNotifications = useCallback(() => {
-    setNotifications([]);
-    if (notificationService?.clearAll) {
-      notificationService.clearAll();
-    }
-  }, []);
+  const globalTodoCount = useMemo(() => {
+    if (!currentRole) return 0;
+    const allTasks = [
+      ...(prs || []).map(pr => ({ ...pr, docType: pr.docType || 'PR' })),
+      ...(pos || []).map(po => ({ ...po, docType: po.docType || 'PO' }))
+    ];
+    return allTasks.filter(task => isToDoTask(task, currentRole, prs, pos)).length;
+  }, [currentRole, prs, pos]);
 
   const value = useMemo(() => ({
     currentUser,
@@ -1584,7 +1551,6 @@ export function AppProvider({ children }) {
     prs,
     pos,
     stockLogs,
-    notifications,
     budgetSummary,
     loadAllData,
     fetchBootstrapData: loadAllData,
@@ -1630,12 +1596,6 @@ export function AppProvider({ children }) {
     budgetTransactions,
     adjustBudget: handleAdjustBudget,
     refundBudget: handleRefundBudget,
-    markNotificationAsRead: handleMarkNotificationAsRead,
-    markAllNotificationsAsRead: handleMarkAllNotificationsAsRead,
-    setNotifications,
-    clearNotifications: handleClearNotifications,
-    readNotifIds,
-    setReadNotifIds,
     preselectedProduct,
     setPreselectedProduct,
     clearPreselectedProduct: () => setPreselectedProduct(null),
@@ -1653,6 +1613,7 @@ export function AppProvider({ children }) {
     isMobileSidebarOpen,
     setIsMobileSidebarOpen,
     onNavigate,
+    globalTodoCount,
   }), [
     currentUser,
     currentRole,
@@ -1670,8 +1631,6 @@ export function AppProvider({ children }) {
     prs,
     pos,
     stockLogs,
-    notifications,
-    readNotifIds,
     budgetSummary,
     loadAllData,
     fetchPRs,
@@ -1706,8 +1665,6 @@ export function AppProvider({ children }) {
     handleRollbackBudget,
     handleReceiveToStock,
     handleIssueStock,
-    handleMarkNotificationAsRead,
-    handleClearNotifications,
     preselectedProduct,
     editingPR,
     handleQuickPR,

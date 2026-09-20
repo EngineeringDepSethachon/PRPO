@@ -14,6 +14,9 @@ import {
   getTaskBadgeLabel 
 } from '../src/services/workspaceService';
 import OnlineOrderCard, { resolveGRNEvidence } from '../src/views/procurement/OnlineOrderCard';
+import { hasUnresolvedClaim } from '../src/views/OnlineTaskView';
+import { isPendingClaimOrder } from '../src/services/procurementService';
+import { recordGoodsReceipt } from '../src/context/ProcurementContext';
 import { AppProvider } from '../src/context/AppContext';
 
 vi.mock('react-dom', async () => {
@@ -160,7 +163,7 @@ describe('Mission-Critical Suite: Claim State Machine, Task Blocker & Evidence D
       expect(badgeLabel).toBe('⏳ รอฝ่ายจัดซื้อเจรจาเคลมร้านค้า');
     });
 
-    it('allows Requester to get To Do task for round 2 ONLY when status is WAITING_DELIVERY_ROUND_2', () => {
+    it('routes WAITING_DELIVERY_ROUND_2 to To Do tab for Requester immediately', () => {
       const round2PO = {
         ...claimPendingPO,
         status: 'WAITING_DELIVERY_ROUND_2',
@@ -169,6 +172,12 @@ describe('Mission-Critical Suite: Claim State Machine, Task Blocker & Evidence D
 
       const isTodo = isTaskForMe(round2PO, requesterUser);
       expect(isTodo).toBe(true);
+
+      const isInProg = isInProgressTask(round2PO, requesterUser);
+      expect(isInProg).toBe(false);
+
+      const badgeLabel = getTaskBadgeLabel(round2PO, requesterUser);
+      expect(badgeLabel).toBe('รอร้านค้าส่งของรอบที่ 2 (ทดแทน)');
     });
   });
 
@@ -329,6 +338,212 @@ describe('Mission-Critical Suite: Claim State Machine, Task Blocker & Evidence D
       expect(html).toContain('นายประสิทธิ์ ตรวจรับ');
       expect(html).toContain('หัวเซ็นเซอร์หัก 3 ตัว ไม่สามารถใช้งานได้');
       expect(html).toContain('sensor_broken_img');
+    });
+  });
+
+  describe('4. Cyclical Multi-Round Claim & Goods Receipt (Arbitrary N Rounds)', () => {
+    it('Round 2: when replacement goods arrive damaged and receiver files claim, PO cycles back to CLAIM_PENDING and does NOT jump to COMPLETED', async () => {
+      // Mock PO after Round 1 negotiation where purchaser selected REPLACEMENT
+      const poAfterRound1 = {
+        id: 'PO-CYCLE-001',
+        poNo: 'PO-2026-CYCLE-01',
+        docType: 'PO',
+        status: 'WAITING_DELIVERY_ROUND_2',
+        purchaseChannel: 'ONLINE',
+        department: 'QC',
+        requestedBy: 'นายสมชาย ผู้ตรวจรับ',
+        requesterId: 'USR-REQ-QC',
+        platform: 'Shopee',
+        actualStoreName: 'TechStore',
+        hasGRN: true,
+        grnHistory: [
+          {
+            grnNumber: 'GRN-2026-CYCLE-01-R1',
+            round: 1,
+            date: '18/09/2026 10:00:00',
+            receivedBy: 'นายสมชาย ผู้ตรวจรับ',
+            statusAfterRound: 'PARTIALLY_RECEIVED_IN_CLAIM'
+          }
+        ],
+        storeClaims: {
+          'Shopee_techstore': {
+            storeKey: 'Shopee_techstore',
+            storeName: 'TechStore',
+            type: 'REPLACEMENT',
+            actionType: 'REPLACEMENT',
+            isResolved: true,
+            status: 'RESOLVED'
+          }
+        },
+        items: [
+          {
+            id: 'ITM-CYCLE-1',
+            productId: 'PROD-C1',
+            code: 'C1',
+            name: 'จอแสดงผลดิจิทัล',
+            orderedQty: 10,
+            receivedQty: 9,
+            accumulatedReceived: 9,
+            damagedQty: 1,
+            shortageQty: 0,
+            unitPrice: 1000,
+            storeName: 'TechStore',
+            storePlatform: 'Shopee',
+            claimResolution: 'REPLACEMENT',
+            replacementPendingQty: 1,
+            isSettled: false,
+            hasDispute: false
+          }
+        ]
+      };
+
+      storageService.savePOs([poAfterRound1]);
+
+      // Receiver inspects replacement in Round 2: receives 0 good, 1 damaged -> submits GRN with CLAIM_PENDING
+      const grnPayloadRound2 = {
+        grnNumber: 'GRN-2026-CYCLE-01-R2',
+        round: 2,
+        receivedDate: '19/09/2026 14:00:00',
+        receivedBy: 'นายสมชาย ผู้ตรวจรับ',
+        statusOverride: 'CLAIM_PENDING',
+        claimEvidence: {
+          inspectorName: 'นายสมชาย ผู้ตรวจรับ',
+          inspectedAt: '2026-09-19T14:00:00.000Z',
+          notes: 'สินค้าทดแทนรอบ 2 แตกหักเสียหายเหมือนเดิม',
+          attachments: ['https://drive.google.com/file/d/damaged-r2-img/view']
+        },
+        receivingItems: [
+          {
+            productId: 'PROD-C1',
+            acceptedQty: 0,
+            goodQty: 0,
+            damagedQty: 1,
+            shortageQty: 0,
+            defectReason: 'สินค้าทดแทนรอบ 2 แตกหักเสียหายเหมือนเดิม'
+          }
+        ]
+      };
+
+      const result = await recordGoodsReceipt('PO-CYCLE-001', grnPayloadRound2);
+      expect(result.success).toBe(true);
+
+      const updatedPO = result.po;
+      // 1. PO Status must cycle to CLAIM_PENDING / PARTIALLY_RECEIVED_IN_CLAIM, NEVER COMPLETED!
+      expect(updatedPO.status).not.toBe('COMPLETED');
+      expect(updatedPO.status).toBe('CLAIM_PENDING');
+      expect(updatedPO.claimStatus).toBe('PENDING_CLAIM');
+      expect(updatedPO.hasUnresolvedClaim).toBe(true);
+      expect(updatedPO.hasDispute).toBe(true);
+      expect(updatedPO.isCompleted).toBe(false);
+
+      // 2. Disputed item state must reset claimResolution and isSettled
+      const disputedItem = updatedPO.items[0];
+      expect(disputedItem.claimResolution).toBeNull();
+      expect(disputedItem.isSettled).toBe(false);
+      expect(disputedItem.replacementPendingQty).toBe(0);
+
+      // 3. Online Task View guards
+      expect(hasUnresolvedClaim(updatedPO)).toBe(true);
+      expect(isPendingClaimOrder(updatedPO)).toBe(true);
+
+      // 4. Workspace View Task routing
+      // Requester: Must NOT see in To Do, must see in In Progress!
+      expect(isTaskForMe(updatedPO, requesterUser)).toBe(false);
+      expect(isInProgressTask(updatedPO, requesterUser)).toBe(true);
+      expect(getTaskBadgeLabel(updatedPO, requesterUser)).toBe('⏳ รอฝ่ายจัดซื้อเจรจาเคลมร้านค้า');
+
+      // Online Purchaser: Must see in To Do to negotiate Round 2 claim!
+      expect(isTaskForMe(updatedPO, onlinePurchaserUser)).toBe(true);
+      expect(getTaskBadgeLabel(updatedPO, onlinePurchaserUser)).toBe('🔴 รอเจรจาเคลมร้านค้า');
+
+      // 5. OnlineOrderCard UI Rendering: Must NOT show "✓ ปิดงานสำเร็จ 100%"
+      const html = renderToStaticMarkup(
+        <MemoryRouter>
+          <AppProvider>
+            <OnlineOrderCard 
+              po={updatedPO} 
+              activeTab="CLAIM" 
+              currentRole={onlinePurchaserUser} 
+            />
+          </AppProvider>
+        </MemoryRouter>
+      );
+      expect(html).not.toContain('✓ ปิดงานสำเร็จ 100%');
+      expect(html).toContain('รอเคลม');
+    });
+
+    it('Arbitrary Round N: supports N rounds of claiming and re-receiving cyclically without hardcoded round limits', async () => {
+      // Simulate Round N-1 PO with grnHistory of 5 rounds
+      const roundNPo = {
+        id: 'PO-CYCLE-ROUND-N',
+        poNo: 'PO-2026-CYCLE-N',
+        docType: 'PO',
+        status: 'WAITING_DELIVERY_ROUND_2',
+        purchaseChannel: 'ONLINE',
+        department: 'QC',
+        requestedBy: 'นายสมชาย ผู้ตรวจรับ',
+        requesterId: 'USR-REQ-QC',
+        platform: 'Shopee',
+        actualStoreName: 'TechStore',
+        hasGRN: true,
+        grnHistory: [
+          { round: 1, grnNumber: 'GRN-R1' },
+          { round: 2, grnNumber: 'GRN-R2' },
+          { round: 3, grnNumber: 'GRN-R3' },
+          { round: 4, grnNumber: 'GRN-R4' }
+        ],
+        storeClaims: {
+          'Shopee_techstore': {
+            type: 'REPLACEMENT',
+            isResolved: true,
+            status: 'RESOLVED'
+          }
+        },
+        items: [
+          {
+            id: 'ITM-N',
+            productId: 'PROD-N',
+            orderedQty: 5,
+            receivedQty: 4,
+            accumulatedReceived: 4,
+            damagedQty: 1,
+            unitPrice: 200,
+            storeName: 'TechStore',
+            storePlatform: 'Shopee',
+            claimResolution: 'REPLACEMENT',
+            isSettled: false
+          }
+        ]
+      };
+
+      storageService.savePOs([roundNPo]);
+
+      // In round 5, item is damaged again
+      const grnPayloadRound5 = {
+        grnNumber: 'GRN-R5',
+        round: 5,
+        receivedDate: '20/09/2026 10:00:00',
+        receivedBy: 'นายสมชาย ผู้ตรวจรับ',
+        statusOverride: 'CLAIM_PENDING',
+        receivingItems: [
+          {
+            productId: 'PROD-N',
+            acceptedQty: 0,
+            goodQty: 0,
+            damagedQty: 1,
+            shortageQty: 0,
+            defectReason: 'สินค้าเสียหายรอบที่ 5'
+          }
+        ]
+      };
+
+      const res = await recordGoodsReceipt('PO-CYCLE-ROUND-N', grnPayloadRound5);
+      expect(res.po.status).toBe('CLAIM_PENDING');
+      expect(res.po.hasUnresolvedClaim).toBe(true);
+      expect(hasUnresolvedClaim(res.po)).toBe(true);
+      expect(isInProgressTask(res.po, requesterUser)).toBe(true);
+      expect(isTaskForMe(res.po, requesterUser)).toBe(false);
+      expect(isTaskForMe(res.po, onlinePurchaserUser)).toBe(true);
     });
   });
 });

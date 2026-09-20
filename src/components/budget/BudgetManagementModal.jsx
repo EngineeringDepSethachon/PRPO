@@ -73,7 +73,10 @@ function BudgetManagementModalContent({
   // Scoped Transaction Log for History Tab
   const scopedBudgetTransactions = useMemo(() => {
     const validCodes = scopedDeptList.map(d => d.code);
-    return budgetTransactions.filter(tx => validCodes.includes(tx.dept));
+    return budgetTransactions.filter(tx => {
+      const txDept = String(tx.dept || tx.department || '').replace(/^ฝ่าย\s*/i, '').trim().toUpperCase();
+      return validCodes.includes(txDept);
+    });
   }, [budgetTransactions, scopedDeptList]);
 
   // Form State for Adjustment / Top-up

@@ -21,6 +21,7 @@ import RejectPRModal from './RejectPRModal';
 import CollapsibleActivityTimeline from '../common/CollapsibleActivityTimeline';
 import { sanitizeExternalUrl, getProductUrl } from '../../utils/urlHelper';
 import { resolveDriveImageUrl, handleDriveImageError } from '../../utils/driveHelper';
+import AttachmentThumbnail from '../common/AttachmentThumbnail';
 import LoadingOverlay from '../common/LoadingOverlay';
 
 const formatDateTime = (dateVal) => {
@@ -696,8 +697,13 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
                                         if (!src) return null;
                                         const resolvedThumb = resolveDriveImageUrl(src, 'w400');
                                         return (
-                                          <div
+                                          <AttachmentThumbnail
                                             key={imgIdx}
+                                            img={img}
+                                            imgIdx={imgIdx}
+                                            sizeClass="w-10 h-10"
+                                            title="คลิกเพื่อดูรูปขนาดใหญ่"
+                                            altText={`Item attachment ${imgIdx + 1}`}
                                             onClick={() => setSelectedPreviewImage({
                                               url: src,
                                               images: photos.map((p, pIdx) => ({
@@ -707,19 +713,7 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
                                               initialIndex: imgIdx,
                                               title: item.name
                                             })}
-                                            className="relative group w-10 h-10 rounded-lg overflow-hidden border border-slate-200 bg-slate-50 hover:border-indigo-400 cursor-pointer shadow-2xs transition-all hover:scale-105 shrink-0"
-                                            title="คลิกเพื่อดูรูปขนาดใหญ่"
-                                          >
-                                            <img
-                                              src={resolvedThumb}
-                                              alt={`Item attachment ${imgIdx + 1}`}
-                                              className="w-full h-full object-cover"
-                                              onError={(e) => handleDriveImageError(e, img)}
-                                            />
-                                            <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px]">
-                                              🔍
-                                            </div>
-                                          </div>
+                                          />
                                         );
                                       })}
                                     </div>

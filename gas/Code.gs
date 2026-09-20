@@ -2058,7 +2058,8 @@ function ensurePOSheetHeaders(sheet) {
   var headers = headerValues.map(function(h) { return String(h).trim(); });
   var REQUIRED_RECEIVING_HEADERS = [
     'receivedBy', 'receiverName', 'receiverId', 'receivedAt', 'receiverRole', 'receiverSignature', 'receivingInfo',
-    'actualTotalAmount', 'savingsAmount', 'settlementStatus', 'settlementNote', 'settlementProofUrl', 'settledBy', 'settledAt', 'actualItems'
+    'actualTotalAmount', 'savingsAmount', 'settlementStatus', 'settlementNote', 'settlementProofUrl', 'settledBy', 'settledAt', 'actualItems',
+    'storeClaims', 'claimResolution', 'totalRefunded', 'hasDispute', 'isInClaim'
   ];
   var missing = [];
   REQUIRED_RECEIVING_HEADERS.forEach(function(col) {
@@ -2225,6 +2226,12 @@ function packageUpdatedPO(poObj) {
   }
   if (typeof packaged.claimData === 'string') {
     try { packaged.claimData = JSON.parse(packaged.claimData); } catch(e) { packaged.claimData = null; }
+  }
+  if (typeof packaged.claimEvidence === 'string') {
+    try { packaged.claimEvidence = JSON.parse(packaged.claimEvidence); } catch(e) { packaged.claimEvidence = null; }
+  }
+  if (typeof packaged.disputeInfo === 'string') {
+    try { packaged.disputeInfo = JSON.parse(packaged.disputeInfo); } catch(e) { packaged.disputeInfo = null; }
   }
 
   // Harmonize receiving signature & receiver info
@@ -2433,6 +2440,13 @@ function apiSavePO(rawPayload, userContext) {
           try { rawVal = JSON.parse(rawVal); } catch (e) { rawVal = []; }
         }
         poObj[field] = JSON.stringify(Array.isArray(rawVal) ? rawVal : []);
+      }
+    });
+
+    // Serialize claim-state object fields to JSON strings so they survive serializeRecordToRow
+    ['storeClaims', 'claimResolution', 'claimData', 'claimDetails', 'claimEvidence', 'disputeInfo', 'receivingInfo'].forEach(function(field) {
+      if (poObj[field] !== undefined && poObj[field] !== null && typeof poObj[field] === 'object') {
+        try { poObj[field] = JSON.stringify(poObj[field]); } catch(e) {}
       }
     });
 
@@ -2751,7 +2765,9 @@ function apiReceivePO(rawPayload, userContext) {
               if (newTotalStock > 0) {
                  prod.avgCost = (totalCurrentValue + newIncomingValue) / newTotalStock;
               }
-              prod.stockBalance = newTotalStock;
+              // STRICT SSOT: Stock Balance is handled exclusively by apiAppendStockMovements.
+              // We only update MAC (avgCost) here.
+              // prod.stockBalance = newTotalStock; 
               
               upsertRecordFast(SHEET_NAMES.PRODUCTS, 'id', prod);
            }
@@ -3789,6 +3805,12 @@ function uploadBase64File(payload) {
     throw new Error(`DRIVE_UPLOAD_FAILED: ไม่สามารถบันทึกไฟล์ลง Google Drive: ${driveErr.message}`);
   }
 
+  try {
+    createdFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+  } catch (shareErr) {
+    Logger.log('[uploadBase64File] Sharing permission notice: ' + shareErr.message);
+  }
+
   const fileId = createdFile.getId();
   const viewUrl = 'https://drive.google.com/file/d/' + fileId + '/view';
   const downloadUrl = `https://drive.google.com/uc?export=download&id=${fileId}`;
@@ -3909,6 +3931,11 @@ function uploadBase64Image(base64Data, fileName, mimeType, category, docNo, docT
 
   try {
     file = folder.createFile(blob);
+    try {
+      file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    } catch (e) {
+      Logger.log('[apiSaveBase64ImageFast] Sharing permission notice: ' + e.message);
+    }
   } catch (driveErr) {
     return null;
   }

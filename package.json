@@ -15,7 +15,7 @@
     "gas:status": "clasp status",
     "gas:push": "npm run gas:build && clasp push --force",
     "gas:deploy": "node scripts/deploy-gas.js",
-    "test": "vitest run tests",
+    "test": "vitest run tests src/services/__tests__",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "lint": "oxlint",

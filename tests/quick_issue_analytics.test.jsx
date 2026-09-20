@@ -1,4 +1,4 @@
-﻿import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import './setup.js';
 import { storageService } from '../src/services/storageService';
 
@@ -139,6 +139,42 @@ describe('Domain Suite: Quick Issue Location Tracking & Analytics', () => {
 
     it('returns empty array when selectedProduct is null', () => {
       expect(recentFor(null, [mkLog({})])).toHaveLength(0);
+    });
+  });
+
+  describe('6. Real-time MAC Recalculation on Quick Issue Summary Card', () => {
+    it('recalculates MAC from historical IN logs and computes accurate issue value', async () => {
+      const { healMACForProduct } = await import('../src/utils/macMigration');
+      const targetProd = {
+        id: 'PROD-QI-MAC-01',
+        code: 'QI-MAC-01',
+        name: 'หัวแร้งไฟฟ้าสำหรับสายการผลิต',
+        department: 'PD',
+        category: 'PD',
+        stockBalance: 10,
+        averageCost: 0,
+        avgCost: 0,
+        unit: 'อัน'
+      };
+
+      const inLogs = [
+        { type: 'IN', productId: 'PROD-QI-MAC-01', productCode: 'QI-MAC-01', qty: 4, unitPrice: 200, timestamp: '2026-09-10T09:00:00Z' },
+        { type: 'IN', productId: 'PROD-QI-MAC-01', productCode: 'QI-MAC-01', qty: 6, unitPrice: 250, timestamp: '2026-09-12T09:00:00Z' }
+      ];
+
+      storageService.saveProducts([targetProd]);
+      storageService.saveStockLogs(inLogs);
+
+      // (4 * 200 + 6 * 250) / 10 = (800 + 1500) / 10 = 2300 / 10 = 230
+      const healed = await healMACForProduct('PROD-QI-MAC-01');
+      expect(healed).not.toBeNull();
+      expect(healed.averageCost).toBe(230);
+      expect(healed.avgCost).toBe(230);
+
+      // Real-time issue value calculation: issueQty = 3 -> 3 * 230 = 690
+      const issueQty = 3;
+      const issueValue = issueQty * healed.averageCost;
+      expect(issueValue).toBe(690);
     });
   });
 });

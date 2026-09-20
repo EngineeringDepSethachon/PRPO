@@ -705,7 +705,7 @@ describe('Domain Suite: Authentication, Authorization & RBAC', () => {
         </MemoryRouter>
       );
 
-      expect(html).toContain('>2</span>');
+      expect(html).toContain('>3</span>');
       expect(html).toContain('bg-rose-500');
     });
 

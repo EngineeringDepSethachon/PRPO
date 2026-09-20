@@ -1,7 +1,5 @@
 import React, { useMemo } from 'react';
 import { Menu } from 'lucide-react';
-import NotificationBell from './NotificationBell';
-import NotificationDrawer from './NotificationDrawer';
 import UserProfileModal from './UserProfileModal';
 import { useAppContext } from '../../context/AppContext';
 import { workflowEngine } from '../../services/workflowEngine';
@@ -19,7 +17,6 @@ export default function Navbar({
   onRefresh,
   onToggleMobileSidebar
 }) {
-  const [showNotiDrawer, setShowNotiDrawer] = React.useState(false);
   const [showProfileModal, setShowProfileModal] = React.useState(false);
 
   const context = useAppContext();
@@ -55,12 +52,7 @@ export default function Navbar({
         </div>
 
         <div className="flex items-center gap-2 sm:gap-3">
-          <NotificationBell 
-            currentRole={currentRole} 
-            count={taskCounts?.total}
-            onClick={() => setShowNotiDrawer(true)} 
-          />
-          <div className="h-5 w-px bg-slate-200 mx-1 hidden sm:block"></div>
+
           <button
             onClick={() => setShowProfileModal(true)}
             className="flex items-center gap-2 pl-2 pr-3 py-1.5 rounded-full hover:bg-slate-50 border border-transparent hover:border-slate-200/60 transition-all text-xs group cursor-pointer"
@@ -69,16 +61,6 @@ export default function Navbar({
           </button>
         </div>
       </div>
-
-      <NotificationDrawer
-        isOpen={showNotiDrawer}
-        onClose={() => setShowNotiDrawer(false)}
-        currentRole={currentRole}
-        onNavigate={onNavigate}
-        onOpenPR={onOpenPR}
-        onOpenPO={onOpenPO}
-        onRefresh={onRefresh}
-      />
 
       <UserProfileModal
         isOpen={showProfileModal}

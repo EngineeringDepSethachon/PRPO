@@ -568,18 +568,20 @@ describe('Domain Suite: Inventory Management & Goods Receiving (GRN)', () => {
       expect(html).toContain('ยกเลิกและย้อนกลับ');
     });
 
-    it('2. Renders compact table with 6 columns: สินค้า, สั่งมา, รับแล้ว, ตรวจรับรอบนี้, ชำรุด/NG, สถานะ / การจัดการ', () => {
+    it('2. Renders compact table with 6 columns: สินค้า, รอตรวจรับ (รอบนี้), รับดี (เข้าคลัง), ชำรุด (NG), ขาดส่ง, สถานะ / การจัดการ', () => {
       const html = renderToStaticMarkup(<ReceivingModal po={basePO} isOpen={true} />);
       expect(html).toContain('สินค้า');
-      expect(html).toContain('สั่งมา');
-      expect(html).toContain('รับแล้ว');
+      expect(html).toContain('รอตรวจรับ (รอบนี้)');
       expect(html).toContain('รับดี (เข้าคลัง)');
       expect(html).toContain('ชำรุด (NG)');
+      expect(html).toContain('ขาดส่ง');
       expect(html).toContain('สถานะ / การจัดการ');
       expect(html).toContain('OIL-HYD-68');
       expect(html).toContain('น้ำมันไฮดรอลิกเกรด 68 (200L)');
       expect(html).toContain('10');
-      expect(html).toContain('✓ ครบถ้วน');
+      expect(html).toContain('ครบถ้วน');
+      expect(html).not.toContain('✓ ครบถ้วน');
+      expect(html).toContain('สั่งทั้งหมด 10 • รับแล้ว 0');
     });
 
     it('3. Renders emerald action button "[ ✓ ยืนยันรับเข้าคลังสมบูรณ์ ]" when 100% fully received', () => {
@@ -1379,7 +1381,7 @@ describe('Domain Suite: Inventory Management & Goods Receiving (GRN)', () => {
       expect(updatedItem.receivedQty).toBe(1);
     });
 
-    it('sets poItem.hasDispute = false and PO status = WAITING_DELIVERY_ROUND_2 when WAIT_NEXT_ROUND in warehouseService', async () => {
+    it('sets poItem.hasDispute = true and PO status = CLAIM_PENDING when shortage exists in warehouseService', async () => {
       const testPO = {
         id: 'PO-TEST-WAIT',
         poNo: 'PO-2026-902',
@@ -1400,13 +1402,13 @@ describe('Domain Suite: Inventory Management & Goods Receiving (GRN)', () => {
 
       const savedPOs = storageService.getPOs();
       const updated = savedPOs.find(p => p.id === testPO.id);
-      expect(updated.status).toBe('WAITING_DELIVERY_ROUND_2');
-      expect(updated.hasDispute).toBe(false);
+      expect(updated.status).toBe('CLAIM_PENDING');
+      expect(updated.hasDispute).toBe(true);
       expect(updated.hasGRN).toBe(true);
 
       const updatedItem = updated.items[0];
-      expect(updatedItem.shortageAction).toBe('WAIT_NEXT_ROUND');
-      expect(updatedItem.hasDispute).toBe(false);
+      expect(updatedItem.shortageAction).toBe('CLAIM_SHORTAGE');
+      expect(updatedItem.hasDispute).toBe(true);
       expect(updatedItem.shortageQty).toBe(4);
       expect(updatedItem.receivedQty).toBe(6);
     });

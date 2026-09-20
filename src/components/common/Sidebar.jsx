@@ -7,9 +7,6 @@ import {
   User, ArrowRightLeft, ShieldCheck, LogOut
 } from 'lucide-react';
 import { workflowEngine } from '../../services/workflowEngine';
-import NotificationBell from './NotificationBell';
-import NotificationDrawer from './NotificationDrawer';
-import NotificationPopover from './NotificationPopover';
 import { notificationService } from '../../services/notificationService';
 import UserProfileModal from './UserProfileModal';
 import { useAppContext } from '../../context/AppContext';
@@ -36,7 +33,7 @@ export default function Sidebar({
   onRefresh,
   isDev
 }) {
-  const [showNotiDrawer, setShowNotiDrawer] = useState(false);
+
   const [showProfileModal, setShowProfileModal] = useState(false);
 
   // App context for dynamic notifications
@@ -46,6 +43,8 @@ export default function Sidebar({
   } catch {
     context = null;
   }
+
+  const globalTodoCount = context?.globalTodoCount || 0;
 
   let auth = null;
   try {
@@ -128,41 +127,7 @@ export default function Sidebar({
     }
   };
 
-  const handleMarkAsRead = async (id) => {
-    setNotifications(prev => 
-      prev.map(n => (n.id === id || n._id === id) ? { ...n, isRead: true, read: true, status: 'read' } : n)
-    );
-    if (context?.setNotifications) {
-      context.setNotifications(prev =>
-        prev.map(n => (n.id === id || n._id === id) ? { ...n, isRead: true, read: true, status: 'read' } : n)
-      );
-    }
-    if (notificationService?.markAsRead) {
-      await notificationService.markAsRead(id, notifUserName);
-    }
-  };
 
-  const handleNotificationClick = (item) => {
-    handleMarkAsRead(item.id);
-    if (isOnlinePurchaser) {
-      if (onNavigate) onNavigate('online-tasks');
-    } else if (item.refDocType === 'PR') {
-      if (onOpenPR && item.refDocId) {
-        onOpenPR(item.refDocId);
-      } else if (onNavigate) {
-        onNavigate('pr-list');
-      }
-    } else if (item.refDocType === 'PO') {
-      if (onOpenPO && item.refDocId) {
-        onOpenPO(item.refDocId);
-      } else if (onNavigate) {
-        onNavigate(item.type === 'ONLINE_TASK' ? 'online-tasks' : 'po-list');
-      }
-    } else if (item.refDocType === 'STOCK') {
-      if (onNavigate) onNavigate('stock-card');
-    }
-    setShowNotiDrawer(false);
-  };
 
   const fallbackUser = typeof authService?.getCurrentUser === 'function' ? authService.getCurrentUser() : null;
   const effectiveUser = currentRole || currentUser || auth?.currentUser || auth?.currentRole || fallbackUser;
@@ -252,7 +217,7 @@ export default function Sidebar({
           ariaLabel: 'งานของฉัน',
           icon: Sparkles, 
           visible: !isOnlinePurchaser, 
-          badge: taskCounts.total > 0 ? taskCounts.total : null 
+          badge: globalTodoCount > 0 ? globalTodoCount : null 
         },
         { 
           id: 'online-tasks', 
@@ -378,11 +343,6 @@ export default function Sidebar({
 
           {/* Top Actions: Notification Bell & Mobile Close Button */}
           <div className="flex items-center gap-1.5 shrink-0 ml-1">
-            <NotificationBell 
-              currentRole={currentRole} 
-              count={taskCounts.total}
-              onClick={() => setShowNotiDrawer(true)} 
-            />
 
             {onItemClick && (
               <button 
@@ -583,26 +543,6 @@ export default function Sidebar({
         </div>
       )}
 
-      {/* ── Integrated Notification Popover Modal (Single-Click Instant Reactive) ── */}
-      {showNotiDrawer && createPortal(
-        <>
-          <div 
-            className="fixed inset-0 z-40 bg-slate-900/10 backdrop-blur-2xs no-print animate-fade-in" 
-            onClick={() => setShowNotiDrawer(false)} 
-          />
-          <NotificationPopover
-            notifications={notifications}
-            onMarkAllAsRead={handleMarkAllAsRead}
-            markAllAsRead={handleMarkAllAsRead}
-            onMarkAsRead={handleMarkAsRead}
-            onClose={() => setShowNotiDrawer(false)}
-            onNotificationClick={handleNotificationClick}
-            currentUser={currentUser || context?.currentUser}
-            currentRole={currentRole}
-          />
-        </>,
-        document.body
-      )}
 
       {/* ── Integrated User Profile & Role Modal (with Fast Account Switcher) ── */}
       <UserProfileModal

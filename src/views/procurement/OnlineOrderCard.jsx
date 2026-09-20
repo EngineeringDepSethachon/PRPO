@@ -17,6 +17,7 @@ import { isOrderPending, isOrderInClaim, isOrderClosed } from '../../context/Onl
 import ImageLightboxModal from '../../components/common/ImageLightboxModal';
 import { getFallbackAttachmentsForCode } from '../../services/workflowEngine';
 import AttachmentViewerModal from '../../components/common/AttachmentViewerModal';
+import AttachmentThumbnail from '../../components/common/AttachmentThumbnail';
 import { formatCurrency } from '../../utils/formatters.js';
 import { resolveDriveImageUrl, handleDriveImageError } from '../../utils/driveHelper';
 import LoadingOverlay from '../../components/common/LoadingOverlay.jsx';
@@ -64,8 +65,9 @@ export const getStoreGroupKey = (item, index) => {
 // ✅ ฟังก์ชันตรวจสอบการบันทึกผลเจรจาของร้านค้า (รองรับ Special Characters, single quotes, storeKey, storeName)
 export const isStoreClaimResolved = (group, storeClaims = {}) => {
   if (!group) return true;
-  if (group.isResolved || group.status === 'RESOLVED') return true;
-  if (!storeClaims || typeof storeClaims !== 'object') return false;
+  if (!storeClaims || typeof storeClaims !== 'object') {
+    return Boolean(group.isResolved || group.status === 'RESOLVED');
+  }
 
   const normalize = (str) => String(str || '').trim().toLowerCase().replace(/['"`]/g, '');
 
@@ -82,13 +84,21 @@ export const isStoreClaimResolved = (group, storeClaims = {}) => {
                       storeClaims[normKey] ||
                       storeClaims[normName];
 
-  if (directClaim && (directClaim.isResolved || directClaim.status === 'RESOLVED' || directClaim.status === 'COMPLETED')) {
-    return true;
+  if (directClaim) {
+    if (directClaim.isResolved === false || directClaim.status === 'PENDING_CLAIM' || directClaim.claimStatus === 'PENDING_CLAIM') {
+      return false;
+    }
+    if (directClaim.isResolved || directClaim.status === 'RESOLVED' || directClaim.status === 'COMPLETED') {
+      return true;
+    }
   }
 
   // 2. Iterate through storeClaims supporting normalized comparison and quotes removal
   for (const [key, claim] of Object.entries(storeClaims)) {
     if (!claim) continue;
+    if (claim.isResolved === false || claim.status === 'PENDING_CLAIM' || claim.claimStatus === 'PENDING_CLAIM') {
+      return false;
+    }
     const isResolvedStatus = claim.isResolved || claim.status === 'RESOLVED' || claim.status === 'COMPLETED';
     if (!isResolvedStatus) continue;
 
@@ -109,7 +119,16 @@ export const isStoreClaimResolved = (group, storeClaims = {}) => {
   }
 
   // 3. Check group.claimData
-  if (group.claimData && (group.claimData.isResolved || group.claimData.status === 'RESOLVED' || group.claimData.status === 'COMPLETED')) {
+  if (group.claimData) {
+    if (group.claimData.isResolved === false || group.claimData.status === 'PENDING_CLAIM' || group.claimData.claimStatus === 'PENDING_CLAIM') {
+      return false;
+    }
+    if (group.claimData.isResolved || group.claimData.status === 'RESOLVED' || group.claimData.status === 'COMPLETED') {
+      return true;
+    }
+  }
+
+  if (group.isResolved || group.status === 'RESOLVED') {
     return true;
   }
 
@@ -617,6 +636,7 @@ export default function OnlineOrderCard({
       actualQty: item.actualQty ?? item.purchaseQty ?? item.qty ?? 1,
       unitPrice: item.actualPrice ?? item.unitPrice ?? item.estimatedPrice ?? item.price ?? 0,
       purchaseQty: item.actualQty ?? item.purchaseQty ?? item.qty ?? 1,
+      actualTotal: item.actualTotal ?? ((item.actualQty ?? item.purchaseQty ?? item.qty ?? 1) * (item.actualPrice ?? item.unitPrice ?? item.estimatedPrice ?? item.price ?? 0)),
       originalEstimatedPrice: Number(item.originalEstimatedPrice ?? item.estimatedPrice ?? item.unitPrice ?? item.price) || 0,
       originalPurchaseQty: Number(item.originalPurchaseQty ?? item.qty ?? item.purchaseQty) || 1,
       orderRefNo: item.orderRefNo || ''
@@ -650,6 +670,7 @@ export default function OnlineOrderCard({
         actualQty: item.actualQty ?? item.purchaseQty ?? item.qty ?? 1,
         unitPrice: item.actualPrice ?? item.unitPrice ?? item.estimatedPrice ?? item.price ?? 0,
         purchaseQty: item.actualQty ?? item.purchaseQty ?? item.qty ?? 1,
+        actualTotal: item.actualTotal ?? ((item.actualQty ?? item.purchaseQty ?? item.qty ?? 1) * (item.actualPrice ?? item.unitPrice ?? item.estimatedPrice ?? item.price ?? 0)),
         originalEstimatedPrice: Number(item.originalEstimatedPrice ?? item.estimatedPrice ?? item.unitPrice ?? item.price) || 0,
         originalPurchaseQty: Number(item.originalPurchaseQty ?? item.qty ?? item.purchaseQty) || 1,
         orderRefNo: item.orderRefNo || ''
@@ -707,6 +728,13 @@ export default function OnlineOrderCard({
       if (field === 'actualQty') target.purchaseQty = value;
       if (field === 'unitPrice') target.actualPrice = value;
       if (field === 'purchaseQty') target.actualQty = value;
+      if (field === 'actualTotal') {
+        const total = parseFloat(value) || 0;
+        const qty = parseFloat(target.purchaseQty) || 1;
+        const unit = qty > 0 ? (total / qty) : 0;
+        target.unitPrice = unit;
+        target.actualPrice = unit;
+      }
       next[index] = target;
       return next;
     });
@@ -720,9 +748,9 @@ export default function OnlineOrderCard({
     }
   };
 
-  const handlePriceChange = (index, val) => {
+  const handleTotalChange = (index, val) => {
     const num = parseFloat(val);
-    handleItemChange(index, 'actualPrice', isNaN(num) || num < 0 ? '' : num);
+    handleItemChange(index, 'actualTotal', isNaN(num) || num < 0 ? '' : num);
   };
 
   const _handleQtyChange = (index, val) => {
@@ -794,7 +822,7 @@ export default function OnlineOrderCard({
 
   // Real-time totals
   const totalEstimatedAmount = useMemo(() => {
-    return items.reduce((sum, it) => sum + ((Number(it.purchaseQty) || 0) * (Number(it.unitPrice) || 0)), 0);
+    return items.reduce((sum, it) => sum + (Number(it.actualTotal) || 0), 0);
   }, [items]);
 
   const originalTotalAmount = useMemo(() => {
@@ -886,7 +914,7 @@ export default function OnlineOrderCard({
       groups[key].itemIndices.push(itemIdx);
       const price = Number(item.unitPrice ?? item.actualPrice ?? item.price ?? 0);
       const qty = Number(item.purchaseQty ?? item.actualQty ?? item.qty ?? 0);
-      groups[key].totalAmount += (qty * price);
+      groups[key].totalAmount += (Number(item.actualTotal) || 0);
       
       // Directive 1 & 3: Dispute Detection Logic (Item-level with Lifecycle Guard)
       const metrics = calculateDisputeMetrics(item, po?.status, poHasGRN);
@@ -952,12 +980,23 @@ export default function OnlineOrderCard({
 
       if (matchedClaim) {
         g.claimData = matchedClaim;
-        if (matchedClaim.isResolved || matchedClaim.status === 'RESOLVED' || matchedClaim.status === 'COMPLETED') {
+        const isMatchedPending = matchedClaim.isResolved === false || matchedClaim.status === 'PENDING_CLAIM' || matchedClaim.claimStatus === 'PENDING_CLAIM';
+        const isMatchedResolved = !isMatchedPending && (matchedClaim.isResolved || matchedClaim.status === 'RESOLVED' || matchedClaim.status === 'COMPLETED');
+        const isReplacement = matchedClaim.type === 'REPLACEMENT' || matchedClaim.actionType === 'REPLACEMENT' || matchedClaim.type === 'RESEND' || matchedClaim.actionType === 'RESEND';
+        const hasItemIssue = g.items.some(i => {
+          const dam = Number(i.damagedQty ?? i.defectQty ?? i.claimedQty ?? 0);
+          const isWait = i.shortageAction === 'WAIT_NEXT_ROUND' || i.disputeAction === 'WAIT_NEXT_ROUND' || i.shortageReason === 'SPLIT_SHIPMENT';
+          const sho = Number(i.shortageQty ?? 0);
+          return dam > 0 || (sho > 0 && !isWait) || Boolean(i.hasDispute && !isWait);
+        });
+
+        if (isMatchedResolved) {
           g.status = 'RESOLVED';
           g.isResolved = true;
-        } else if (isClaimOrder) {
+        } else if (isClaimOrder || isMatchedPending) {
           g.hasDispute = true;
           g.status = 'DISPUTED';
+          g.isResolved = false;
           if (!g.defaultRefund && Number(matchedClaim.refundAmount) > 0) {
             g.defaultRefund = Number(matchedClaim.refundAmount);
           }
@@ -979,8 +1018,9 @@ export default function OnlineOrderCard({
 
       if (hasAnyItemDispute) {
         g.hasDispute = true;
-        if (g.status !== 'RESOLVED') {
+        if (g.status !== 'RESOLVED' || g.isResolved === false) {
           g.status = 'DISPUTED';
+          g.isResolved = false;
         }
         g.defaultRefund = storeDisputeMetrics
           .filter(m => m.hasDispute)
@@ -1160,7 +1200,7 @@ export default function OnlineOrderCard({
   }, [storesGroup, storeInfo]);
 
   const hasInvalidPrice = useMemo(() => {
-    return items.some(it => it.unitPrice === '' || isNaN(Number(it.unitPrice)) || Number(it.unitPrice) < 0);
+    return items.some(it => it.actualTotal === '' || isNaN(Number(it.actualTotal)) || Number(it.actualTotal) < 0);
   }, [items]);
 
   const hasInvalidQty = useMemo(() => {
@@ -1269,8 +1309,9 @@ export default function OnlineOrderCard({
       const finalItems = (po.items || []).map((originalItem, idx) => {
         const rowState = itemData[idx] || {};
         const finalQty = Number(rowState.actualQty ?? rowState.purchaseQty ?? originalItem.actualQty ?? originalItem.qty ?? 1);
-        const finalPrice = Number(rowState.actualPrice ?? rowState.unitPrice ?? originalItem.actualPrice ?? originalItem.price ?? 0);
-        const lineTotal = finalQty * finalPrice;
+        const finalTotal = Number(rowState.actualTotal ?? (finalQty * Number(rowState.actualPrice ?? rowState.unitPrice ?? originalItem.actualPrice ?? originalItem.price ?? 0)));
+        const finalPrice = finalQty > 0 ? (finalTotal / finalQty) : 0;
+        const lineTotal = finalTotal;
         
         const origPrice = Number(originalItem.originalEstimatedPrice ?? originalItem.estimatedPrice ?? originalItem.price ?? 0);
         const origQty = Number(originalItem.originalPurchaseQty ?? originalItem.qty ?? originalItem.purchaseQty ?? 1);
@@ -1293,6 +1334,8 @@ export default function OnlineOrderCard({
           orderedQty: finalQty,
           qty: finalQty,
           stockQty: newStockQty,
+          actualTotal: finalTotal,
+          actualUnitPrice: finalPrice,
           actualPrice: finalPrice,
           unitPrice: finalPrice,
           price: finalPrice,
@@ -1480,29 +1523,6 @@ export default function OnlineOrderCard({
         Object.values(nextStoreClaims || {}).some(c => c.actionType === 'REPLACEMENT' || c.actionType === 'RESEND' || c.type === 'REPLACEMENT' || c.type === 'RESEND') ||
         (claimResolutionType === 'REPLACEMENT' || claimResolutionType === 'RESEND');
 
-      let nextOrderStatus = po.status;
-      let nextClaimStatus = po.claimStatus;
-      let nextHasDispute = po.hasDispute;
-      let nextIsInClaim = po.isInClaim;
-
-      if (allOtherDisputesResolved) {
-        if (hasPendingDeliveries) {
-          nextOrderStatus = 'WAITING_DELIVERY_ROUND_2';
-          nextClaimStatus = 'REPLACEMENT_PENDING';
-        } else {
-          nextOrderStatus = 'COMPLETED';
-          nextClaimStatus = 'RESOLVED';
-        }
-        // ปลดสถานะ po.claimStatus = 'RESOLVED' และ po.hasDispute = false ทันที เพื่อให้การ์ดหลุดออกจากแท็บ "รอเคลม" 100%
-        nextHasDispute = false;
-        nextIsInClaim = false;
-      } else {
-        nextOrderStatus = (po.status && po.status !== 'COMPLETED' && po.status !== 'CLOSED') 
-          ? po.status 
-          : 'PARTIALLY_RECEIVED_IN_CLAIM';
-        nextClaimStatus = 'IN_CLAIM';
-      }
-
       // Automated Budget Rollback (Directive 4 - Idempotent via budgetService)
       if ((claimResolutionType === 'REFUND' || claimResolutionType === 'CANCEL') && resolvedRefundNum > 0) {
         const targetDepartment = po?.department || po?.departmentId || po?.prDepartment || po?.dept || 'PD';
@@ -1532,6 +1552,11 @@ export default function OnlineOrderCard({
         allStoresResolved: allOtherDisputesResolved,
         hasPendingDeliveries: hasPendingDeliveries
       }, currentRole || currentUser);
+
+      let nextOrderStatus = res?.status || po.status;
+      let nextClaimStatus = res?.claimStatus || po.claimStatus;
+      let nextHasDispute = res?.hasDispute !== undefined ? res.hasDispute : po.hasDispute;
+      let nextIsInClaim = res?.isInClaim !== undefined ? res.isInClaim : po.isInClaim;
 
       // บันทึก Activity Timeline
       const timelineTitle = (claimResolutionType === 'REFUND' || claimResolutionType === 'CANCEL')
@@ -1672,7 +1697,9 @@ export default function OnlineOrderCard({
       await modalService.success(
         'บันทึกผลเจรจาสำเร็จ',
         allOtherDisputesResolved
-          ? `เจรจาเคลมครบทุกร้านแล้ว! PO ${po.poNo || po.id} ปิดงานสำเร็จและย้ายไปแท็บ "ปิดงานสำเร็จ"`
+          ? (updatedOrder.status === 'WAITING_DELIVERY_ROUND_2' 
+              ? `บันทึกผลเจรจาสำเร็จ! PO ย้ายไปแท็บ "สั่งซื้อแล้ว" เพื่อรอจัดส่งสินค้าทดแทน`
+              : `เจรจาเคลมครบทุกร้านแล้ว! PO ${po.poNo || po.id} ปิดงานสำเร็จและย้ายไปแท็บ "ปิดงานสำเร็จ"`)
           : `บันทึกผลการเจรจาสำหรับร้าน "${storeName}" เรียบร้อยแล้ว (ยังเหลือร้านค้ารอเคลมอีก ${remainingUnresolvedStores.length} ร้านค้า)`
       );
     } catch (err) {
@@ -2255,7 +2282,7 @@ export default function OnlineOrderCard({
 
                     const pQty = currentItem.purchaseQty !== '' ? Number(currentItem.purchaseQty ?? currentItem.actualQty ?? currentItem.qty) : '';
                     const price = currentItem.unitPrice !== '' ? Number(currentItem.unitPrice ?? currentItem.actualPrice ?? currentItem.price) : '';
-                    const lineTotal = (Number(pQty) || 0) * (Number(price) || 0);
+                    const lineTotal = Number(currentItem.actualTotal) || 0;
                     const pUnit = currentItem.purchaseUnit || currentItem.unit || 'ชิ้น';
                     const rawUrl = getProductUrl(currentItem);
                     const origPrice = Number(currentItem.originalEstimatedPrice ?? currentItem.estimatedPrice ?? currentItem.price ?? 0);
@@ -2275,19 +2302,13 @@ export default function OnlineOrderCard({
                               title={`คลิกเพื่อดูรูปภาพขยาย (${itemImages.length} รูป)`}
                             >
                               {itemImages.slice(0, 2).map((img, imgIdx) => (
-                                <button
+                                <AttachmentThumbnail
                                   key={imgIdx}
-                                  type="button"
+                                  img={img}
+                                  imgIdx={imgIdx}
                                   onClick={() => openLightbox(itemImages, imgIdx, currentItem.name)}
-                                  className="relative w-8 h-8 rounded-lg border border-slate-200 shadow-2xs overflow-hidden bg-slate-100 transition-transform duration-150 hover:scale-110 hover:z-10 cursor-pointer shrink-0 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                >
-                                  <img
-                                    src={resolveDriveImageUrl(img.url, 'w400')}
-                                    alt={img.name || `thumb-${imgIdx}`}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => handleDriveImageError(e, img)}
-                                  />
-                                </button>
+                                  sizeClass="w-8 h-8"
+                                />
                               ))}
                               {itemImages.length > 2 && (
                                 <button
@@ -2396,25 +2417,27 @@ export default function OnlineOrderCard({
                             {pUnit}
                           </span>
 
-                          {/* ราคาต่อหน่วยจริง: ช่อง Input w-24 h-8 pl-4 pr-2 text-right font-mono text-xs bg-white border border-slate-200 rounded-lg focus:border-indigo-500 พร้อมเครื่องหมาย ฿ จิ๋ว */}
-                          <div className="relative w-24 h-8 shrink-0">
-                            <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-mono select-none pointer-events-none">฿</span>
-                            <input
-                              type="number"
-                              min="0"
-                              step="any"
-                              value={currentItem.unitPrice === '' ? '' : currentItem.unitPrice}
-                              onChange={(e) => handlePriceChange(resolvedIdx, e.target.value)}
-                              placeholder="0.00"
-                              className="w-24 h-8 pl-4 pr-2 text-right font-mono text-xs bg-white border border-slate-200 rounded-lg focus:border-indigo-500 focus:outline-none transition-all tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
-                              title="ราคาซื้อจริงต่อหน่วยจากหน้าเว็บ"
-                            />
+                          {/* ราคารวมที่จ่ายจริง: ช่อง Input */}
+                          <div className="flex flex-col items-end shrink-0">
+                            <div className="relative w-28 h-8">
+                              <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-mono select-none pointer-events-none">฿</span>
+                              <input
+                                type="number"
+                                min="0"
+                                step="any"
+                                value={currentItem.actualTotal === '' ? '' : currentItem.actualTotal}
+                                onChange={(e) => handleTotalChange(resolvedIdx, e.target.value)}
+                                placeholder="0.00"
+                                className="w-28 h-8 pl-4 pr-2 text-right font-mono text-xs bg-white border border-slate-200 rounded-lg focus:border-indigo-500 focus:outline-none transition-all tabular-nums [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                                title="ราคารวมที่จ่ายจริง"
+                              />
+                            </div>
+                            {Number(pQty) > 0 && currentItem.actualTotal !== '' && (
+                              <span className="text-[10px] text-slate-500 font-medium mt-1 text-right">
+                                เฉลี่ย @ ฿{((Number(currentItem.actualTotal) || 0) / Number(pQty)).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {pUnit}
+                              </span>
+                            )}
                           </div>
-
-                          {/* ราคารวมจริงรายบรรทัด: font-mono text-xs font-bold text-slate-900 min-w-[75px] text-right */}
-                          <span className="font-mono text-xs font-bold text-slate-900 min-w-[75px] text-right shrink-0">
-                            ฿{formatMoney(lineTotal)}
-                          </span>
                         </div>
                       </div>
                     );
@@ -2468,19 +2491,13 @@ export default function OnlineOrderCard({
                               title={`คลิกเพื่อดูรูปภาพขยาย (${itemImages.length} รูป)`}
                             >
                               {itemImages.slice(0, 2).map((img, imgIdx) => (
-                                <button
+                                <AttachmentThumbnail
                                   key={imgIdx}
-                                  type="button"
+                                  img={img}
+                                  imgIdx={imgIdx}
                                   onClick={() => openLightbox(itemImages, imgIdx, currentItem.name)}
-                                  className="relative w-7 h-7 rounded-md border border-slate-200 shadow-2xs overflow-hidden bg-slate-100 transition-transform duration-150 hover:scale-110 hover:z-10 cursor-pointer shrink-0 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                >
-                                  <img
-                                    src={resolveDriveImageUrl(img.url, 'w400')}
-                                    alt={img.name || `thumb-${imgIdx}`}
-                                    className="w-full h-full object-cover"
-                                    onError={(e) => handleDriveImageError(e, img)}
-                                  />
-                                </button>
+                                  sizeClass="w-7 h-7"
+                                />
                               ))}
                               {itemImages.length > 2 && (
                                 <button
