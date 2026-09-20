@@ -2,6 +2,8 @@ import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 import { viteSingleFile } from 'vite-plugin-singlefile';
 
+import { visualizer } from 'rollup-plugin-visualizer';
+
 // https://vite.dev/config/
 export default defineConfig(({ mode }) => {
   const isGas = mode === 'gas' || process.env.BUILD_GAS === 'true';
@@ -10,6 +12,7 @@ export default defineConfig(({ mode }) => {
     plugins: [
       react(),
       isGas && viteSingleFile(),
+      visualizer({ filename: 'stats.html', template: 'treemap' }),
     ].filter(Boolean),
 
     server: {
@@ -30,19 +33,16 @@ export default defineConfig(({ mode }) => {
       outDir: isGas ? 'dist-gas' : 'dist',
       emptyOutDir: true,
       target: 'es2020',
-      minify: isGas ? 'terser' : 'esbuild',
-      terserOptions: isGas
+      minify: 'esbuild',
+      esbuild: isGas
         ? {
-            compress: {
-              drop_console: true,
-              drop_debugger: true,
-            },
+            drop: ['console', 'debugger'],
           }
         : undefined,
       cssCodeSplit: !isGas,
       assetsInlineLimit: isGas ? 10240 : 4096,
       chunkSizeWarningLimit: 10000,
-      sourcemap: false,
+      sourcemap: true,
     },
   };
 });

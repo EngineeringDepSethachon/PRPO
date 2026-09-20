@@ -20,7 +20,43 @@
   FORM: Grounded Candidate 4 (Inspector's Clipboard), seed key b3827d85.
   FINISH: unreviewed and undocumented is unfinished; this build ends with the finish review, the verdict, and DESIGN.md
   -->
-  <div id="root"></div>
+  <style>
+    /* Instant App Shell Spinner */
+    #app-loading-shell {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: #f8fafc;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      z-index: 99999;
+      font-family: 'Inter', sans-serif;
+    }
+    .shell-spinner {
+      width: 40px; height: 40px;
+      border: 3px solid #e2e8f0;
+      border-top: 3px solid #4f46e5;
+      border-radius: 50%;
+      animation: shell-spin 1s linear infinite;
+      margin-bottom: 16px;
+    }
+    .shell-text {
+      color: #64748b;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    @keyframes shell-spin {
+      0% { transform: rotate(0deg); }
+      100% { transform: rotate(360deg); }
+    }
+  </style>
+  <div id="root">
+    <div id="app-loading-shell">
+      <div class="shell-spinner"></div>
+      <div class="shell-text">Loading System...</div>
+    </div>
+  </div>
   <script type="module" src="/src/main.jsx"></script>
 </body>
 

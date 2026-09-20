@@ -4,7 +4,7 @@ import { NavLink } from 'react-router-dom';
 import { 
   LayoutDashboard, Sparkles, ScrollText, ReceiptText, Boxes, Zap, 
   SlidersHorizontal, WalletCards, ShoppingBag, Factory, X,
-  User, ArrowRightLeft, ShieldCheck, LogOut
+  User, ArrowRightLeft, ShieldCheck, LogOut, RefreshCw
 } from 'lucide-react';
 import { workflowEngine } from '../../services/workflowEngine';
 import { notificationService } from '../../services/notificationService';
@@ -35,6 +35,32 @@ export default function Sidebar({
 }) {
 
   const [showProfileModal, setShowProfileModal] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+
+  const handleGlobalRefresh = async () => {
+    if (isRefreshing) return;
+    setIsRefreshing(true);
+    try {
+      // Execute the provided onRefresh callback or context refresh
+      if (context?.refreshData) {
+        await context.refreshData();
+      } else if (typeof onRefresh === 'function') {
+        const result = onRefresh();
+        if (result instanceof Promise) {
+          await result;
+        }
+      }
+      
+      // Display success toast
+      if (typeof window !== 'undefined' && window.showToast) {
+        window.showToast('อัปเดตข้อมูลล่าสุดเรียบร้อย', 'success');
+      }
+    } catch (err) {
+      console.warn('Global refresh error:', err);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   // App context for dynamic notifications
   let context = null;
@@ -343,6 +369,17 @@ export default function Sidebar({
 
           {/* Top Actions: Notification Bell & Mobile Close Button */}
           <div className="flex items-center gap-1.5 shrink-0 ml-1">
+            <button
+              onClick={handleGlobalRefresh}
+              disabled={isRefreshing}
+              className={`w-8 h-8 rounded-xl border border-slate-200/80 flex items-center justify-center transition-colors cursor-pointer group relative ${
+                isRefreshing ? 'bg-slate-50 text-slate-400 cursor-not-allowed' : 'hover:bg-slate-100/80 text-slate-500 hover:text-indigo-600'
+              }`}
+              aria-label="รีเฟรชข้อมูลล่าสุด"
+              title="รีเฟรชข้อมูลล่าสุด"
+            >
+              <RefreshCw className={`w-4 h-4 ${isRefreshing ? 'animate-spin' : ''}`} />
+            </button>
 
             {onItemClick && (
               <button 

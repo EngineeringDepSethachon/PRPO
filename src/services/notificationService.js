@@ -301,13 +301,7 @@ export const notificationService = {
     const all = this.getAll();
     const updated = all.map(n => (n.id === id || n._id === id) ? { ...n, isRead: true, read: true, status: 'read' } : n);
     this.saveAll(updated);
-    try {
-      await fetch(`/api/notifications/${id}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isRead: true, read: true, status: 'read' })
-      });
-    } catch (e) {}
+
     return updated;
   },
 
@@ -336,13 +330,7 @@ export const notificationService = {
 
     this.saveAll(updated);
 
-    try {
-      await fetch('/api/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-    } catch (e) {}
+
 
     return updated;
   },
@@ -350,9 +338,7 @@ export const notificationService = {
   // Clear all
   clearAll() {
     this.saveAll([]);
-    try {
-      fetch('/api/notifications', { method: 'DELETE' }).catch(() => {});
-    } catch (e) {}
+
   },
 
   // Dispatch an In-App Notification
@@ -399,13 +385,7 @@ export const notificationService = {
     const trimmed = all.slice(0, 100);
     this.saveAll(trimmed);
 
-    try {
-      fetch('/api/notifications', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newNoti)
-      }).catch(() => {});
-    } catch (e) {}
+
 
     return newNoti;
   }

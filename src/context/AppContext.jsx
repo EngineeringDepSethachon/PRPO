@@ -174,7 +174,8 @@ export function AppProvider({ children }) {
           vendors: vendorsData,
           storageLocations: locsData,
           usageUnits: unitsData,
-          budgetTransactions: txsData
+          budgetTransactions: txsData,
+          notifications: notisData
         } = bootstrapData;
 
         // Prioritize master products list (prodsData), enrich with inventory stock (invData)
@@ -280,10 +281,7 @@ export function AppProvider({ children }) {
             }
             return n;
           });
-          setNotifications(merged);
           notificationService.saveAll(merged);
-        } else {
-          setNotifications(notificationService.getAll());
         }
 
         const bSummary = workflowEngine.calculateBudgetSummary();
@@ -416,7 +414,7 @@ export function AppProvider({ children }) {
         if (Array.isArray(payload.stockLogs)) setStockLogs(payload.stockLogs);
         if (Array.isArray(payload.budgetTransactions)) setBudgetTransactions(payload.budgetTransactions);
         if (Array.isArray(payload.notifications)) {
-          setNotifications(payload.notifications);
+          notificationService.saveAll(payload.notifications);
         }
         const bSummary = workflowEngine.calculateBudgetSummary();
         if (bSummary) setBudgetSummary(bSummary);
@@ -672,17 +670,31 @@ export function AppProvider({ children }) {
   }, [currentRole, loadAllData]);
 
   const handleCancelPR = useCallback(async (prId, reason) => {
-    const result = await apiService.cancelPR(prId, currentRole, reason);
-    if (result) {
-      setPRs(prev => prev.map(p => 
-        (p.id === prId || p.prNo === prId || (result.id && p.id === result.id) || (result.prNo && p.prNo === result.prNo))
-          ? { ...p, ...result }
-          : p
-      ));
-    }
-    setTimeout(() => { loadAllData(true); }, 1000);
-    return result;
-  }, [currentRole, loadAllData]);
+    // 1. Optimistic Update
+    setPRs(prev => prev.map(p => 
+      (p.id === prId || p.prNo === prId) 
+        ? { ...p, status: 'CANCELLED' } 
+        : p
+    ));
+
+    // 2. Fire and forget network call (Non-blocking)
+    apiService.cancelPR(prId, currentRole, reason)
+      .then(result => {
+        if (result) {
+          setPRs(prev => prev.map(p => 
+            (p.id === prId || p.prNo === prId || (result.id && p.id === result.id) || (result.prNo && p.prNo === result.prNo))
+              ? { ...p, ...result }
+              : p
+          ));
+        }
+      })
+      .catch(err => {
+        console.error('[AppContext] Failed to cancel PR on backend:', err);
+      });
+
+    // 3. Return instantly (No loadAllData full reload to save time)
+    return { id: prId, prNo: prId, status: 'CANCELLED' };
+  }, [currentRole]);
 
   // Immutable PO updater in state with storage persistence
   const updatePO = useCallback((poId, updates) => {

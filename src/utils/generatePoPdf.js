@@ -1,6 +1,5 @@
-import { PDFDocument, rgb } from 'pdf-lib';
-import fontkit from '@pdf-lib/fontkit';
 import { storageService } from '../services/storageService.js';
+import { apiService } from '../services/apiService.js';
 
 /**
  * Thai PUA Glyphs Shaper & Normalizer for PDF-lib / TrueType fonts
@@ -310,31 +309,39 @@ export async function generatePoPdf(po) {
     await document.fonts.ready;
   }
 
+  // Dynamically import heavyweight PDF libraries via CDN to reduce bundle size
+  const { PDFDocument, rgb } = await import('https://esm.sh/pdf-lib@1.17.1');
+  let fontkit = (await import('https://esm.sh/@pdf-lib/fontkit@1.1.1')).default;
+  if (fontkit.default) fontkit = fontkit.default;
+
   const pdfDoc = await PDFDocument.create();
   pdfDoc.registerFontkit(fontkit);
 
   // 1. โหลดฟอนต์ TH Sarabun New รองรับภาษาไทยและชุดอักขระ Thai PUA Glyphs (U+F700 - U+F71A)
+  const isGas = typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_GAS === 'true';
+
   const loadFontBytes = async (localPath, fallbackCdnUrl) => {
     try {
-      const res = await fetch(localPath);
-      if (res.ok) return await res.arrayBuffer();
-    } catch {
-      // ignore and fallback
+      if (!isGas) {
+        const res = await fetch(localPath);
+        if (res.ok) return await res.arrayBuffer();
+      }
+      throw new Error('Fallback to CDN');
+    } catch (e) {
+      const fb = await fetch(fallbackCdnUrl);
+      return await fb.arrayBuffer();
     }
-    const cdnRes = await fetch(fallbackCdnUrl);
-    return await cdnRes.arrayBuffer();
   };
 
-  const [fontBytes, boldFontBytes] = await Promise.all([
-    loadFontBytes(
-      '/fonts/THSarabunNew.ttf',
-      'https://cdn.jsdelivr.net/npm/font-th-sarabun-new@1.0.0/fonts/THSarabunNew-webfont.ttf'
-    ),
-    loadFontBytes(
-      '/fonts/THSarabunNew-Bold.ttf',
-      'https://cdn.jsdelivr.net/npm/font-th-sarabun-new@1.0.0/fonts/THSarabunNew_bold-webfont.ttf'
-    ),
-  ]);
+  const fontBytes = await loadFontBytes(
+    '/fonts/THSarabunNew.ttf',
+    'https://cdn.jsdelivr.net/npm/font-th-sarabun-new@1.0.0/fonts/THSarabunNew-webfont.ttf'
+  );
+
+  const boldFontBytes = await loadFontBytes(
+    '/fonts/THSarabunNew-Bold.ttf',
+    'https://cdn.jsdelivr.net/npm/font-th-sarabun-new@1.0.0/fonts/THSarabunNew_bold-webfont.ttf'
+  );
 
   const customFont = await pdfDoc.embedFont(fontBytes);
   const boldFont = await pdfDoc.embedFont(boldFontBytes);
@@ -345,66 +352,26 @@ export async function generatePoPdf(po) {
   const rightX = 555; // width - marginX (595.28 - 40 ≈ 555.28)
 
 
-  // โหลดรูปภาพตราสัญลักษณ์บริษัท (SC Logo)
-  let logoImage = null;
-  try {
-    const logoRes = await fetch('/images/sc-logo.png');
-    if (logoRes.ok) {
-      const logoBytes = await logoRes.arrayBuffer();
-      logoImage = await pdfDoc.embedPng(logoBytes);
-    }
-  } catch (err) {
-    console.warn('Cannot load PO logo for PDF:', err);
-  }
-
   // 4. ส่วนหัวเอกสารควบคุม (QMS/DCC Header)
   // ── Y เริ่มต้นของหัวเอกสาร (บรรทัดแรก = ชื่อบริษัท) ──
   const headerStartY = height - 52;
 
-  // บริษัท เศรษฐชล จำกัด (ฝั่งซ้าย)
-  if (logoImage) {
-    // ── โลโก้รักษาสัดส่วนภาพจริง (scaleToFit 46×46) วางที่ x: 42, y: 752 ──
-    const logoDims = logoImage.scaleToFit ? logoImage.scaleToFit(46, 46) : { width: 44, height: 44 };
-    page.drawImage(logoImage, {
-      x: 42,
-      y: 752,
-      width: logoDims.width,
-      height: logoDims.height,
-    });
-    // บรรทัด 1: ชื่อบริษัท (Y = headerStartY)
-    page.drawText(normalizeThaiText('บริษัท เศรษฐชล จำกัด (สำนักงานใหญ่)'), {
-      x: 98, y: headerStartY, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.2)
-    });
-    // บรรทัด 2: ที่อยู่ บรรทัด 1 (ตัดคำป้องกันการทับซ้อนกับฝั่งขวา) (Y -= 16 pt)
-    page.drawText(normalizeThaiText('ที่อยู่ 225 หมู่ที่ 12 ถนนเทพารักษ์ ตำบลบางพลีใหญ่'), {
-      x: 98, y: headerStartY - 16, size: 9, font: customFont, color: rgb(0.3, 0.3, 0.3)
-    });
-    // บรรทัด 3: ที่อยู่ บรรทัด 2 (Y -= 15 pt = headerStartY - 31)
-    page.drawText(normalizeThaiText('อำเภอบางพลี จังหวัดสมุทรปราการ 10540'), {
-      x: 98, y: headerStartY - 31, size: 9, font: customFont, color: rgb(0.3, 0.3, 0.3)
-    });
-    // บรรทัด 4: TAX ID (Y -= 15 pt = headerStartY - 46)
-    page.drawText(normalizeThaiText('เลขประจำตัวผู้เสียภาษี (TAX ID): 0-10553-2104-63-7'), {
-      x: 98, y: headerStartY - 46, size: 9, font: customFont, color: rgb(0.3, 0.3, 0.3)
-    });
-  } else {
-    // บรรทัด 1: ชื่อบริษัท
-    page.drawText(normalizeThaiText('บริษัท เศรษฐชล จำกัด (สำนักงานใหญ่)'), {
-      x: 42, y: headerStartY, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.2)
-    });
-    // บรรทัด 2: ที่อยู่ บรรทัด 1 (Y -= 16 pt)
-    page.drawText(normalizeThaiText('ที่อยู่ 225 หมู่ที่ 12 ถนนเทพารักษ์ ตำบลบางพลีใหญ่'), {
-      x: 42, y: headerStartY - 16, size: 9, font: customFont, color: rgb(0.3, 0.3, 0.3)
-    });
-    // บรรทัด 3: ที่อยู่ บรรทัด 2 (Y -= 15 pt)
-    page.drawText(normalizeThaiText('อำเภอบางพลี จังหวัดสมุทรปราการ 10540'), {
-      x: 42, y: headerStartY - 31, size: 9, font: customFont, color: rgb(0.3, 0.3, 0.3)
-    });
-    // บรรทัด 4: TAX ID (Y -= 15 pt)
-    page.drawText(normalizeThaiText('เลขประจำตัวผู้เสียภาษี (TAX ID): 0-10553-2104-63-7'), {
-      x: 42, y: headerStartY - 46, size: 9, font: customFont, color: rgb(0.3, 0.3, 0.3)
-    });
-  }
+  // บรรทัด 1: ชื่อบริษัท
+  page.drawText(normalizeThaiText('บริษัท เศรษฐชล จำกัด (สำนักงานใหญ่)'), {
+    x: 42, y: headerStartY, size: 14, font: boldFont, color: rgb(0.1, 0.1, 0.2)
+  });
+  // บรรทัด 2: ที่อยู่ บรรทัด 1 (Y -= 16 pt)
+  page.drawText(normalizeThaiText('ที่อยู่ 225 หมู่ที่ 12 ถนนเทพารักษ์ ตำบลบางพลีใหญ่'), {
+    x: 42, y: headerStartY - 16, size: 9, font: customFont, color: rgb(0.3, 0.3, 0.3)
+  });
+  // บรรทัด 3: ที่อยู่ บรรทัด 2 (Y -= 15 pt)
+  page.drawText(normalizeThaiText('อำเภอบางพลี จังหวัดสมุทรปราการ 10540'), {
+    x: 42, y: headerStartY - 31, size: 9, font: customFont, color: rgb(0.3, 0.3, 0.3)
+  });
+  // บรรทัด 4: TAX ID (Y -= 15 pt)
+  page.drawText(normalizeThaiText('เลขประจำตัวผู้เสียภาษี (TAX ID): 0-10553-2104-63-7'), {
+    x: 42, y: headerStartY - 46, size: 9, font: customFont, color: rgb(0.3, 0.3, 0.3)
+  });
 
   // ── ข้อมูลเลขที่ PO และวันที่ออก PO (ชิดขอบขวาสุด rightX = 555, ไม่มีกรอบสี่เหลี่ยม) ──
   const poNoText = normalizeThaiText(`เลขที่ PO: ${po?.poNo || po?.id || po?.poNumber || '-'}`);
@@ -680,29 +647,16 @@ export async function generatePoPdf(po) {
   }
 
   // Fetch users with signatures
-  let users = [];
-  try {
-    const res = await fetch('/api/users');
-    if (res.ok) users = await res.json();
-  } catch {
-    // fallback
-  }
-  if (!users || users.length === 0) {
-    users = storageService.getUsers() || [];
-  }
+  let users = await apiService.getUsers(false) || storageService.getUsers() || [];
 
   // Retrieve linked PR data for approval history and timestamps
   const prs = storageService.getPRs() || [];
   let prData = po?.prData || prs.find(p => p.id === po.prId || p.prNo === po.prNo || p.id === po.prNumber || p.prNo === po.prNumber) || null;
   if (!prData && (po?.prId || po?.prNo || po?.prNumber)) {
     try {
-      const res = await fetch('/api/storage');
-      if (res.ok) {
-        const storageData = await res.json();
-        const apiPrs = storageData?.prs || storageData?.PRS;
-        if (Array.isArray(apiPrs)) {
-          prData = apiPrs.find(p => p.id === po.prId || p.prNo === po.prNo || p.id === po.prNumber || p.prNo === po.prNumber) || null;
-        }
+      const apiPrs = await apiService.getPRs(false) || storageService.getPRs() || [];
+      if (Array.isArray(apiPrs)) {
+        prData = apiPrs.find(p => p.id === po.prId || p.prNo === po.prNo || p.id === po.prNumber || p.prNo === po.prNumber) || null;
       }
     } catch { }
   }

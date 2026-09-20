@@ -177,4 +177,30 @@ describe('Domain Suite: Quick Issue Location Tracking & Analytics', () => {
       expect(issueValue).toBe(690);
     });
   });
+
+  describe('7. Usage Analytics UI/UX Formatting & Column Consistency', () => {
+    it('converts ISO string (UTC) to Thai Buddhist Era (พ.ศ. / GMT+7) without raw T, Z, or ms', async () => {
+      const { formatThaiDateTime } = await import('../src/utils/formatters');
+      const isoUtc = '2026-09-20T00:28:56.394Z';
+      const formatted = formatThaiDateTime(isoUtc);
+      expect(formatted).toBe('20/09/2569 07:28 น.');
+      expect(formatted).not.toContain('T');
+      expect(formatted).not.toContain('Z');
+      expect(formatted).not.toContain('394');
+    });
+
+    it('formats evening UTC ISO string correctly to Bangkok next day / GMT+7', async () => {
+      const { formatThaiDateTime } = await import('../src/utils/formatters');
+      const isoUtc = '2026-09-19T15:02:15.024Z';
+      const formatted = formatThaiDateTime(isoUtc);
+      expect(formatted).toBe('19/09/2569 22:02 น.');
+    });
+
+    it('handles empty or placeholder date safely', async () => {
+      const { formatThaiDateTime } = await import('../src/utils/formatters');
+      expect(formatThaiDateTime(null)).toBe('..... / ..... / .........');
+      expect(formatThaiDateTime('-')).toBe('..... / ..... / .........');
+    });
+  });
 });
+

@@ -19,10 +19,6 @@ export default function DashboardView({
   deptFilter,
   onDeptFilterChange
 }) {
-  // If loading and no products or documents loaded yet, show non-blocking skeleton immediately
-  if (isLoading && products.length === 0 && prs.length === 0 && pos.length === 0) {
-    return <DashboardSkeleton />;
-  }
 
   const effectiveUser = currentUser || currentRole;
 
@@ -216,6 +212,11 @@ export default function DashboardView({
       onNavigate('pr-create', { prefillProduct: batchPayload, department: batchPayload[0]?.department });
     }
   };
+
+  // If loading and no products or documents loaded yet, show non-blocking skeleton immediately
+  if (isLoading && products.length === 0 && prs.length === 0 && pos.length === 0) {
+    return <DashboardSkeleton />;
+  }
 
   return (
     <div className="p-6 max-w-[1600px] mx-auto space-y-5 animate-fade-in pb-12">

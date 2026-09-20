@@ -147,7 +147,7 @@ export default function ReceivingModal({
   currentUser: propCurrentUser,
   user: propUser
 }) {
-  const targetPO = po || selectedPO;
+  const targetPO = po || selectedPO || { items: [] };
   const isOnlinePurchase = targetPO?.isOnlinePurchase === true || targetPO?.purchaseChannel === 'ONLINE';
   const auth = useAuth();
   const appContext = useAppContext();
@@ -159,7 +159,7 @@ export default function ReceivingModal({
   const actorName = activeUser?.name || activeUser?.employeeName || activeUser?.username || (typeof activeUser === 'string' ? activeUser : 'ผู้ตรวจรับพัสดุ');
   const actorRole = activeUser?.canonicalRole || activeUser?.roleId || activeUser?.role || activeUser?.title || 'REQUESTER';
 
-  if (!isOpen || !targetPO) return null;
+
 
   const handleBackToPO = onBack || onBackToPO;
 
@@ -1889,6 +1889,8 @@ export default function ReceivingModal({
   if (typeof document === 'undefined') {
     return modalContent;
   }
+
+  if (!isOpen || !targetPO) return null;
 
   return createPortal(
     <>

@@ -1889,17 +1889,44 @@ function apiCancelPR(rawPayload, userContext) {
     prObj.cancelledAt = prObj.cancelledAt || new Date().toISOString();
     prObj.updatedAt = new Date().toISOString();
 
-    ['items', 'history', 'timeline', 'activityLog', 'approvalHistory', 'comments'].forEach(function(field) {
-      if (prObj[field]) {
-        var rawVal = prObj[field];
-        if (typeof rawVal === 'string') {
-          try { rawVal = JSON.parse(rawVal); } catch (e) { rawVal = []; }
-        }
-        prObj[field] = JSON.stringify(Array.isArray(rawVal) ? rawVal : []);
-      }
-    });
+    // 1. Find Row and Update Specifically in RAM (Zero JSON parsing overhead)
+    var targetId = prObj.prNo || prObj.id;
+    var sheet = getSheet(SHEET_NAMES.PRS);
+    var values = sheet.getDataRange().getValues();
+    var headers = values[0].map(function(h) { return String(h).trim(); });
+    
+    var idColIdx = headers.indexOf('id');
+    var statusColIdx = headers.indexOf('status');
+    var reasonColIdx = headers.indexOf('reason');
+    if (reasonColIdx === -1) reasonColIdx = headers.indexOf('rejectReason');
+    var cancelByColIdx = headers.indexOf('cancelledBy');
+    var cancelAtColIdx = headers.indexOf('cancelledAt');
+    var updatedByColIdx = headers.indexOf('updatedBy');
+    var updatedAtColIdx = headers.indexOf('updatedAt');
 
-    var result = upsertRecordFast(SHEET_NAMES.PRS, 'id', prObj);
+    var rowIndexToUpdate = -1;
+    var existingRow = null;
+    for (var i = 1; i < values.length; i++) {
+      if (String(values[i][idColIdx]).trim() === targetId) {
+        rowIndexToUpdate = i + 1; // 1-based index
+        existingRow = values[i];
+        break;
+      }
+    }
+
+    if (rowIndexToUpdate !== -1) {
+      if (statusColIdx > -1) existingRow[statusColIdx] = 'CANCELLED';
+      if (reasonColIdx > -1) existingRow[reasonColIdx] = actualReason;
+      if (cancelByColIdx > -1) existingRow[cancelByColIdx] = prObj.cancelledBy;
+      if (cancelAtColIdx > -1) existingRow[cancelAtColIdx] = prObj.cancelledAt;
+      if (updatedByColIdx > -1) existingRow[updatedByColIdx] = user.name;
+      if (updatedAtColIdx > -1) existingRow[updatedAtColIdx] = prObj.updatedAt;
+      
+      // เขียนแบบครั้งเดียวจบ (Single Batch Write)
+      sheet.getRange(rowIndexToUpdate, 1, 1, headers.length).setValues([existingRow]);
+    } else {
+      upsertRecordFast(SHEET_NAMES.PRS, 'id', prObj);
+    }
 
     var committed = Number(prObj.totalAmount || prObj.grandTotal || 0);
     if (committed > 0) {
@@ -1924,7 +1951,12 @@ function apiCancelPR(rawPayload, userContext) {
       console.warn('AuditLog Error in apiCancelPR:', e);
     }
 
-    // Trigger In-App Notification (PR Cancelled & Budget Released)
+    // 2. ปล่อย Lock ทันทีที่เขียนข้อมูลหลักเสร็จสิ้น
+    try {
+      LockService.getScriptLock().releaseLock();
+    } catch(e) {}
+
+    // 3. Trigger Notification (แบบไม่บล็อกการเขียนข้อมูล)
     try {
       recordNotification({
         title: 'PR ถูกยกเลิกและคืนงบประมาณแล้ว',

@@ -33,6 +33,13 @@ const parseLogDate = (log) => {
   return parseSafeDate(log.timestamp || log.date);
 };
 
+// Helper to format date into Thai Buddhist Era and GMT+7 time
+const safeThaiDateTime = (val) => {
+  if (!val || val === '-') return '-';
+  const formatted = formatThaiDateTime(val);
+  return formatted === '..... / ..... / .........' ? '-' : formatted;
+};
+
 // Helper to extract unit / room name from log
 // Priority: log.location (new GAS field) > log.issueUnit > note bracket pattern
 const getLogUnit = (log) => {
@@ -584,13 +591,13 @@ export default function QuickIssueView({
           count: 0,
           totalValue: 0,
           unitCost: Number(log.unitCost ?? (prod?.avgCost || prod?.costPrice || prod?.price || 0)),
-          lastDate: log.date || '-'
+          lastDate: log.date || log.timestamp || '-'
         };
       }
       unitMap[unitName].items[pCode].qty += Number(log.qty) || 0;
       unitMap[unitName].items[pCode].count += 1;
       unitMap[unitName].items[pCode].totalValue += cost;
-      unitMap[unitName].items[pCode].lastDate = log.date || unitMap[unitName].items[pCode].lastDate;
+      unitMap[unitName].items[pCode].lastDate = log.date || log.timestamp || unitMap[unitName].items[pCode].lastDate;
     });
 
     const unitList = Object.values(unitMap).map(u => ({
@@ -1713,22 +1720,21 @@ export default function QuickIssueView({
               <table className="w-full text-left text-xs sm:text-sm">
                 <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs text-slate-500 font-bold text-[11px] uppercase tracking-wider border-b border-slate-200">
                   <tr>
-                    <th className="py-3.5 px-4 pl-6">หน่วยที่เบิก (Location)</th>
-                    <th className="py-3.5 px-4">รหัสสินค้า</th>
-                    <th className="py-3.5 px-4">ชื่อสินค้า</th>
-                    <th className="py-3.5 px-4 text-center">แผนก</th>
-                    <th className="py-3.5 px-4 text-center">จำนวนครั้ง</th>
-                    <th className="py-3.5 px-4 text-right">ยอดรวมที่เบิก</th>
-                    <th className="py-3.5 px-4 text-right">ต้นทุนเฉลี่ย</th>
-                    <th className="py-3.5 px-4 text-right">มูลค่ารวม (บาท)</th>
-                    <th className="py-3.5 px-4 text-right">สัดส่วน (%)</th>
-                    <th className="py-3.5 px-4 text-right pr-6">เบิกล่าสุด</th>
+                    <th className="py-3.5 px-4 pl-6 whitespace-nowrap">หน่วยที่เบิก (Location)</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">รหัสสินค้า</th>
+                    <th className="py-3.5 px-4 min-w-[200px]">ชื่อสินค้า</th>
+                    <th className="py-3.5 px-4 text-center whitespace-nowrap">แผนก</th>
+                    <th className="py-3.5 px-4 text-center whitespace-nowrap">จำนวนครั้ง</th>
+                    <th className="py-3.5 px-4 text-right whitespace-nowrap">ยอดรวมที่เบิก</th>
+                    <th className="py-3.5 px-4 text-right whitespace-nowrap">มูลค่ารวม (บาท)</th>
+                    <th className="py-3.5 px-4 text-right whitespace-nowrap">สัดส่วน (%)</th>
+                    <th className="py-3.5 px-4 text-right pr-6 whitespace-nowrap">เบิกล่าสุด</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginatedMatrixRows.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="p-8 text-center text-slate-400">
+                      <td colSpan="9" className="p-8 text-center text-slate-400">
                         <PackageCheck className="w-8 h-8 mx-auto text-slate-300 mb-2" />
                         <p className="font-semibold text-slate-600">ไม่พบข้อมูลการเบิกจ่ายตามเงื่อนไขที่เลือก</p>
                         <p className="text-xs text-slate-400 mt-1">ลองเปลี่ยนตัวกรองหน่วยหรือช่วงเวลาเพื่อดูข้อมูล</p>
@@ -1739,38 +1745,35 @@ export default function QuickIssueView({
                       const config = usageUnitConfigMap[row.unitName] || { color: 'bg-slate-100 text-slate-700', badgeBg: 'bg-slate-100 text-slate-800' };
                       return (
                         <tr key={`${row.unitName}-${row.code}-${idx}`} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3 px-4 pl-6">
+                          <td className="py-3 px-4 pl-6 whitespace-nowrap">
                             <span className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold border ${config.color}`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${config.dot || 'bg-slate-500'}`} />
                               {row.unitName}
                             </span>
                           </td>
-                          <td className="py-3 px-4 font-mono font-bold text-slate-700 text-xs">
+                          <td className="py-3 px-4 font-mono font-bold text-slate-700 text-xs whitespace-nowrap">
                             {row.code}
                           </td>
                           <td className="py-3 px-4 font-semibold text-slate-800 max-w-[280px] truncate" title={row.name}>
                             {row.name}
                           </td>
-                          <td className="py-3 px-4 text-center">
+                          <td className="py-3 px-4 text-center whitespace-nowrap">
                             <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
                               row.dept === 'PD' ? 'bg-blue-50 text-blue-700 border border-blue-200/60' : 'bg-amber-50 text-amber-700 border border-amber-200/60'
                             }`}>
                               {row.dept}
                             </span>
                           </td>
-                          <td className="py-3 px-4 text-center font-mono font-bold text-slate-700">
+                          <td className="py-3 px-4 text-center font-mono font-bold text-slate-700 whitespace-nowrap">
                             {row.count} ครั้ง
                           </td>
-                          <td className="py-3 px-4 text-right font-mono font-bold text-rose-600 text-sm">
+                          <td className="py-3 px-4 text-right font-mono font-bold text-rose-600 text-sm whitespace-nowrap">
                             {row.qty.toLocaleString()} <span className="text-xs font-normal text-slate-400 font-sans">{row.unit}</span>
                           </td>
-                          <td className="py-3 px-4 text-right font-mono text-slate-500 text-xs">
-                            ฿{Number(row.unitCost || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </td>
-                          <td className="py-3 px-4 text-right font-mono font-bold text-slate-700 text-sm">
+                          <td className="py-3 px-4 text-right font-mono font-bold text-slate-700 text-sm whitespace-nowrap">
                             ฿{Number(row.totalValue || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </td>
-                          <td className="py-3 px-4 text-right font-mono text-slate-600">
+                          <td className="py-3 px-4 text-right font-mono text-slate-600 whitespace-nowrap">
                             <div className="flex items-center justify-end gap-1.5">
                               <span>{row.pctOfTotal}%</span>
                               <div className="w-10 bg-slate-100 h-1.5 rounded-full overflow-hidden hidden sm:block">
@@ -1779,7 +1782,7 @@ export default function QuickIssueView({
                             </div>
                           </td>
                           <td className="py-3 px-4 text-right pr-6 text-xs text-slate-500 whitespace-nowrap">
-                            {row.lastDate}
+                            {safeThaiDateTime(row.lastDate)}
                           </td>
                         </tr>
                       );
@@ -1834,13 +1837,13 @@ export default function QuickIssueView({
               <table className="w-full text-left text-xs sm:text-sm">
                 <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs text-slate-500 font-bold text-[11px] uppercase tracking-wider border-b border-slate-200">
                   <tr>
-                    <th className="py-3.5 px-4 pl-6">วัน-เวลา</th>
-                    <th className="py-3.5 px-4">เลขที่เอกสาร</th>
-                    <th className="py-3.5 px-4">หน่วยที่เบิก</th>
-                    <th className="py-3.5 px-4">สินค้า</th>
-                    <th className="py-3.5 px-4 text-right">จำนวนที่เบิก</th>
-                    <th className="py-3.5 px-4 text-right">คงเหลือ</th>
-                    <th className="py-3.5 px-4">ผู้ทำรายการ</th>
+                    <th className="py-3.5 px-4 pl-6 whitespace-nowrap">วัน-เวลา</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">เลขที่เอกสาร</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">หน่วยที่เบิก</th>
+                    <th className="py-3.5 px-4 min-w-[200px]">สินค้า</th>
+                    <th className="py-3.5 px-4 text-right whitespace-nowrap">จำนวนที่เบิก</th>
+                    <th className="py-3.5 px-4 text-right whitespace-nowrap">คงเหลือ</th>
+                    <th className="py-3.5 px-4 whitespace-nowrap">ผู้ทำรายการ</th>
                     <th className="py-3.5 px-4 pr-6">วัตถุประสงค์ / หมายเหตุ</th>
                   </tr>
                 </thead>
@@ -1859,8 +1862,8 @@ export default function QuickIssueView({
                       const prod = products.find(p => p.id === log.productId || p.code === log.productCode);
                       return (
                         <tr key={log.id} className="hover:bg-slate-50/80 transition-colors">
-                          <td className="py-3 px-4 pl-6 text-slate-600 whitespace-nowrap text-xs">
-                            {log.date}
+                          <td className="py-3 px-4 pl-6 text-slate-600 whitespace-nowrap text-xs font-medium">
+                            {safeThaiDateTime(log.timestamp || log.date)}
                           </td>
                           <td className="py-3 px-4 font-mono font-bold text-slate-800 text-xs">
                             {log.docNo}

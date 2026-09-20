@@ -1065,28 +1065,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
             </div>
           )}
 
-          {/* Piece 3: Refresh Button */}
-          <div className="flex flex-col justify-end">
-            <span className="text-[10px] font-bold text-transparent uppercase tracking-wider px-1 mb-1 hidden sm:block select-none pointer-events-none">
-              &nbsp;
-            </span>
-            <button
-              type="button"
-              id="budget-refresh-btn"
-              data-testid="budget-refresh-btn"
-              onClick={() => {
-                budgetService.resetBudgetData();
-                budgetService.syncSettledRefundsToBudget(pos, deptList);
-                if (onRefresh) onRefresh();
-                if (context?.refreshData) context.refreshData();
-              }}
-              className="h-[42px] px-3 bg-white hover:bg-slate-50 active:bg-slate-100 text-slate-600 hover:text-slate-900 border border-slate-200/80 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 shadow-xs hover:shadow-sm transition-all cursor-pointer group"
-              title="รีเฟรชและรีเซ็ตงบประมาณเป็นฐานข้อมูลปัจจุบัน (Refresh & Reset Budget Baseline)"
-            >
-              <RotateCw className="w-4 h-4 text-slate-400 group-hover:text-slate-700 group-hover:rotate-180 transition-all duration-300" />
-              <span className="hidden xl:inline">รีเฟรช</span>
-            </button>
-          </div>
+
         </div>
       </div>
 

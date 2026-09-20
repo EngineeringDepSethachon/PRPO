@@ -12,7 +12,6 @@ export default function DeleteLocationModal({
   onClose,
   onDeleted
 }) {
-  if (!location) return null;
 
   // Find all products currently assigned to this location
   const assignedProducts = useMemo(() => {
@@ -30,6 +29,8 @@ export default function DeleteLocationModal({
   const [targetLocationId, setTargetLocationId] = useState(otherLocations[0]?.id || '');
   const [isDeleting, setIsDeleting] = useState(false);
   const [error, setError] = useState('');
+
+  if (!location) return null;
 
   const handleDelete = async () => {
     setError('');

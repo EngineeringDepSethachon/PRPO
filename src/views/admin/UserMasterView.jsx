@@ -52,17 +52,8 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
   const fetchUsers = async () => {
     setIsLoading(true);
     try {
-      let data = [];
-      try {
-        const res = await fetch('/api/users');
-        if (res.ok) data = await res.json();
-      } catch {
-        // ignore
-      }
-      if (!data || data.length === 0) {
-        data = storageService.getUsers() || [];
-      }
-      setUsersList(data);
+      const data = await apiService.getUsers(true);
+      setUsersList(data || []);
     } catch (err) {
       console.error('Failed to load users:', err);
     } finally {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { storageService } from '../../services/storageService.js';
+import { SC_LOGO_BASE64 } from '../../utils/logoBase64.js';
 
 /**
  * Thai Unicode Text Normalizer
@@ -286,7 +287,7 @@ export default function PrintablePO({ po }) {
           {/* Left Column: Logo + Company Info */}
           <div className="flex items-start gap-4">
             <img
-              src="/images/sc-logo.png"
+              src={SC_LOGO_BASE64}
               alt="Logo"
               className="h-16 w-auto object-contain shrink-0 mt-1"
             />

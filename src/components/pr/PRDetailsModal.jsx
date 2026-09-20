@@ -342,18 +342,34 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
     setProcessingAction('กำลังบันทึกการยกเลิกคำขอ...');
     setIsProcessing(true);
     try {
+      let res;
       if (context?.cancelPR) {
-        await context.cancelPR(selectedPR.id, reason.trim());
+        res = await context.cancelPR(selectedPR.id, reason.trim());
       } else {
-        await apiService.cancelPR(selectedPR.id, currentRole, reason.trim());
+        res = await apiService.cancelPR(selectedPR.id, currentRole, reason.trim());
       }
-      await modalService.success('ยกเลิกสำเร็จ', `ยกเลิกใบขอซื้อ ${selectedPR.prNo} เรียบร้อยแล้ว`);
-      if (onRefresh) onRefresh();
-      onClose();
+      
+      // ตรวจสอบ Response ให้ยืดหยุ่นตามที่ได้รับจาก Backend
+      if (res || res?.success || res?.status === 'success' || res === true) {
+        // อัปเดตสถานะของ PR ใน State ท้องถิ่นทันที
+        selectedPR.status = 'CANCELLED';
+        
+        // สั่งปิด Modal ทันที ไม่ต้องรอ
+        onClose();
+        if (onRefresh) onRefresh();
+
+        // แสดง Toast แจ้งเตือนแบบไม่บล็อก UI
+        if (typeof window !== 'undefined' && window.showToast) {
+          window.showToast('ยกเลิกเอกสารเรียบร้อยแล้ว', 'success');
+        } else {
+          modalService.success('ยกเลิกสำเร็จ', 'ยกเลิกเอกสารเรียบร้อยแล้ว');
+        }
+      }
     } catch (err) {
       console.error('[Workflow Error Stack]:', err.stack || err);
       modalService.error('เกิดข้อผิดพลาดในการยกเลิก', err.message);
     } finally {
+      // สั่งรีเซ็ต State โหลดเสมอ
       setIsCancelling(false);
       setIsProcessing(false);
     }

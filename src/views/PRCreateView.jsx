@@ -141,36 +141,6 @@ export default function PRCreateView({
     return storageService.getPRs?.() || [];
   }, [context?.prs]);
 
-  // Master Vendors integration (Directive 1)
-  const masterVendors = useMemo(() => {
-    if (Array.isArray(vendors) && vendors.length > 0) return vendors;
-    if (Array.isArray(context?.vendors) && context.vendors.length > 0) return context.vendors;
-    return storageService.getVendors?.() || [];
-  }, [vendors, context?.vendors]);
-
-  const vendorOptions = useMemo(() => {
-    return masterVendors.map(v => ({
-      value: v.id,
-      label: v.name,
-      code: v.code,
-      subLabel: `${v.code} • โทร: ${v.phone || '-'} • เลขผู้เสียภาษี: ${v.taxId || '-'}`,
-      keywords: `${v.code} ${v.name} ${v.taxId || ''} ${v.phone || ''} ${v.contactPerson || ''}`
-    }));
-  }, [masterVendors]);
-
-  // Helper to find default vendor from product preferredSupplier / supplierId
-  const getDefaultVendorId = useCallback((prod) => {
-    if (!prod) return masterVendors[0]?.id || '';
-    const match = masterVendors.find(v => 
-      v.id === prod.supplierId || 
-      v.id === prod.preferredSupplier ||
-      v.code === prod.supplierId || 
-      v.code === prod.preferredSupplier ||
-      v.name === prod.preferredSupplier
-    );
-    return match?.id || prod.supplierId || prod.preferredSupplier || masterVendors[0]?.id || '';
-  }, [masterVendors]);
-
   // Dynamic Departments from context / master data
   const deptList = useMemo(() => {
     return (departments && departments.length > 0) ? departments : (DEPARTMENTS ? Object.values(DEPARTMENTS) : []);
@@ -220,6 +190,47 @@ export default function PRCreateView({
     }
   }, [department, existingPRs, editingPR]);
 
+  // Master Vendors integration (Directive 1)
+  const allMasterVendors = useMemo(() => {
+    if (Array.isArray(vendors) && vendors.length > 0) return vendors;
+    if (Array.isArray(context?.vendors) && context.vendors.length > 0) return context.vendors;
+    return storageService.getVendors?.() || [];
+  }, [vendors, context?.vendors]);
+
+  const masterVendors = useMemo(() => {
+    if (!department) return allMasterVendors;
+    const currentDept = String(department).toUpperCase();
+    return allMasterVendors.filter(v => {
+      const vDept = String(v.department || v.scope || 'ALL').toUpperCase();
+      return currentDept === 'ALL' || vDept === 'ALL' || vDept === currentDept || currentDept.includes(vDept) || vDept.includes(currentDept);
+    });
+  }, [allMasterVendors, department]);
+
+  const vendorOptions = useMemo(() => {
+    return masterVendors.map(v => ({
+      value: v.id,
+      label: v.name,
+      code: v.code,
+      subLabel: `${v.code} • โทร: ${v.phone || '-'} • เลขผู้เสียภาษี: ${v.taxId || '-'}`,
+      keywords: `${v.code} ${v.name} ${v.taxId || ''} ${v.phone || ''} ${v.contactPerson || ''}`
+    }));
+  }, [masterVendors]);
+
+  // Helper to find default vendor from product preferredSupplier / supplierId
+  const getDefaultVendorId = useCallback((prod) => {
+    if (!prod) return masterVendors[0]?.id || '';
+    const match = masterVendors.find(v => 
+      v.id === prod.supplierId || 
+      v.id === prod.preferredSupplier ||
+      v.code === prod.supplierId || 
+      v.code === prod.preferredSupplier ||
+      v.name === prod.preferredSupplier
+    );
+    return match?.id || prod.supplierId || prod.preferredSupplier || masterVendors[0]?.id || '';
+  }, [masterVendors]);
+
+
+
   const [purchaseChannel, setPurchaseChannel] = useState(editingPR?.purchaseChannel || 'SELF');
   
   // 1 PR = 1 Vendor at Form Header for Internal Purchase (Directive 1)
@@ -233,11 +244,14 @@ export default function PRCreateView({
     return masterVendors[0]?.id || '';
   });
 
-  // Ensure default vendor selection when masterVendors load
+  // Ensure default vendor selection when masterVendors load or department changes
   useEffect(() => {
-    if (!selectedVendorId && masterVendors.length > 0 && !editingPR) {
-      const primaryPreselected = Array.isArray(preselectedProduct) ? preselectedProduct[0] : preselectedProduct;
-      setSelectedVendorId(primaryPreselected ? getDefaultVendorId(primaryPreselected) : (masterVendors[0]?.id || ''));
+    if (!editingPR) {
+      const isValidVendor = masterVendors.some(v => v.id === selectedVendorId);
+      if (!selectedVendorId || (!isValidVendor && masterVendors.length > 0)) {
+        const primaryPreselected = Array.isArray(preselectedProduct) ? preselectedProduct[0] : preselectedProduct;
+        setSelectedVendorId(primaryPreselected ? getDefaultVendorId(primaryPreselected) : (masterVendors[0]?.id || ''));
+      }
     }
   }, [masterVendors, selectedVendorId, editingPR, preselectedProduct, getDefaultVendorId]);
 
@@ -1205,7 +1219,8 @@ export default function PRCreateView({
         } else if (context?.refreshData) {
           context.refreshData(true).catch(err => console.warn('Background sync error:', err));
         } else if (onRefresh) {
-          onRefresh().catch && onRefresh().catch(err => console.warn('Background sync error:', err));
+          const p = onRefresh();
+          if (p && p.catch) p.catch(err => console.warn('Background sync error:', err));
         }
       }, 500);
       
