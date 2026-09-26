@@ -8,10 +8,30 @@ const DATA_VERSION = 'prpo_clean_v16_empty_state';
 const API_URL = '/api/storage';
 
 /**
- * Environment detection: Checks if running inside Google Apps Script Web App
+ * Retrieves configured Google Apps Script Web App API URL.
+ * Checks import.meta.env, window.__GAS_API_URL__, and localStorage.
+ */
+export const getGasApiUrl = () => {
+  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GAS_API_URL) {
+    return import.meta.env.VITE_GAS_API_URL;
+  }
+  if (typeof window !== 'undefined' && window.__GAS_API_URL__) {
+    return window.__GAS_API_URL__;
+  }
+  if (typeof localStorage !== 'undefined') {
+    return localStorage.getItem('prpo_gas_api_url') || '';
+  }
+  return '';
+};
+
+/**
+ * Environment detection: Checks if running inside Google Apps Script Web App or connected to GAS Web API
  */
 export const isGAS = () => {
   if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_GAS === 'true') {
+    return true;
+  }
+  if (Boolean(getGasApiUrl())) {
     return true;
   }
   return (
@@ -64,87 +84,156 @@ export const sanitizePayloadForGAS = (data) => {
 };
 
 /**
- * Universal Promise wrapper for google.script.run RPC calls.
- * Automatically enriches payloads with currentUser, unwraps API envelope,
- * and triggers red modal notification on backend failure.
+ * HTTP POST Client for decoupled Frontend (GitHub Pages -> GAS Web App API).
+ * Uses text/plain Content-Type to prevent CORS preflight OPTIONS request.
+ * Automatically attaches HMAC session token and API secret key.
+ * 
+ * @param {string} functionName Name of GAS function in Code.gs
+ * @param  {...any} args Arguments to pass to GAS function
+ * @returns {Promise<any>}
+ */
+export const callGASHttp = async (functionName, ...args) => {
+  const gasUrl = getGasApiUrl();
+  if (!gasUrl) {
+    throw new Error(`GAS_URL_NOT_CONFIGURED: VITE_GAS_API_URL is not configured.`);
+  }
+
+  let currentUser = null;
+  let authToken = null;
+  try {
+    if (typeof localStorage !== 'undefined') {
+      const authData = localStorage.getItem('prpo_auth_session') || localStorage.getItem('prpo_current_user');
+      if (authData) currentUser = JSON.parse(authData);
+      authToken = localStorage.getItem('prpo_auth_token') || (currentUser && currentUser.token) || null;
+    }
+  } catch (e) {}
+
+  const safeArgs = args.map(sanitizePayloadForGAS);
+
+  const payload = {
+    action: functionName,
+    args: safeArgs,
+    currentUser: currentUser,
+    token: authToken,
+    apiKey: (typeof import.meta !== 'undefined' && import.meta.env?.VITE_API_SECRET_KEY) || undefined
+  };
+
+  try {
+    const response = await fetch(gasUrl, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'text/plain;charset=utf-8'
+      },
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      throw new Error(`HTTP_STATUS_${response.status}: Failed to reach Google Apps Script API`);
+    }
+
+    const resJson = await response.json();
+    if (resJson && typeof resJson === 'object' && 'success' in resJson) {
+      if (resJson.success) {
+        if (functionName === 'apiLogin' && resJson.data && resJson.data.token) {
+          try {
+            localStorage.setItem('prpo_auth_token', resJson.data.token);
+          } catch (e) {}
+        }
+        return resJson.data;
+      } else {
+        const errMsg = resJson.error || resJson.message || 'GAS Request Failed';
+        console.error(`[GAS HTTP Server Error] ${functionName}:`, errMsg);
+        modalService.error('ข้อผิดพลาดจากระบบหลังบ้าน', errMsg);
+        const err = new Error(errMsg);
+        err.code = resJson.error || 'GAS_ERROR';
+        throw err;
+      }
+    }
+    return resJson;
+  } catch (netErr) {
+    const errMsg = netErr instanceof Error ? netErr.message : String(netErr);
+    console.error(`[GAS HTTP Request Error] ${functionName}:`, netErr);
+    modalService.error('ข้อผิดพลาดการเชื่อมต่อระบบ', errMsg);
+    throw netErr instanceof Error ? netErr : new Error(errMsg);
+  }
+};
+
+/**
+ * Universal Promise wrapper for GAS calls.
+ * Automatically delegates to native google.script.run when running inside Apps Script iframe,
+ * or routes through callGASHttp when running externally on GitHub Pages.
  * 
  * @param {string} functionName Name of GAS function in Code.gs
  * @param  {...any} args Arguments to pass to GAS function
  * @returns {Promise<any>}
  */
 export const callGAS = (functionName, ...args) => {
-  return new Promise((resolve, reject) => {
-    if (!isGAS()) {
-      return reject(new Error(`GAS_UNAVAILABLE: google.script.run is not available for calling "${functionName}".`));
-    }
-
-    if (typeof window.google?.script?.run?.[functionName] !== 'function') {
-      return reject(new Error(`GAS_METHOD_NOT_FOUND: Method "${functionName}" does not exist on google.script.run.`));
-    }
-
-    // Automatically resolve active user session to attach currentUser
-    let currentUser = null;
-    try {
-      if (typeof localStorage !== 'undefined') {
-        const authData = localStorage.getItem('prpo_auth_session') || localStorage.getItem('prpo_current_user');
-        if (authData) {
-          currentUser = JSON.parse(authData);
+  // Path 1: Running inside Google Apps Script iframe with google.script.run
+  if (typeof window !== 'undefined' && typeof window.google?.script?.run?.[functionName] === 'function') {
+    return new Promise((resolve, reject) => {
+      let currentUser = null;
+      try {
+        if (typeof localStorage !== 'undefined') {
+          const authData = localStorage.getItem('prpo_auth_session') || localStorage.getItem('prpo_current_user');
+          if (authData) currentUser = JSON.parse(authData);
         }
-      }
-    } catch (e) {}
+      } catch (e) {}
 
-    // Enrich object arguments with currentUser if absent
-    const enrichedArgs = args.map(arg => {
-      if (arg && typeof arg === 'object' && !Array.isArray(arg)) {
-        if (!arg.currentUser && !arg.user && currentUser) {
-          return { ...arg, currentUser };
-        }
-      }
-      return arg;
-    });
-
-    // If last arg is not user and currentUser exists, append userContext
-    let finalArgs = enrichedArgs;
-    if (currentUser) {
-      if (finalArgs.length === 0) {
-        finalArgs = [{}, currentUser];
-      } else if (finalArgs.length === 1) {
-        finalArgs = [finalArgs[0], currentUser];
-      } else if (finalArgs.length === 2 && typeof finalArgs[0] === 'string') {
-        finalArgs = [finalArgs[0], finalArgs[1], currentUser];
-      }
-    }
-
-    // Strip all browser File/Blob/ArrayBuffer instances from every argument
-    // before crossing the google.script.run RPC boundary to prevent
-    // "Failed due to illegal value in property: file" errors.
-    const safeArgs = finalArgs.map(sanitizePayloadForGAS);
-
-    window.google.script.run
-      .withSuccessHandler((response) => {
-        if (response && typeof response === 'object' && 'success' in response) {
-          if (response.success) {
-            resolve(response.data);
-          } else {
-            const errMsg = response.error || response.message || 'GAS Request Failed';
-            console.error(`[GAS Server Error] ${functionName}:`, errMsg);
-            modalService.error('ข้อผิดพลาดจากระบบหลังบ้าน', errMsg);
-            const err = new Error(errMsg);
-            err.code = response.error || 'GAS_ERROR';
-            reject(err);
+      const enrichedArgs = args.map(arg => {
+        if (arg && typeof arg === 'object' && !Array.isArray(arg)) {
+          if (!arg.currentUser && !arg.user && currentUser) {
+            return { ...arg, currentUser };
           }
-        } else {
-          resolve(response);
         }
-      })
-      .withFailureHandler((error) => {
-        const errMsg = error instanceof Error ? error.message : String(error);
-        console.error(`[GAS RPC Error] ${functionName}:`, error);
-        modalService.error('ข้อผิดพลาดการเชื่อมต่อระบบ', errMsg);
-        reject(error instanceof Error ? error : new Error(String(error)));
-      })
-      [functionName](...safeArgs);
-  });
+        return arg;
+      });
+
+      let finalArgs = enrichedArgs;
+      if (currentUser) {
+        if (finalArgs.length === 0) {
+          finalArgs = [{}, currentUser];
+        } else if (finalArgs.length === 1) {
+          finalArgs = [finalArgs[0], currentUser];
+        } else if (finalArgs.length === 2 && typeof finalArgs[0] === 'string') {
+          finalArgs = [finalArgs[0], finalArgs[1], currentUser];
+        }
+      }
+
+      const safeArgs = finalArgs.map(sanitizePayloadForGAS);
+
+      window.google.script.run
+        .withSuccessHandler((response) => {
+          if (response && typeof response === 'object' && 'success' in response) {
+            if (response.success) {
+              resolve(response.data);
+            } else {
+              const errMsg = response.error || response.message || 'GAS Request Failed';
+              console.error(`[GAS Server Error] ${functionName}:`, errMsg);
+              modalService.error('ข้อผิดพลาดจากระบบหลังบ้าน', errMsg);
+              const err = new Error(errMsg);
+              err.code = response.error || 'GAS_ERROR';
+              reject(err);
+            }
+          } else {
+            resolve(response);
+          }
+        })
+        .withFailureHandler((error) => {
+          const errMsg = error instanceof Error ? error.message : String(error);
+          console.error(`[GAS RPC Error] ${functionName}:`, error);
+          modalService.error('ข้อผิดพลาดการเชื่อมต่อระบบ', errMsg);
+          reject(error instanceof Error ? error : new Error(String(error)));
+        })
+        [functionName](...safeArgs);
+    });
+  }
+
+  // Path 2: Decoupled Web API via HTTP POST (GitHub Pages / External Web App)
+  if (getGasApiUrl()) {
+    return callGASHttp(functionName, ...args);
+  }
+
+  return Promise.reject(new Error(`GAS_UNAVAILABLE: google.script.run is not available and VITE_GAS_API_URL is not configured for calling "${functionName}".`));
 };
 
 // ── Permanent Blacklist Guard against Test / Mock Artifacts ──

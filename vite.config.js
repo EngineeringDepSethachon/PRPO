@@ -9,6 +9,7 @@ export default defineConfig(({ mode }) => {
   const isGas = mode === 'gas' || process.env.BUILD_GAS === 'true';
 
   return {
+    base: './',
     plugins: [
       react(),
       isGas && viteSingleFile(),
