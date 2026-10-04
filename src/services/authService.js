@@ -426,76 +426,118 @@ export const authService = {
       throw new Error('กรุณาระบุรหัสผ่าน (Password)');
     }
 
-    // 2. In Google Apps Script environment: Authenticate directly against Users sheet backend
+    // 2. Cloudflare API / Serverless D1 Auth Check
+    try {
+      const apiRes = await fetch('/api/auth/login', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ username: cleanUser, password: cleanPass })
+      });
+      if (apiRes.ok) {
+        const authData = await apiRes.json();
+        if (authData && authData.user) {
+          const userObj = authData.user;
+          const rolePermissions = resolveUserPermissions(userObj);
+          const userDepts = rolePermissions.departments || userObj.departments || [userObj.department || 'PD'];
+          const sessionData = {
+            id: userObj.id,
+            username: userObj.username,
+            employeeId: userObj.employeeId,
+            name: userObj.name,
+            employeeName: userObj.employeeName || userObj.name,
+            displayName: userObj.displayName || userObj.name,
+            primaryDepartment: userObj.primaryDepartment || userObj.department,
+            department: userObj.department,
+            departments: userDepts,
+            assignedDepartments: userDepts,
+            allowedDepartments: userDepts,
+            roleId: userObj.roleId,
+            positionKey: userObj.positionKey || userObj.roleId,
+            title: userObj.title,
+            level: userObj.level || 1,
+            token: authData.token,
+            lastLogin: new Date().toISOString(),
+            ...rolePermissions,
+            role: rolePermissions,
+            rolePermissions: rolePermissions,
+            expiresAt: Date.now() + (24 * 60 * 60 * 1000)
+          };
+          localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionData));
+          localStorage.setItem('prpo_auth_session', JSON.stringify(sessionData));
+          return sessionData;
+        }
+      }
+    } catch (apiErr) {
+      // Cloudflare API not yet reached, continue to GAS or Persona fallback
+    }
+
+    // 3. In Google Apps Script environment: Authenticate against Users sheet backend
     if (isGAS()) {
       try {
         const gasUser = await callGAS('apiLogin', cleanUser, cleanPass);
-        if (!gasUser) {
-          throw new Error('ชื่อผู้ใช้งาน (Username) หรือรหัสผ่าน (Password) ไม่ถูกต้อง');
-        }
+        if (gasUser) {
+          const rawRole = gasUser.roleId || gasUser.role || gasUser.canonicalRole || 'REQUESTER_PD';
+          const userLevel = Number(gasUser.level) || 1;
+          const rolePermissions = resolveUserPermissions({
+            ...gasUser,
+            roleId: rawRole,
+            level: userLevel
+          });
 
-        const rawRole = gasUser.roleId || gasUser.role || gasUser.canonicalRole || 'REQUESTER_PD';
-        const userLevel = Number(gasUser.level) || 1;
-        const rolePermissions = resolveUserPermissions({
-          ...gasUser,
-          roleId: rawRole,
-          level: userLevel
-        });
-
-        let userDepts = [];
-        if (Array.isArray(gasUser.allowedDepartments) && gasUser.allowedDepartments.length > 0) {
-          userDepts = gasUser.allowedDepartments;
-        } else if (typeof gasUser.allowedDepartments === 'string') {
-          try {
-            userDepts = JSON.parse(gasUser.allowedDepartments);
-          } catch {
-            userDepts = gasUser.allowedDepartments.split(',').map(d => d.trim()).filter(Boolean);
+          let userDepts = [];
+          if (Array.isArray(gasUser.allowedDepartments) && gasUser.allowedDepartments.length > 0) {
+            userDepts = gasUser.allowedDepartments;
+          } else if (typeof gasUser.allowedDepartments === 'string') {
+            try {
+              userDepts = JSON.parse(gasUser.allowedDepartments);
+            } catch {
+              userDepts = gasUser.allowedDepartments.split(',').map(d => d.trim()).filter(Boolean);
+            }
           }
+          if (!userDepts || userDepts.length === 0) {
+            const fallbackDept = gasUser.primaryDepartment || gasUser.department || 'PD';
+            userDepts = [fallbackDept];
+          }
+
+          const primaryDept = gasUser.primaryDepartment || gasUser.department || userDepts[0] || 'PD';
+          const displayName = gasUser.displayName || gasUser.name || gasUser.employeeName || gasUser.username || 'User';
+
+          const sessionData = {
+            id: gasUser.id || `USR-${gasUser.username}`,
+            employeeId: gasUser.employeeId || '',
+            username: gasUser.username,
+            email: gasUser.email || '',
+            name: displayName,
+            employeeName: displayName,
+            displayName: displayName,
+            primaryDepartment: primaryDept,
+            department: primaryDept,
+            departments: userDepts,
+            assignedDepartments: userDepts,
+            allowedDepartments: userDepts,
+            roleId: rawRole,
+            canonicalRole: rolePermissions.canonicalRole || gasUser.canonicalRole || 'REQUESTER',
+            positionKey: gasUser.positionKey || rawRole,
+            title: gasUser.title || gasUser.role || 'User',
+            level: userLevel,
+            status: gasUser.status || 'ACTIVE',
+            lastLogin: new Date().toISOString(),
+            ...rolePermissions,
+            role: rolePermissions,
+            rolePermissions: rolePermissions,
+            expiresAt: Date.now() + (24 * 60 * 60 * 1000)
+          };
+
+          localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionData));
+          localStorage.setItem('prpo_auth_session', JSON.stringify(sessionData));
+          return sessionData;
         }
-        if (!userDepts || userDepts.length === 0) {
-          const fallbackDept = gasUser.primaryDepartment || gasUser.department || 'PD';
-          userDepts = [fallbackDept];
-        }
-
-        const primaryDept = gasUser.primaryDepartment || gasUser.department || userDepts[0] || 'PD';
-        const displayName = gasUser.displayName || gasUser.name || gasUser.employeeName || gasUser.username || 'User';
-
-        const sessionData = {
-          id: gasUser.id || `USR-${gasUser.username}`,
-          employeeId: gasUser.employeeId || '',
-          username: gasUser.username,
-          email: gasUser.email || '',
-          name: displayName,
-          employeeName: displayName,
-          displayName: displayName,
-          primaryDepartment: primaryDept,
-          department: primaryDept,
-          departments: userDepts,
-          assignedDepartments: userDepts,
-          allowedDepartments: userDepts,
-          roleId: rawRole,
-          canonicalRole: rolePermissions.canonicalRole || gasUser.canonicalRole || 'REQUESTER',
-          positionKey: gasUser.positionKey || rawRole,
-          title: gasUser.title || gasUser.role || 'User',
-          level: userLevel,
-          status: gasUser.status || 'ACTIVE',
-          lastLogin: new Date().toISOString(),
-          ...rolePermissions,
-          role: rolePermissions,
-          rolePermissions: rolePermissions,
-          expiresAt: Date.now() + (24 * 60 * 60 * 1000)
-        };
-
-        localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionData));
-        localStorage.setItem('prpo_auth_session', JSON.stringify(sessionData));
-        return sessionData;
       } catch (gasErr) {
-        console.warn('[authService] GAS apiLogin error:', gasErr.message);
-        throw new Error(gasErr.message || 'ชื่อผู้ใช้งาน (Username) หรือรหัสผ่าน (Password) ไม่ถูกต้อง');
+        console.warn('[authService] GAS apiLogin error (falling back to persona):', gasErr.message);
       }
     }
 
-    // 3. Localhost / Offline / Unit Testing Mode: Authenticate against registered users / authentic personas
+    // 4. Localhost / Offline / Direct Persona Mode: Authenticate against registered users / authentic personas
     const users = this.getRegisteredUsers();
     const cleanUserLower = cleanUser.toLowerCase();
     
