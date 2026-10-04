@@ -118,6 +118,28 @@ CREATE TABLE budgets (
     updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
+-- 7.1 Budget Transactions & Ledger Table
+CREATE TABLE IF NOT EXISTS budget_transactions (
+    id TEXT PRIMARY KEY,
+    dept TEXT NOT NULL,
+    department TEXT NOT NULL,
+    departmentName TEXT,
+    type TEXT NOT NULL,          -- 'MONTHLY_ALLOCATION', 'TOP_UP', 'SET_BUDGET', 'BUDGET_ROLLBACK', etc.
+    actionType TEXT,
+    typeLabel TEXT,
+    amount REAL DEFAULT 0,
+    delta REAL DEFAULT 0,
+    previousAmount REAL DEFAULT 0,
+    newAmount REAL DEFAULT 0,
+    isAllocation INTEGER DEFAULT 0,
+    actor TEXT,
+    note TEXT,
+    targetMonth TEXT,            -- 'YYYY-MM'
+    period TEXT,                 -- 'YYYY-MM'
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    date TEXT DEFAULT CURRENT_TIMESTAMP
+);
+
 -- 8. Purchase Requests (PR) Table
 DROP TABLE IF EXISTS prs;
 CREATE TABLE prs (
