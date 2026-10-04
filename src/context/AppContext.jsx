@@ -32,8 +32,8 @@ export const VIEW_PATH_MAP = {
   'online-tasks': '/online-tasks',
 };
 
-// Default fallback user (คุณวิชัย - Requester PD)
-export const DEFAULT_USER = DEFAULT_EMPLOYEE_ACCOUNTS[0];
+// Default fallback user (null for unauthenticated state)
+export const DEFAULT_USER = null;
 
 // Helper to get initial user with permissions enriched
 const getInitialUserSession = () => {
@@ -55,17 +55,7 @@ const getInitialUserSession = () => {
       rolePermissions: permissions
     };
   }
-  // Auto-Login fallback: Default User enriched with permissions
-  const permissions = resolveUserPermissions(DEFAULT_USER);
-  const isAdmin = DEFAULT_USER.roleId === 'ADMIN' || DEFAULT_USER.level >= 99 || DEFAULT_USER.username === 'admin';
-  return {
-    ...DEFAULT_USER,
-    ...permissions,
-    canonicalRole: normalizeRole(DEFAULT_USER),
-    expiresAt: Date.now() + (24 * 60 * 60 * 1000),
-    role: isAdmin ? 'admin' : (DEFAULT_USER.roleId || 'user').toLowerCase(),
-    rolePermissions: permissions
-  };
+  return null;
 };
 
 export function AppProvider({ children }) {
@@ -97,8 +87,7 @@ export function AppProvider({ children }) {
   const [users, setUsers] = useState([]);
   const availableUsers = useMemo(() => {
     if (users.length > 0) return users;
-    const registered = authService.getRegisteredUsers() || [];
-    return registered.length > 0 ? registered : DEFAULT_EMPLOYEE_ACCOUNTS;
+    return authService.getRegisteredUsers() || [];
   }, [users]);
 
   // 2. Operational Data States

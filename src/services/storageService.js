@@ -1,6 +1,4 @@
 import { STORAGE_KEYS, ROLES, INITIAL_USAGE_UNITS, INITIAL_DEPARTMENTS } from '../config/constants.js';
-import { initialProducts, initialVendors, initialStorageLocations, initialPRs, initialPOs, initialStockLogs, initialBudgets, initialCounters } from '../data/mockData.js';
-import { DEFAULT_EMPLOYEE_ACCOUNTS } from './authService.js';
 import { modalService } from './modalService.js';
 import { normalizePR, normalizePO } from '../utils/dataNormalizer.js';
 import { matchDepartment } from '../utils/permissions.js';
@@ -663,18 +661,18 @@ export const storageService = {
       localStorage.setItem('prpo_data_version', DATA_VERSION);
     }
     _setItem(STORAGE_KEYS.CURRENT_ROLE, ROLES.REQUESTER_PD, false);
-    _setItem(STORAGE_KEYS.PRODUCTS, initialProducts, false);
-    _setItem(STORAGE_KEYS.VENDORS, initialVendors, false);
-    _setItem(STORAGE_KEYS.STORAGE_LOCATIONS, initialStorageLocations, false);
+    _setItem(STORAGE_KEYS.PRODUCTS, [], false);
+    _setItem(STORAGE_KEYS.VENDORS, [], false);
+    _setItem(STORAGE_KEYS.STORAGE_LOCATIONS, [], false);
     _setItem(STORAGE_KEYS.USAGE_UNITS, INITIAL_USAGE_UNITS, false);
     _setItem(STORAGE_KEYS.DEPARTMENTS, INITIAL_DEPARTMENTS, false);
-    _setItem(STORAGE_KEYS.USERS, DEFAULT_EMPLOYEE_ACCOUNTS, false);
-    _setItem(STORAGE_KEYS.BUDGETS, initialBudgets, false);
-    _setItem(STORAGE_KEYS.PR_COUNTERS, initialCounters, false);
+    _setItem(STORAGE_KEYS.USERS, [], false);
+    _setItem(STORAGE_KEYS.BUDGETS, {}, false);
+    _setItem(STORAGE_KEYS.PR_COUNTERS, { PD: { PR: 0, PO: 0 }, QC: { PR: 0, PO: 0 } }, false);
     _setItem(STORAGE_KEYS.SIGNATURES, {}, false);
-    _setItem(STORAGE_KEYS.PRS, initialPRs, false);
-    _setItem(STORAGE_KEYS.POS, initialPOs, false);
-    _setItem(STORAGE_KEYS.STOCK_LOGS, initialStockLogs, false);
+    _setItem(STORAGE_KEYS.PRS, [], false);
+    _setItem(STORAGE_KEYS.POS, [], false);
+    _setItem(STORAGE_KEYS.STOCK_LOGS, [], false);
     _setItem(STORAGE_KEYS.BUDGET_TRANSACTIONS, [], false);
     _setItem(STORAGE_KEYS.AUDIT_LOGS, [], false);
     _setItem('prpo_notifications', [], false);
@@ -745,13 +743,9 @@ export const storageService = {
       } catch (e) {}
     }
 
-    const inGAS = isGAS();
-    // In GAS Production mode: Google Sheet is SSOT 100% - Never fallback to initialProducts when empty
-    const products = data !== null && data !== undefined
-      ? data
-      : (inGAS ? [] : initialProducts);
+    const products = data !== null && data !== undefined ? data : [];
 
-    if (inGAS && (!products || products.length === 0)) {
+    if (!products || products.length === 0) {
       _resultCache.set(_cacheKey, []);
       _dirtyKeys.delete(_cacheKey);
       return [];
@@ -965,14 +959,7 @@ export const storageService = {
   // Storage Locations (Simple Name & Department)
   getStorageLocations() {
     const data = _getItem(STORAGE_KEYS.STORAGE_LOCATIONS);
-    if (!data) {
-      if (isGAS()) {
-        return [];
-      }
-      this.saveStorageLocations(initialStorageLocations);
-      return initialStorageLocations;
-    }
-    return data;
+    return Array.isArray(data) ? data : [];
   },
   saveStorageLocations(locations) {
     _setItem(STORAGE_KEYS.STORAGE_LOCATIONS, locations, true);
@@ -1096,14 +1083,7 @@ export const storageService = {
   // Users & Access Management
   getUsers() {
     const data = _getItem(STORAGE_KEYS.USERS);
-    if (!data) {
-      if (isGAS()) {
-        return [];
-      }
-      this.saveUsers(DEFAULT_EMPLOYEE_ACCOUNTS);
-      return DEFAULT_EMPLOYEE_ACCOUNTS;
-    }
-    return data;
+    return Array.isArray(data) ? data : [];
   },
   saveUsers(users) {
     _setItem(STORAGE_KEYS.USERS, users);
@@ -1249,16 +1229,9 @@ export const storageService = {
     return true;
   },
 
-  // Vendors
   getVendors() {
     const data = _getItem(STORAGE_KEYS.VENDORS);
-    if (!data) {
-      if (isGAS()) {
-        return [];
-      }
-      return initialVendors;
-    }
-    return data;
+    return Array.isArray(data) ? data : [];
   },
   saveVendors(vendors) {
     _setItem(STORAGE_KEYS.VENDORS, vendors, true);
@@ -1895,45 +1868,8 @@ export const storageService = {
       return _resultCache.get(_cacheKey);
     }
     const data = _getItem(STORAGE_KEYS.STOCK_LOGS);
-    const raw = Array.isArray(data) ? [...data] : (isDataCleared() ? [] : (initialStockLogs ? [...initialStockLogs] : []));
+    const raw = Array.isArray(data) ? [...data] : [];
     
-    // Ensure canonical initial balance for PD-OIL-068 exists with correct valuation (฿174,000.00)
-    const hasOilInit = raw.some(l => 
-      (l.id === 'INIT-PROD-PD-001' || l.documentNo === 'INITIAL-BALANCE' || l.docNo === 'INITIAL-BALANCE') &&
-      (l.productId === 'PROD-PD-001' || l.productCode === 'PD-OIL-068' || l.itemCode === 'PD-OIL-068')
-    );
-    if (!hasOilInit && !isDataCleared()) {
-      raw.unshift({
-        id: 'INIT-PROD-PD-001',
-        productId: 'PROD-PD-001',
-        productCode: 'PD-OIL-068',
-        itemCode: 'PD-OIL-068',
-        name: 'น้ำมันไฮดรอลิกอุตสาหกรรม (Hydraulic Oil ISO VG 68)',
-        type: 'IN',
-        documentNo: 'INITIAL-BALANCE',
-        docNo: 'INITIAL-BALANCE',
-        poNumber: '-',
-        poNo: '-',
-        qty: 2400,
-        quantity: 2400,
-        balance: 2400,
-        balanceAfter: 2400,
-        unit: 'ลิตร',
-        baseUom: 'ลิตร',
-        purchaseUom: 'ถัง (200L)',
-        conversionRatio: 200,
-        unitPrice: 72.50,
-        baseUnitCost: 72.50,
-        purchaseUnitPrice: 14500,
-        totalPrice: 174000,
-        totalValue: 174000,
-        user: 'System Initial Balance',
-        date: '2026-09-01 00:00:00',
-        createdAt: '2026-09-01T00:00:00.000Z',
-        note: 'ยอดยกมาจากระบบเริ่มต้น (System Initial Balance)'
-      });
-    }
-
     let needsHeal = false;
     const sanitized = raw
       .filter(l => {
@@ -2374,10 +2310,7 @@ export const storageService = {
   // Budgets
   getBudgets() {
     const data = _getItem(STORAGE_KEYS.BUDGETS);
-    if (!data && isGAS()) {
-      return {};
-    }
-    const budgets = data || initialBudgets;
+    const budgets = data || {};
     const sanitized = {};
     if (budgets && typeof budgets === 'object') {
       ['PD', 'QC', 'WH', 'PUR', 'ENG'].forEach(code => {

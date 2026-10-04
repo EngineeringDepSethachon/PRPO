@@ -132,7 +132,7 @@ export default function UserCRUDModal({
         id: user?.id || undefined,
         employeeId: user?.employeeId || `EMP-${primaryDept !== 'ALL' ? primaryDept : 'SYS'}-${Date.now().toString().slice(-3)}`,
         username: username.trim().toLowerCase(),
-        password: user?.password || 'password123',
+        password: user?.password || '',
         name: name.trim(),
         employeeName: employeeName.trim() || name.trim(),
         displayName: name.trim(),

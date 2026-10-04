@@ -5,153 +5,8 @@ const AUTH_SESSION_KEY = 'prpo_auth_session';
 const REGISTERED_USERS_KEY = 'prpo_registered_users';
 export const EXPLICIT_SIGNOUT_KEY = 'prpo_explicit_signout';
 
-// Pre-configured Employee Accounts categorized by Position for Localhost Testing
-export const DEFAULT_EMPLOYEE_ACCOUNTS = [
-  {
-    id: 'USR-0001',
-    employeeId: 'EMP-PD-001',
-    username: 'wichai.pd',
-    email: 'wichai@company.com',
-    password: 'password123',
-    pin: 'password123',
-    name: 'คุณวิชัย (PD)',
-    employeeName: 'คุณวิชัย สุขใจ',
-    displayName: 'Wichai (PD)',
-    position: 'เจ้าหน้าที่ฝ่ายผลิต',
-    department: 'PD',
-    primaryDepartment: 'PD',
-    departments: ['PD'],
-    assignedDepartments: ['PD'],
-    allowedDepartments: ['PD'],
-    roleId: 'REQUESTER_PD',
-    canonicalRole: 'REQUESTER',
-    positionKey: 'REQUESTER_PD',
-    title: 'Requester (PD)',
-    level: 1,
-    status: 'ACTIVE',
-    description: 'สร้าง/ส่ง PR ฝ่ายผลิต, เบิกจ่ายสินค้า, ตรวจรับของเข้าสต็อก'
-  },
-  {
-    id: 'USR-0002',
-    employeeId: 'EMP-QC-001',
-    username: 'somying.qc',
-    email: 'somying@company.com',
-    password: 'password123',
-    pin: 'password123',
-    name: 'คุณสมหญิง (QC)',
-    employeeName: 'คุณสมหญิง รักดี',
-    displayName: 'Somying (QC)',
-    position: 'เจ้าหน้าที่ฝ่ายควบคุมคุณภาพ (QC)',
-    department: 'QC',
-    primaryDepartment: 'QC',
-    departments: ['QC'],
-    assignedDepartments: ['QC'],
-    allowedDepartments: ['QC'],
-    roleId: 'REQUESTER_QC',
-    canonicalRole: 'REQUESTER',
-    positionKey: 'REQUESTER_QC',
-    title: 'Requester (QC)',
-    level: 1,
-    status: 'ACTIVE',
-    description: 'สร้าง/ส่ง PR ฝ่าย QC/Lab, เบิกจ่ายสารเคมี, ตรวจรับของ'
-  },
-  {
-    id: 'USR-0003',
-    employeeId: 'EMP-MGR-001',
-    username: 'somchai.am',
-    email: 'somchai.am@company.com',
-    password: 'password123',
-    pin: 'password123',
-    name: 'คุณสมชาย (Asst. Mgr)',
-    employeeName: 'คุณสมชาย มุ่งมั่น',
-    displayName: 'Somchai (Asst Mgr)',
-    position: 'ผู้ช่วยผู้จัดการฝ่ายผลิต (Asst. Manager)',
-    department: 'PD',
-    primaryDepartment: 'PD',
-    departments: ['PD', 'QC'],
-    assignedDepartments: ['PD', 'QC'],
-    allowedDepartments: ['PD', 'QC'],
-    roleId: 'ASST_MANAGER',
-    canonicalRole: 'REVIEWER',
-    positionKey: 'REVIEWER',
-    title: 'Assistant Manager',
-    level: 2,
-    status: 'ACTIVE',
-    description: 'ตรวจทาน PR (Level 1 Reviewer), ดูแลฝ่ายผลิต (PD) และฝ่ายควบคุมคุณภาพ (QC)'
-  },
-  {
-    id: 'USR-0004',
-    employeeId: 'EMP-PUR-001',
-    username: 'nat.on',
-    email: 'nat.on@company.com',
-    password: 'password123',
-    pin: 'password123',
-    name: 'คุณนัท (Online Purchaser)',
-    employeeName: 'คุณนัท จัดซื้อ',
-    displayName: 'Nat (Online)',
-    position: 'เจ้าหน้าที่จัดซื้อออนไลน์',
-    department: 'PUR',
-    primaryDepartment: 'PUR',
-    departments: ['PD', 'QC', 'WH', 'PUR', 'ENG'],
-    assignedDepartments: ['*'],
-    allowedDepartments: ['*'],
-    roleId: 'ONLINE_PURCHASER',
-    canonicalRole: 'PURCHASER',
-    positionKey: 'ONLINE_PURCHASER',
-    title: 'Online Purchaser (คุณนัท)',
-    level: 2,
-    status: 'ACTIVE',
-    description: 'จัดการสั่งซื้อออนไลน์ Shopee/Lazada, บันทึกราคาจริง'
-  },
-  {
-    id: 'USR-0005',
-    employeeId: 'EMP-MGR-002',
-    username: 'prasert.pm',
-    email: 'prasert.pm@company.com',
-    password: 'password123',
-    pin: 'password123',
-    name: 'คุณประเสริฐ (Plant Mgr)',
-    employeeName: 'คุณประเสริฐ ยิ่งยง',
-    displayName: 'Prasert (Plant Mgr)',
-    position: 'ผู้จัดการโรงงาน (Plant Manager)',
-    department: 'MGT',
-    primaryDepartment: 'MGT',
-    departments: ['PD', 'QC', 'WH', 'PUR', 'ENG'],
-    assignedDepartments: ['*'],
-    allowedDepartments: ['*'],
-    roleId: 'PLANT_MANAGER',
-    canonicalRole: 'APPROVER',
-    positionKey: 'APPROVER',
-    title: 'Plant Manager',
-    level: 3,
-    status: 'ACTIVE',
-    description: 'อนุมัติสั่งซื้อ (Final Approver), ออก PO อัตโนมัติ, คุมงบประมาณ'
-  },
-  {
-    id: 'USR-0006',
-    employeeId: 'EMP-SYS-999',
-    username: 'admin',
-    email: 'admin@company.com',
-    password: 'password123',
-    pin: 'password123',
-    name: 'Admin System',
-    employeeName: 'ผู้ดูแลระบบ',
-    displayName: 'Admin System',
-    position: 'ผู้ดูแลระบบ (Admin)',
-    department: 'MGT',
-    primaryDepartment: 'MGT',
-    departments: ['*'],
-    assignedDepartments: ['*'],
-    allowedDepartments: ['*'],
-    roleId: 'ADMIN',
-    canonicalRole: 'ADMIN',
-    positionKey: 'ADMIN',
-    title: 'System Administrator',
-    level: 99,
-    status: 'ACTIVE',
-    description: 'ผู้ดูแลระบบ สิทธิ์สูงสุดในการจัดการข้อมูลทุกส่วน'
-  }
-];
+// Pre-configured Employee Accounts (Now dynamically fetched from Cloudflare D1)
+export const DEFAULT_EMPLOYEE_ACCOUNTS = [];
 
 /**
  * Check if the current environment is UAT mode
@@ -348,22 +203,11 @@ export const authService = {
   getRegisteredUsers() {
     try {
       const data = localStorage.getItem(REGISTERED_USERS_KEY);
-      if (!data) return DEFAULT_EMPLOYEE_ACCOUNTS;
+      if (!data) return [];
       const parsed = JSON.parse(data);
-      return parsed.map(u => {
-        const def = DEFAULT_EMPLOYEE_ACCOUNTS.find(d => d.id === u.id || d.username === u.username);
-        if (def && def.departments && (!u.departments || u.departments.length < def.departments.length)) {
-          return {
-            ...u,
-            departments: def.departments,
-            assignedDepartments: def.assignedDepartments || def.departments,
-            allowedDepartments: def.allowedDepartments || def.departments
-          };
-        }
-        return u;
-      });
+      return Array.isArray(parsed) ? parsed : [];
     } catch {
-      return DEFAULT_EMPLOYEE_ACCOUNTS;
+      return [];
     }
   },
 
@@ -426,7 +270,7 @@ export const authService = {
       throw new Error('กรุณาระบุรหัสผ่าน (Password)');
     }
 
-    // 2. Cloudflare API / Serverless D1 Auth Check
+    // 2. Cloudflare API / Serverless D1 Auth Check (Primary SSOT)
     try {
       const apiRes = await fetch('/api/auth/login', {
         method: 'POST',
@@ -466,9 +310,15 @@ export const authService = {
           localStorage.setItem('prpo_auth_session', JSON.stringify(sessionData));
           return sessionData;
         }
+      } else if (apiRes.status === 401 || apiRes.status === 400) {
+        const errorData = await apiRes.json().catch(() => ({}));
+        throw new Error(errorData.error || 'ชื่อผู้ใช้งาน หรือ รหัสผ่าน ไม่ถูกต้อง');
       }
     } catch (apiErr) {
-      // Cloudflare API not yet reached, continue to GAS or Persona fallback
+      if (apiErr.message && apiErr.message.includes('ชื่อผู้ใช้งาน หรือ รหัสผ่าน ไม่ถูกต้อง')) {
+        throw apiErr;
+      }
+      // If network error occurred, continue to secondary checks (e.g. GAS)
     }
 
     // 3. In Google Apps Script environment: Authenticate against Users sheet backend
@@ -533,24 +383,19 @@ export const authService = {
           return sessionData;
         }
       } catch (gasErr) {
-        console.warn('[authService] GAS apiLogin error (falling back to persona):', gasErr.message);
+        console.warn('[authService] GAS apiLogin error:', gasErr.message);
       }
     }
 
-    // 4. Localhost / Offline / Direct Persona Mode: Authenticate against registered users / authentic personas
+    // 4. Fallback check against cached registered users (strictly requires password match)
     const users = this.getRegisteredUsers();
     const cleanUserLower = cleanUser.toLowerCase();
     
     const matched = users.find(u => {
       const uUser = (u.username || '').toLowerCase();
       const uEmp = (u.employeeId || '').toLowerCase();
-      const userMatch = uUser === cleanUserLower || uEmp === cleanUserLower ||
-        (cleanUserLower === 'siraphat.pd' && uUser === 'wichai.pd') ||
-        (cleanUserLower === 'natthinee.qc' && uUser === 'somying.qc') ||
-        (cleanUserLower === 'kallayani.mgr' && uUser === 'somchai.am');
-      const passMatch = u.password === cleanPass || u.pin === cleanPass ||
-        (uUser === 'admin' && (cleanPass === 'admin123' || cleanPass === 'password123' || cleanPass === '123456')) ||
-        (cleanPass === '123456');
+      const userMatch = uUser === cleanUserLower || uEmp === cleanUserLower;
+      const passMatch = u.password === cleanPass || u.pin === cleanPass;
       return userMatch && passMatch;
     });
 

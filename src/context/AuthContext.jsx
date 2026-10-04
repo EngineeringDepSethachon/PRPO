@@ -6,7 +6,7 @@
  */
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
-import { authService, DEFAULT_EMPLOYEE_ACCOUNTS } from '../services/authService.js';
+import { authService } from '../services/authService.js';
 import { storageService } from '../services/storageService.js';
 import { auditService } from '../services/auditService.js';
 import { resolveUserPermissions } from '../config/constants.js';
@@ -462,7 +462,7 @@ export function AuthProvider({ children }) {
    */
   const switchRoleDev = useCallback((roleOrUser) => {
     let target = null;
-    let userPool = DEFAULT_EMPLOYEE_ACCOUNTS;
+    let userPool = [];
     try {
       const cached = localStorage.getItem('prpo_users_cache') || localStorage.getItem('prpo_registered_users');
       if (cached) {

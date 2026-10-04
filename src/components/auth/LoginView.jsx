@@ -210,7 +210,7 @@ export default function LoginView({ onLoginSuccess }) {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="password123 (หรือ admin123 สำหรับแอดมิน)"
+                  placeholder="รหัสผ่านของคุณ"
                   className="w-full bg-slate-950/80 border border-slate-700 text-slate-100 text-sm rounded-sm pl-10 pr-11 py-3 focus:outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20 transition-all font-medium placeholder:text-slate-600"
                   autoComplete="current-password"
                 />
@@ -240,11 +240,6 @@ export default function LoginView({ onLoginSuccess }) {
                 </>
               )}
             </button>
-
-            <div className="p-3 bg-slate-950/60 rounded-sm border border-slate-800 text-[11px] text-slate-400 flex items-start gap-1.5">
-              <Lightbulb className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
-              <span><span className="font-semibold text-slate-300">รหัสผ่านเริ่มต้น:</span> บัญชีทั่วไปใช้ <code className="font-mono text-indigo-400 font-bold">password123</code> และบัญชี admin ใช้ <code className="font-mono text-indigo-400 font-bold">admin123</code></span>
-            </div>
           </form>
         )}
       </div>

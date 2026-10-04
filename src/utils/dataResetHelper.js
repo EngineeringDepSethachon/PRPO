@@ -1,5 +1,4 @@
 import { STORAGE_KEYS } from '../config/constants.js';
-import { initialProducts } from '../data/mockData.js';
 import { storageService } from '../services/storageService.js';
 import { logAuditEvent } from '../services/auditLogger.js';
 
@@ -88,25 +87,19 @@ export function resetMockTransactions(options = { reload: true }) {
       console.warn('[dataResetHelper] Failed to reset budget balances:', e.message);
     }
 
-    // 4. Reset Product Stock levels back to starting defaults while preserving 100% of Master Items
+    // 4. Reset Product Stock levels to 0 while strictly preserving 100% of Master Items
     try {
       const storedProducts = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
-      const initialMap = new Map((initialProducts || []).map(p => [p.id || p.code, p]));
-
       if (storedProducts) {
         const products = JSON.parse(storedProducts);
         if (Array.isArray(products)) {
-          const resetProducts = products.map(prod => {
-            const spec = initialMap.get(prod.id) || initialMap.get(prod.code);
-            const initStock = spec ? (spec.stockBalance ?? spec.currentStock ?? spec.onHand ?? 0) : 0;
-            return {
-              ...prod,
-              stockBalance: initStock,
-              currentStock: initStock,
-              onHand: initStock,
-              stockQty: initStock
-            };
-          });
+          const resetProducts = products.map(prod => ({
+            ...prod,
+            stockBalance: 0,
+            currentStock: 0,
+            onHand: 0,
+            stockQty: 0
+          }));
           localStorage.setItem(STORAGE_KEYS.PRODUCTS, JSON.stringify(resetProducts));
           localStorage.setItem('master_items', JSON.stringify(resetProducts));
         }

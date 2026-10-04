@@ -560,7 +560,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
   const [name, setName] = useState(user?.name || '');
   const [employeeName, setEmployeeName] = useState(user?.employeeName || user?.name || '');
   const [username, setUsername] = useState(user?.username || '');
-  const [password, setPassword] = useState(user?.password || 'password123');
+  const [password, setPassword] = useState(user?.password || '');
   const [position, setPosition] = useState(user?.position || user?.title || '');
   const [title, setTitle] = useState(user?.title || user?.position || '');
   const [assignedDepts, setAssignedDepts] = useState(resolveInitialDepts);
@@ -722,7 +722,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
         employeeName: employeeName.trim() || name.trim(),
         displayName: name.trim(),
         username: username.trim(),
-        password: password || 'password123',
+        password: password || user?.password || '',
         position: position.trim(),
         title: position.trim() || title.trim() || (ROLE_OPTIONS.find(r => r.id === roleId)?.title || 'Officer'),
         primaryDepartment: primaryDept,

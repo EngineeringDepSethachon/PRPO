@@ -165,7 +165,7 @@ export default function LoginView() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="รหัสผ่าน (เช่น password123)"
+                  placeholder="รหัสผ่านของคุณ"
                   autoComplete="current-password"
                   className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-mono tracking-wide"
                   required
