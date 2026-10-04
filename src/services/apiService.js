@@ -1439,7 +1439,10 @@ export const apiService = {
         body: JSON.stringify(product)
       });
       if (res.ok) {
-        const saved = await res.json();
+        const resData = await res.json();
+        const saved = (resData && (resData.id || resData.code) && resData.name)
+          ? { ...product, ...resData }
+          : product;
         const targetId = String(product.id || '').trim().toLowerCase();
         const targetCode = String(product.code || '').trim().toLowerCase();
         const updatedList = isUpdate 
@@ -1606,7 +1609,10 @@ export const apiService = {
         body: JSON.stringify(vendor)
       });
       if (res.ok) {
-        const saved = await res.json();
+        const resData = await res.json();
+        const saved = (resData && (resData.id || resData.code) && resData.name)
+          ? { ...vendor, ...resData }
+          : vendor;
         const targetId = String(vendor.id || '').trim().toLowerCase();
         const targetCode = String(vendor.code || '').trim().toLowerCase();
         const updatedList = isUpdate 
@@ -2014,7 +2020,10 @@ export const apiService = {
         body: JSON.stringify(userPayload)
       });
       if (res.ok) {
-        const saved = await res.json();
+        const resData = await res.json();
+        const saved = (resData && (resData.id || resData.username || resData.employeeId) && resData.name)
+          ? { ...userPayload, ...resData }
+          : userPayload;
         const updatedList = isUpdate ? users.map(u => u.id === user.id ? saved : u) : [...users, saved];
         storageService.saveUsers(updatedList);
 
@@ -2103,7 +2112,10 @@ export const apiService = {
         body: JSON.stringify(deptPayload)
       });
       if (res.ok) {
-        const saved = await res.json();
+        const resData = await res.json();
+        const saved = (resData && (resData.id || resData.code) && resData.name)
+          ? { ...deptPayload, ...resData }
+          : deptPayload;
         const depts = storageService.getDepartments();
         const updated = isUpdate ? depts.map(d => d.id === saved.id ? saved : d) : [...depts, saved];
         storageService.saveDepartments(updated);

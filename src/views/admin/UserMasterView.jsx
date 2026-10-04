@@ -239,7 +239,7 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
             >
               <option value="ALL">ทุกบทบาทหน้าที่ (All Roles)</option>
               {ROLE_OPTIONS.map(r => (
-                <option key={r.id} value={r.id}>{r.label.split(' - ')[0]}</option>
+                <option key={r.id} value={r.id}>{(r?.label || r?.id || '').split(' - ')[0]}</option>
               ))}
             </select>
 
@@ -328,7 +328,10 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
                 </tr>
               ) : (
                 paginatedUsers.map(user => {
-                  const roleCfg = ROLE_OPTIONS.find(r => r.id === user.roleId) || { label: user.roleId, color: 'bg-slate-100 text-slate-700 border-slate-200' };
+                  const roleCfg = ROLE_OPTIONS.find(r => r.id === user?.roleId) || {
+                    label: user?.roleId || user?.role || user?.title || 'Staff',
+                    color: 'bg-slate-100 text-slate-700 border-slate-200'
+                  };
                   const hasSignature = Boolean(user.signature && user.signature.length > 50);
 
                   return (
@@ -386,8 +389,8 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
 
                       {/* 5. Role */}
                       <td className="py-3.5 px-3">
-                        <span className={`inline-block px-2.5 py-0.5 rounded-md text-[10.5px] font-bold border ${roleCfg.color}`}>
-                          {roleCfg.label.split(' - ')[0]}
+                        <span className={`inline-block px-2.5 py-0.5 rounded-md text-[10.5px] font-bold border ${roleCfg?.color || 'bg-slate-100 text-slate-700 border-slate-200'}`}>
+                          {((roleCfg?.label || user?.roleId || 'Staff') + '').split(' - ')[0]}
                         </span>
                       </td>
 

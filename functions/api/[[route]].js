@@ -340,14 +340,55 @@ export async function onRequest(context) {
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
             ON CONFLICT(id) DO UPDATE SET
               name = excluded.name,
+              category = excluded.category,
+              purchaseUnit = excluded.purchaseUnit,
+              usageUnit = excluded.usageUnit,
+              conversionRate = excluded.conversionRate,
               currentStock = excluded.currentStock,
               standardPrice = excluded.standardPrice,
               defaultLocationId = excluded.defaultLocationId,
+              department = excluded.department,
               minStock = excluded.minStock,
+              isDeleted = 0,
               updatedAt = CURRENT_TIMESTAMP
           `).bind(id, code, name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock, price, locId, dept).run();
         }
-        return jsonResponse({ success: true, count: prods.length });
+        return jsonResponse(Array.isArray(body) || body.products ? { success: true, count: prods.length } : prods[0]);
+      }
+
+      if (method === 'PUT') {
+        const p = await request.json().catch(() => ({}));
+        const id = p.id || subId;
+        const code = p.code || p.itemCode || id;
+        const name = p.name || p.itemName || '';
+        const cat = p.category || p.department || 'PD';
+        const purchaseUnit = p.purchaseUnit || p.unit || 'ชิ้น';
+        const usageUnit = p.usageUnit || p.stockUnit || purchaseUnit;
+        const convRate = Number(p.conversionRate || 1);
+        const minStock = Number(p.minStock || 0);
+        const curStock = Number(p.currentStock ?? p.stockBalance ?? 0);
+        const price = Number(p.price ?? p.standardPrice ?? 0);
+        const locId = p.locationId || p.defaultLocationId || '';
+        const dept = p.department || cat;
+
+        await db.prepare(`
+          UPDATE products SET
+            name = COALESCE(?, name),
+            category = COALESCE(?, category),
+            purchaseUnit = COALESCE(?, purchaseUnit),
+            usageUnit = COALESCE(?, usageUnit),
+            conversionRate = COALESCE(?, conversionRate),
+            minStock = COALESCE(?, minStock),
+            currentStock = COALESCE(?, currentStock),
+            standardPrice = COALESCE(?, standardPrice),
+            defaultLocationId = COALESCE(?, defaultLocationId),
+            department = COALESCE(?, department),
+            isDeleted = 0,
+            updatedAt = CURRENT_TIMESTAMP
+          WHERE id = ? OR code = ?
+        `).bind(name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock, price, locId, dept, id, code).run();
+
+        return jsonResponse({ ...p, id, code, name });
       }
 
       if (method === 'DELETE' && subId) {
@@ -390,10 +431,43 @@ export async function onRequest(context) {
               phone = excluded.phone,
               email = excluded.email,
               address = excluded.address,
-              paymentTerm = excluded.paymentTerm
+              taxId = excluded.taxId,
+              paymentTerm = excluded.paymentTerm,
+              department = excluded.department,
+              isDeleted = 0
           `).bind(id, code, name, contact, phone, email, address, taxId, term, dept).run();
         }
-        return jsonResponse({ success: true, count: vList.length });
+        return jsonResponse(Array.isArray(v) ? { success: true, count: vList.length } : vList[0]);
+      }
+
+      if (method === 'PUT') {
+        const item = await request.json().catch(() => ({}));
+        const id = item.id || subId;
+        const code = item.code || item.vendorCode || id;
+        const name = item.name || '';
+        const contact = item.contactPerson || '';
+        const phone = item.phone || '';
+        const email = item.email || '';
+        const address = item.address || '';
+        const taxId = item.taxId || '';
+        const term = item.paymentTerm || '';
+        const dept = item.department || 'ALL';
+
+        await db.prepare(`
+          UPDATE vendors SET
+            name = COALESCE(?, name),
+            contactPerson = COALESCE(?, contactPerson),
+            phone = COALESCE(?, phone),
+            email = COALESCE(?, email),
+            address = COALESCE(?, address),
+            taxId = COALESCE(?, taxId),
+            paymentTerm = COALESCE(?, paymentTerm),
+            department = COALESCE(?, department),
+            isDeleted = 0
+          WHERE id = ? OR code = ?
+        `).bind(name, contact, phone, email, address, taxId, term, dept, id, code).run();
+
+        return jsonResponse({ ...item, id, code, name });
       }
 
       if (method === 'DELETE' && subId) {
@@ -431,9 +505,196 @@ export async function onRequest(context) {
     // ── 8. Departments (/api/departments) ──
     if (path === '/api/departments' || path.startsWith('/api/departments/')) {
       if (!db) return jsonResponse([]);
+      const subId = path.startsWith('/api/departments/') ? decodeURIComponent(path.replace('/api/departments/', '')) : null;
+
       if (method === 'GET') {
         const res = await db.prepare('SELECT * FROM departments WHERE isActive = 1').all();
         return jsonResponse(res.results || []);
+      }
+
+      if (method === 'POST') {
+        const d = await request.json().catch(() => ({}));
+        const id = d.id || `DEPT-${d.code || Date.now()}`;
+        const code = d.code || id;
+        const name = d.name || '';
+        const nameEn = d.nameEn || '';
+        const prefix = d.prefix || code;
+        const desc = d.description || '';
+        const budget = Number(d.monthlyBudget || 0);
+        const isActive = d.isActive === false || d.isActive === 0 ? 0 : 1;
+        const color = d.color || 'blue';
+        const mgr = d.managerName || '';
+
+        await db.prepare(`
+          INSERT INTO departments (id, code, name, nameEn, prefix, description, monthlyBudget, isActive, color, managerName, createdAt, updatedAt)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          ON CONFLICT(id) DO UPDATE SET
+            name = excluded.name,
+            nameEn = excluded.nameEn,
+            prefix = excluded.prefix,
+            description = excluded.description,
+            monthlyBudget = excluded.monthlyBudget,
+            isActive = excluded.isActive,
+            color = excluded.color,
+            managerName = excluded.managerName,
+            updatedAt = CURRENT_TIMESTAMP
+        `).bind(id, code, name, nameEn, prefix, desc, budget, isActive, color, mgr).run();
+
+        return jsonResponse({ ...d, id, code, name });
+      }
+
+      if (method === 'PUT') {
+        const d = await request.json().catch(() => ({}));
+        const id = d.id || subId;
+        const code = d.code || id;
+        const name = d.name || '';
+        const nameEn = d.nameEn || '';
+        const prefix = d.prefix || code;
+        const desc = d.description || '';
+        const budget = Number(d.monthlyBudget || 0);
+        const isActive = d.isActive === false || d.isActive === 0 ? 0 : 1;
+        const color = d.color || 'blue';
+        const mgr = d.managerName || '';
+
+        await db.prepare(`
+          UPDATE departments SET
+            name = COALESCE(?, name),
+            nameEn = COALESCE(?, nameEn),
+            prefix = COALESCE(?, prefix),
+            description = COALESCE(?, description),
+            monthlyBudget = COALESCE(?, monthlyBudget),
+            isActive = COALESCE(?, isActive),
+            color = COALESCE(?, color),
+            managerName = COALESCE(?, managerName),
+            updatedAt = CURRENT_TIMESTAMP
+          WHERE id = ? OR code = ?
+        `).bind(name, nameEn, prefix, desc, budget, isActive, color, mgr, id, code).run();
+
+        return jsonResponse({ ...d, id, code, name });
+      }
+
+      if (method === 'DELETE' && subId) {
+        await db.prepare('UPDATE departments SET isActive = 0, updatedAt = CURRENT_TIMESTAMP WHERE id = ? OR code = ?').bind(subId, subId).run();
+        return jsonResponse({ success: true, id: subId });
+      }
+    }
+
+    // ── 9. Users Management Endpoints (/api/users or /api/user) ──
+    if (path === '/api/users' || path === '/api/user' || path.startsWith('/api/users/')) {
+      if (!db) return jsonResponse([]);
+      const subId = path.startsWith('/api/users/') ? decodeURIComponent(path.replace('/api/users/', '')) : null;
+
+      // Auto ensure signature column in D1 users table
+      await db.prepare('ALTER TABLE users ADD COLUMN signature TEXT').run().catch(() => {});
+
+      if (method === 'GET') {
+        if (subId) {
+          const user = await db.prepare('SELECT * FROM users WHERE id = ? OR username = ? LIMIT 1').bind(subId, subId).first();
+          if (!user) return errorResponse('User not found', 404);
+          const safeUser = { ...user };
+          delete safeUser.password;
+          safeUser.allowedDepartments = parseJsonSafe(user.allowedDepartments, [user.department || 'PD']);
+          safeUser.assignedDepartments = parseJsonSafe(user.assignedDepartments, safeUser.allowedDepartments);
+          safeUser.departments = safeUser.allowedDepartments;
+          return jsonResponse(safeUser);
+        }
+
+        const res = await db.prepare('SELECT * FROM users ORDER BY name ASC').all();
+        const users = (res.results || []).map(u => {
+          const safe = { ...u };
+          delete safe.password;
+          safe.allowedDepartments = parseJsonSafe(u.allowedDepartments, [u.department || 'PD']);
+          safe.assignedDepartments = parseJsonSafe(u.assignedDepartments, safe.allowedDepartments);
+          safe.departments = safe.allowedDepartments;
+          return safe;
+        });
+        return jsonResponse(users);
+      }
+
+      if (method === 'POST' || method === 'PUT') {
+        const u = await request.json().catch(() => ({}));
+        const id = u.id || subId || `USR-${Date.now()}`;
+        const empId = u.employeeId || '';
+        const username = (u.username || '').trim();
+        const rawPass = (u.password || '').trim();
+        const pin = u.pin || rawPass || '';
+        const name = (u.name || u.employeeName || '').trim();
+        const empName = u.employeeName || name;
+        const dispName = u.displayName || name;
+        const position = u.position || '';
+        const dept = u.department || u.primaryDepartment || 'PD';
+        const primaryDept = u.primaryDepartment || dept;
+        const allowedDepts = JSON.stringify(Array.isArray(u.allowedDepartments) && u.allowedDepartments.length > 0
+          ? u.allowedDepartments
+          : (Array.isArray(u.assignedDepartments) ? u.assignedDepartments : [primaryDept]));
+        const roleId = u.roleId || 'REQUESTER_PD';
+        const canonicalRole = u.canonicalRole || (roleId.includes('ADMIN') ? 'ADMIN' : (roleId.includes('APPROVER') || roleId.includes('MANAGER') ? 'APPROVER' : (roleId.includes('PURCHASER') ? 'PURCHASER' : 'REQUESTER')));
+        const posKey = u.positionKey || roleId;
+        const title = u.title || position || 'Officer';
+        const level = Number(u.level || 1);
+        const status = u.status || 'ACTIVE';
+        const pic = u.pictureUrl || '';
+        const desc = u.description || '';
+        const sig = u.signature || null;
+
+        await db.prepare(`
+          INSERT INTO users (id, employeeId, username, password, pin, name, employeeName, displayName, position, department, primaryDepartment, allowedDepartments, roleId, canonicalRole, positionKey, title, level, status, pictureUrl, description, signature)
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          ON CONFLICT(id) DO UPDATE SET
+            employeeId = excluded.employeeId,
+            username = excluded.username,
+            password = CASE WHEN excluded.password != '' THEN excluded.password ELSE users.password END,
+            pin = CASE WHEN excluded.pin != '' THEN excluded.pin ELSE users.pin END,
+            name = excluded.name,
+            employeeName = excluded.employeeName,
+            displayName = excluded.displayName,
+            position = excluded.position,
+            department = excluded.department,
+            primaryDepartment = excluded.primaryDepartment,
+            allowedDepartments = excluded.allowedDepartments,
+            roleId = excluded.roleId,
+            canonicalRole = excluded.canonicalRole,
+            positionKey = excluded.positionKey,
+            title = excluded.title,
+            level = excluded.level,
+            status = excluded.status,
+            pictureUrl = excluded.pictureUrl,
+            description = excluded.description,
+            signature = COALESCE(excluded.signature, users.signature)
+        `).bind(id, empId, username, rawPass, pin, name, empName, dispName, position, dept, primaryDept, allowedDepts, roleId, canonicalRole, posKey, title, level, status, pic, desc, sig).run();
+
+        const savedSafeUser = {
+          ...u,
+          id,
+          employeeId: empId,
+          username,
+          name,
+          employeeName: empName,
+          displayName: dispName,
+          position,
+          department: dept,
+          primaryDepartment: primaryDept,
+          allowedDepartments: parseJsonSafe(allowedDepts, [primaryDept]),
+          assignedDepartments: parseJsonSafe(allowedDepts, [primaryDept]),
+          departments: parseJsonSafe(allowedDepts, [primaryDept]),
+          roleId,
+          canonicalRole,
+          positionKey: posKey,
+          title,
+          level,
+          status,
+          signature: sig,
+          pictureUrl: pic,
+          description: desc
+        };
+        delete savedSafeUser.password;
+
+        return jsonResponse(savedSafeUser);
+      }
+
+      if (method === 'DELETE' && subId) {
+        await db.prepare('UPDATE users SET status = "INACTIVE" WHERE id = ? OR username = ?').bind(subId, subId).run();
+        return jsonResponse({ success: true, id: subId });
       }
     }
 
