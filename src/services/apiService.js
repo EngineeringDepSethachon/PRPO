@@ -535,9 +535,14 @@ export const apiService = {
       });
       if (res.ok) {
         const data = await res.json();
-        if (data.budgets) storageService.saveBudgets(data.budgets);
-        if (data.transactions) storageService.saveBudgetTransactions(data.transactions);
-        return data;
+        if (data && (data.budgets || data.success)) {
+          if (data.budgets) storageService.saveBudgets(data.budgets);
+          if (data.transactions) storageService.saveBudgetTransactions(data.transactions);
+          if (typeof window !== 'undefined') {
+            window.dispatchEvent(new CustomEvent('budget_updated', { detail: data }));
+          }
+          return data;
+        }
       }
     } catch (e) {
       console.warn('[apiService] POST /api/budgets/adjust fallback to storageService:', e.message);
@@ -570,7 +575,7 @@ export const apiService = {
       if (!budgets[dept].refundCredits) budgets[dept].refundCredits = {};
       budgets[dept].refundCredits[monthKey] = (Number(budgets[dept].refundCredits[monthKey]) || 0) + rollbackAmt;
     } else {
-      if (monthKey === '2026-09' || monthKey === currentActiveMonth) {
+      if (monthKey === '2026-09' || monthKey === '2026-10' || monthKey === currentActiveMonth) {
         budgets[dept].monthlyBudget = finalAmount;
         budgets[dept].variance = finalAmount - (Number(budgets[dept].spent) || 0);
         budgets[dept].remainingBudget = budgets[dept].variance;
@@ -584,6 +589,7 @@ export const apiService = {
     let txType = action || 'ADJUST';
     let txTypeLabel = 'ปรับปรุงงบประมาณ';
     let amountDiff = 0;
+    let isAlloc = false;
 
     if (action === 'BUDGET_ROLLBACK') {
       txType = 'BUDGET_ROLLBACK';
@@ -593,14 +599,17 @@ export const apiService = {
       txType = 'MONTHLY_ALLOCATION';
       txTypeLabel = 'จัดสรรงบประมาณประจำเดือน';
       amountDiff = finalAmount;
+      isAlloc = true;
     } else if (action === 'TOP_UP') {
       txType = 'TOP_UP';
-      txTypeLabel = 'เติมงบประมาณพิเศษ (Top-up)';
+      txTypeLabel = 'ปรับเพิ่มงบประมาณ';
       amountDiff = Number(delta || 0);
+      isAlloc = true;
     } else {
       txType = 'SET_BUDGET';
-      txTypeLabel = (finalAmount - prev >= 0) ? 'ปรับเพิ่มงบประมาณ' : 'ปรับลดยอดงบประมาณ';
-      amountDiff = finalAmount - prev;
+      txTypeLabel = (finalAmount - prev >= 0) ? 'ปรับเพิ่มงบประมาณ' : 'ปรับปรุงงบประมาณ';
+      amountDiff = finalAmount;
+      isAlloc = true;
     }
 
     const newTx = {
@@ -608,17 +617,25 @@ export const apiService = {
       date: today.toISOString().replace('T', ' ').slice(0, 19),
       createdAt: today.toISOString(),
       dept,
+      department: dept,
+      departmentName: `ฝ่าย ${dept}`,
       type: txType,
+      actionType: txType,
       typeLabel: txTypeLabel,
       previousAmount: prev,
       newAmount: finalAmount,
       amount: amountDiff,
+      delta: finalAmount - prev,
+      isAllocation: isAlloc,
       actor: actor || 'Staff',
       note: reason || (txType === 'MONTHLY_ALLOCATION' ? `จัดสรรงบประมาณประจำเดือน ${monthKey}` : 'ปรับปรุงงบประมาณ'),
       targetMonth: monthKey,
       period: monthKey
     };
     storageService.appendBudgetTransaction(newTx);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('budget_updated', { detail: { budgets, transaction: newTx } }));
+    }
     return { success: true, budget: budgets[dept], transaction: newTx, budgets };
   },
 
@@ -646,6 +663,21 @@ export const apiService = {
       actor: actor || 'ผู้ดูแลระบบ',
       targetMonth: monthKey
     });
+  },
+
+  async saveBudgets(budgets) {
+    if (!budgets) return false;
+    storageService.saveBudgets(budgets);
+    try {
+      const res = await fetch('/api/budgets', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(budgets)
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
   },
 
   // --- Budget & Over-Budget Check ---

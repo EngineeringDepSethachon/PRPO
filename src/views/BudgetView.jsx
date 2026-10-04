@@ -79,14 +79,24 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
     }, {});
   }, [deptList]);
 
-  // Self-Healing Retroactive Sync Engine: backfill settled refund credits on load and reset bloated mock baseline
+  const [budgetRevision, setBudgetRevision] = useState(0);
+
+  // Sync settled refunds to budget and listen for live budget update events
   useEffect(() => {
-    const currentB = storageService.getBudgets();
-    if (!currentB?.PD || currentB.PD.monthlyBudget > 1000000 || !currentB.PD.historicalSpent || currentB.PD.historicalSpent['2026-08'] !== undefined) {
-      budgetService.resetBudgetData();
-    }
     budgetService.syncSettledRefundsToBudget(pos, deptList);
   }, [pos, deptList]);
+
+  useEffect(() => {
+    const handleBudgetUpdate = () => {
+      setBudgetRevision(prev => prev + 1);
+    };
+    window.addEventListener('budget_updated', handleBudgetUpdate);
+    window.addEventListener('prpo_data_revalidated', handleBudgetUpdate);
+    return () => {
+      window.removeEventListener('budget_updated', handleBudgetUpdate);
+      window.removeEventListener('prpo_data_revalidated', handleBudgetUpdate);
+    };
+  }, []);
 
   // 1. User Permission Scoping: Check if current user is Super Admin or Approver (Universal Access)
   const isSuperAdminOrApprover = useMemo(() => {
@@ -274,7 +284,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
   // Recalculate dynamic budget summary based on selected month (Zero-Based Budgeting)
   const dynamicSummary = useMemo(() => {
     return budgetService.calculatePeriodBudgetSummary(selectedMonthKey, prs, pos);
-  }, [selectedMonthKey, budgetSummary, prs, pos]);
+  }, [selectedMonthKey, budgetSummary, prs, pos, budgetRevision]);
 
   // Thai month names
   const thaiMonths = [
@@ -675,7 +685,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
       }
       return true;
     });
-  }, [pos, prs, deptsToShow, selectedMonthKey, context?.budgetTransactions]);
+  }, [pos, prs, deptsToShow, selectedMonthKey, context?.budgetTransactions, budgetRevision]);
 
   const _handleEditSave = async (dept) => {
     if (!editBaseValue || isNaN(editBaseValue) || Number(editBaseValue) < 0) return;
@@ -1751,15 +1761,16 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
 
                     const rawType = String(tx.type || tx.transactionType || tx.actionType || '').toUpperCase();
                     const isRefund = ['REFUND_SETTLEMENT', 'BUDGET_ROLLBACK', 'REFUND_CREDIT', 'BUDGET_RESTORED_CLAIM_REFUND'].includes(rawType) ||
-                                     Boolean(tx.referencePo || (tx.poNumber && !['MONTHLY_ALLOCATION', 'SET_BUDGET'].includes(rawType)) || tx.storeKey || String(tx.note || '').includes('คืนเงิน'));
-                    const isMonthlyAlloc = rawType === 'MONTHLY_ALLOCATION' || rawType === 'ALLOCATE_BUDGET' || (rawType === 'SET_BUDGET' && !isRefund && (tx.previousAmount === 0 || tx.isInitialAllocation));
+                                     Boolean(tx.referencePo || (tx.poNumber && !['MONTHLY_ALLOCATION', 'SET_BUDGET', 'TOP_UP'].includes(rawType)) || tx.storeKey || String(tx.note || '').includes('คืนเงิน'));
+                    const isMonthlyAlloc = rawType === 'MONTHLY_ALLOCATION' || rawType === 'ALLOCATE_BUDGET' || Boolean(tx.isAllocation) || String(tx.typeLabel || '').includes('จัดสรร');
                     const isTopUp = rawType === 'TOP_UP';
+                    const isSetBudget = rawType === 'SET_BUDGET';
 
                     const isClaimRefund = rawType === 'CLAIM_REFUND' || rawType === 'PO_CANCEL_REFUND' || rawType === 'PR_RELEASE';
                     const isActualSpend = rawType === 'ACTUAL_SPEND';
-                    const isCommitment = rawType === 'PR_COMMITMENT';
+                    const isCommitment = rawType === 'PR_COMMITMENT' || rawType === 'COMMITMENT';
 
-                    let badgeText = 'ปรับปรุงงบประมาณ';
+                    let badgeText = tx.typeLabel || 'ปรับปรุงงบประมาณ';
                     let badgeClass = 'bg-slate-100 text-slate-700 border-slate-200';
                     let isIncome = false;
                     let isExpense = false;
@@ -1781,8 +1792,12 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                       badgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
                       isIncome = true;
                     } else if (isTopUp) {
-                      badgeText = 'เติมงบประมาณ';
+                      badgeText = 'ปรับเพิ่มงบประมาณ';
                       badgeClass = 'bg-teal-50 text-teal-700 border-teal-200';
+                      isIncome = true;
+                    } else if (isSetBudget) {
+                      badgeText = 'ปรับปรุงงบประมาณ';
+                      badgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
                       isIncome = true;
                     } else if (isActualSpend) {
                       badgeText = 'ใช้จ่ายจริง';
@@ -1793,17 +1808,20 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                       badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
                       isExpense = true;
                     } else if (amountNum < 0) {
-                      badgeText = 'ปรับลดยอดงบประมาณ';
-                      badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
+                      badgeText = 'ปรับลดงบประมาณ';
+                      badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
                       isExpense = true;
                     } else {
                       isIncome = true;
                     }
 
                     // Strict amount sign formatting based on transaction nature (Income vs Expense)
-                    const absAmount = Math.abs(amountNum);
+                    const isAllocRecord = isMonthlyAlloc || isTopUp || isSetBudget || Boolean(tx.isAllocation);
+                    const displayAmount = isAllocRecord && (tx.newAmount !== undefined || tx.amount !== undefined)
+                      ? Math.max(0, Number(tx.newAmount ?? tx.amount ?? 0))
+                      : Math.abs(amountNum);
                     const signPrefix = isIncome ? '+฿' : isExpense ? '-฿' : '฿';
-                    const absAmountFormatted = absAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+                    const absAmountFormatted = displayAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     const amountColor = isIncome ? 'text-emerald-600' : isExpense ? 'text-rose-600' : 'text-slate-600';
 
                     return (

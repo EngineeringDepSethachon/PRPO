@@ -541,8 +541,14 @@ export const storageService = {
     if (Array.isArray(payload.prs)) this.savePRs(payload.prs);
     if (Array.isArray(payload.pos)) this.savePOs(payload.pos);
     if (Array.isArray(payload.stockLogs)) this.saveStockLogs(payload.stockLogs);
-    if (payload.budgets && typeof payload.budgets === 'object') this.saveBudgets(payload.budgets);
-    if (Array.isArray(payload.budgetTransactions)) this.saveBudgetTransactions(payload.budgetTransactions);
+    if (payload.budgets && typeof payload.budgets === 'object') {
+      const isArr = Array.isArray(payload.budgets);
+      const hasContent = isArr ? payload.budgets.length > 0 : Object.keys(payload.budgets).length > 0;
+      if (hasContent) this.saveBudgets(payload.budgets);
+    }
+    if (Array.isArray(payload.budgetTransactions) && payload.budgetTransactions.length > 0) {
+      this.saveBudgetTransactions(payload.budgetTransactions);
+    }
     if (Array.isArray(payload.auditLogs)) this.saveAuditLogs(payload.auditLogs);
     if (Array.isArray(payload.notifications)) this.saveNotifications(payload.notifications);
     if (Array.isArray(payload.signatures) && typeof this.saveSignatures === 'function') {

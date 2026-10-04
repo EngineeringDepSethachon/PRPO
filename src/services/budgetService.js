@@ -13,6 +13,8 @@ import { auditService } from './auditService';
  * With 0 initial spent and strictly the active month (2026-09 / กันยายน 2569), eliminating empty past-month placeholder rows.
  */
 export const generateCleanBudgetBaseline = () => {
+  const today = new Date();
+  const currentMonthStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
   const activeMonth = '2026-09';
   const deptConfigs = {
     PD: { monthlyBudget: 1000000 },
@@ -34,10 +36,12 @@ export const generateCleanBudgetBaseline = () => {
       remainingBudget: cfg.monthlyBudget,
       budgetRemaining: cfg.monthlyBudget,
       history: {
-        [activeMonth]: cfg.monthlyBudget
+        [activeMonth]: cfg.monthlyBudget,
+        [currentMonthStr]: cfg.monthlyBudget
       },
       historicalSpent: {
-        [activeMonth]: 0
+        [activeMonth]: 0,
+        [currentMonthStr]: 0
       },
       refundCredits: {}
     };
@@ -82,6 +86,7 @@ export const calculatePeriodBudgetSummary = (targetPeriodStr, prs = [], pos = []
       let allocated = 0;
       let isAllocated = false;
 
+      // 1. Direct budget object or array check
       if (Array.isArray(budgets)) {
         const found = budgets.find(b => (b.department === dept || b.dept === dept) && (b.period === m || b.month === m));
         if (found && (found.totalBudget !== undefined || found.monthlyBudget !== undefined)) {
@@ -93,9 +98,47 @@ export const calculatePeriodBudgetSummary = (targetPeriodStr, prs = [], pos = []
         if (deptObj.history && deptObj.history[m] !== undefined && deptObj.history[m] !== null) {
           allocated = Number(deptObj.history[m]) || 0;
           isAllocated = allocated > 0;
-        } else {
-          allocated = 0;
-          isAllocated = false;
+        }
+      }
+
+      // 2. Authoritative sync with storageService Budget Transactions (Ledger as Ground Truth)
+      const allTxList = storageService.getBudgetTransactions() || [];
+      const deptAllocTxs = allTxList.filter(tx => {
+        const txDept = String(tx.dept || tx.department || '').replace(/^ฝ่าย\s*/i, '').trim().toUpperCase();
+        if (txDept !== dept) return false;
+        const txPeriod = tx.targetMonth || tx.period || (String(tx.createdAt || tx.date || '').substring(0, 7));
+        if (txPeriod !== m) return false;
+        const rawType = String(tx.type || tx.actionType || '').toUpperCase();
+        return ['MONTHLY_ALLOCATION', 'ALLOCATE_BUDGET', 'SET_BUDGET', 'TOP_UP'].includes(rawType) || tx.isAllocation;
+      });
+
+      if (deptAllocTxs.length > 0) {
+        // Sort ascending by date to obtain latest allocation record
+        deptAllocTxs.sort((a, b) => new Date(a.createdAt || a.date || 0).getTime() - new Date(b.createdAt || b.date || 0).getTime());
+        const latestTx = deptAllocTxs[deptAllocTxs.length - 1];
+        const txAllocated = Number(latestTx.newAmount ?? latestTx.amount ?? 0);
+        if (txAllocated > 0) {
+          allocated = txAllocated;
+          isAllocated = true;
+          // Synchronize back into budgets memory object
+          if (budgets && typeof budgets === 'object' && !Array.isArray(budgets)) {
+            if (!budgets[dept]) budgets[dept] = { monthlyBudget: allocated, spent: 0, actualExpense: 0, pending: 0, variance: allocated, history: {}, historicalSpent: {}, refundCredits: {} };
+            if (!budgets[dept].history) budgets[dept].history = {};
+            budgets[dept].history[m] = allocated;
+          }
+        }
+      }
+
+      // 3. Fallback for active months (2026-09 or 2026-10 / currentMonth) if not yet explicitly allocated
+      if (!isAllocated && (m === '2026-09' || m === '2026-10')) {
+        const baseMonthly = Number(budgets?.[dept]?.monthlyBudget || 0);
+        if (baseMonthly > 0) {
+          allocated = baseMonthly;
+          isAllocated = true;
+          if (budgets && typeof budgets === 'object' && !Array.isArray(budgets) && budgets[dept]) {
+            if (!budgets[dept].history) budgets[dept].history = {};
+            budgets[dept].history[m] = allocated;
+          }
         }
       }
 
@@ -325,40 +368,52 @@ export const budgetService = {
 
       budgets[dept].history[period] = numAmount;
 
-      // If active current month, update base monthlyBudget
-      if (period === currentPeriodStr || period === '2026-09') {
+      // If active current month or 2026-09/2026-10, update base monthlyBudget
+      if (period === currentPeriodStr || period === '2026-09' || period === '2026-10') {
         budgets[dept].monthlyBudget = numAmount;
         budgets[dept].variance = numAmount - (budgets[dept].spent || 0);
         budgets[dept].remainingBudget = budgets[dept].variance;
       }
 
-      const deltaAmount = isInitial ? numAmount : (numAmount - prevMonthAlloc);
+      const deltaAmount = numAmount - prevMonthAlloc;
       const txType = isInitial ? 'MONTHLY_ALLOCATION' : (deltaAmount >= 0 ? 'TOP_UP' : 'SET_BUDGET');
       const txTypeLabel = isInitial 
         ? 'จัดสรรงบประมาณประจำเดือน' 
-        : (deltaAmount >= 0 ? 'ปรับเพิ่มงบประมาณ' : 'ปรับลดยอดงบประมาณ');
+        : (deltaAmount >= 0 ? 'ปรับเพิ่มงบประมาณ' : 'ปรับปรุงงบประมาณ');
 
-      // Append budget transaction
+      // Append budget transaction (Allocations are ALWAYS positive inflows, never red expenses)
       const tx = {
         id: `BTX-ALLOC-${dept}-${period}-${Date.now()}`,
         date: today.toISOString().replace('T', ' ').substring(0, 19),
         createdAt: today.toISOString(),
         type: txType,
-        actionType: isInitial ? 'MONTHLY_ALLOCATION' : 'ADJUST_BUDGET',
+        actionType: isInitial ? 'MONTHLY_ALLOCATION' : (deltaAmount >= 0 ? 'TOP_UP' : 'SET_BUDGET'),
         typeLabel: txTypeLabel,
         dept,
         department: dept,
         departmentName: `ฝ่าย ${dept}`,
-        amount: deltaAmount,
+        amount: numAmount, // Authoritative allocated budget
         delta: deltaAmount,
         previousAmount: prevMonthAlloc,
         newAmount: numAmount,
+        isAllocation: true,
         actor: actor || 'Asst. Manager',
         note: reason || (isInitial ? `จัดสรรงบประมาณประจำเดือน ${period}` : `ปรับปรุงงบประมาณรอบเดือน ${period}`),
         targetMonth: period,
         period
       };
       storageService.appendBudgetTransaction(tx);
+
+      // Async persistence to D1 backend
+      try {
+        if (typeof fetch === 'function') {
+          fetch('/api/budget-transactions', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(tx)
+          }).catch(() => {});
+        }
+      } catch {}
     }
 
     // Explicit Persistence on localStorage & storageService
@@ -366,6 +421,22 @@ export const budgetService = {
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('prpo_budgets', JSON.stringify(budgets));
     }
+
+    // Global reactive UI notification
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('budget_updated', { detail: { budgets, period } }));
+    }
+
+    // Persist full budgets state to backend
+    try {
+      if (typeof fetch === 'function') {
+        fetch('/api/budgets', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(budgets)
+        }).catch(() => {});
+      }
+    } catch {}
 
     // Audit Log
     try {

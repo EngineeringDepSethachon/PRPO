@@ -103,7 +103,8 @@ export async function onRequest(context) {
         prsRes,
         posRes,
         logsRes,
-        budgetsRes
+        budgetsRes,
+        txsRes
       ] = await Promise.all([
         db.prepare('SELECT * FROM products WHERE isDeleted = 0').all().catch(() => ({ results: [] })),
         db.prepare('SELECT * FROM vendors WHERE isDeleted = 0').all().catch(() => ({ results: [] })),
@@ -114,7 +115,8 @@ export async function onRequest(context) {
         db.prepare('SELECT * FROM prs ORDER BY createdAt DESC').all().catch(() => ({ results: [] })),
         db.prepare('SELECT * FROM pos ORDER BY createdAt DESC').all().catch(() => ({ results: [] })),
         db.prepare('SELECT * FROM stock_logs ORDER BY createdAt DESC LIMIT 200').all().catch(() => ({ results: [] })),
-        db.prepare('SELECT * FROM budgets').all().catch(() => ({ results: [] }))
+        db.prepare('SELECT * FROM budgets').all().catch(() => ({ results: [] })),
+        db.prepare('SELECT * FROM budget_transactions ORDER BY createdAt DESC LIMIT 500').all().catch(() => ({ results: [] }))
       ]);
 
       const prs = (prsRes.results || []).map(r => ({
@@ -142,6 +144,23 @@ export async function onRequest(context) {
         return safe;
       });
 
+      const budgets = {};
+      if (budgetsRes.results && budgetsRes.results.length > 0) {
+        budgetsRes.results.forEach(b => {
+          const dept = b.department || b.id;
+          budgets[dept] = {
+            monthlyBudget: Number(b.monthlyBudget || 0),
+            spent: Number(b.totalUsed || 0),
+            actualExpense: Number(b.totalUsed || 0),
+            pending: 0,
+            variance: Number(b.totalRemaining ?? (b.monthlyBudget - (b.totalUsed || 0))),
+            remainingBudget: Number(b.totalRemaining ?? (b.monthlyBudget - (b.totalUsed || 0))),
+            history: parseJsonSafe(b.monthsJson, { '2026-09': Number(b.monthlyBudget || 0), '2026-10': Number(b.monthlyBudget || 0) }),
+            historicalSpent: {}
+          };
+        });
+      }
+
       return jsonResponse({
         success: true,
         prs,
@@ -154,7 +173,8 @@ export async function onRequest(context) {
         departments: deptsRes.results || [],
         users,
         stockLogs: logsRes.results || [],
-        budgets: budgetsRes.results || []
+        budgets: Object.keys(budgets).length > 0 ? budgets : undefined,
+        budgetTransactions: txsRes.results || []
       });
     }
 
@@ -731,12 +751,125 @@ export async function onRequest(context) {
       }
     }
 
-    // ── 10. Budgets (/api/budgets) ──
+    // ── 10. Budgets & Ledger (/api/budgets & /api/budget-transactions) ──
+    if (path === '/api/budgets/adjust' && method === 'POST') {
+      if (!db) return jsonResponse({ success: false });
+      const params = await request.json().catch(() => ({}));
+      const { dept, action, newAmount, delta, reason, actor, targetMonth } = params;
+      const cleanDept = String(dept || 'PD').toUpperCase();
+      const numAmount = Number(newAmount ?? delta ?? 0);
+      const mKey = targetMonth || '2026-10';
+
+      const existing = await db.prepare('SELECT * FROM budgets WHERE id = ?').bind(cleanDept).first().catch(() => null);
+      let history = {};
+      if (existing?.monthsJson) {
+        history = parseJsonSafe(existing.monthsJson, {});
+      }
+      history[mKey] = numAmount;
+
+      await db.prepare(`
+        INSERT INTO budgets (id, department, fiscalYear, monthlyBudget, totalAllocated, totalUsed, totalRemaining, monthsJson, updatedAt)
+        VALUES (?, ?, 2026, ?, ?, 0, ?, ?, CURRENT_TIMESTAMP)
+        ON CONFLICT(id) DO UPDATE SET
+          monthlyBudget = excluded.monthlyBudget,
+          totalAllocated = excluded.totalAllocated,
+          monthsJson = excluded.monthsJson,
+          updatedAt = CURRENT_TIMESTAMP
+      `).bind(cleanDept, cleanDept, numAmount, numAmount, numAmount, JSON.stringify(history)).run().catch(() => {});
+
+      return jsonResponse({ success: true, budget: { department: cleanDept, monthlyBudget: numAmount, history } });
+    }
+
     if (path === '/api/budgets' || path.startsWith('/api/budgets/')) {
       if (!db) return jsonResponse([]);
       if (method === 'GET') {
-        const res = await db.prepare('SELECT * FROM budgets').all();
+        const res = await db.prepare('SELECT * FROM budgets').all().catch(() => ({ results: [] }));
         return jsonResponse(res.results || []);
+      }
+      if (method === 'POST') {
+        const body = await request.json().catch(() => ({}));
+        const entries = Array.isArray(body)
+          ? body.map(b => [b.department || b.dept || b.id, b])
+          : Object.entries(body || {});
+
+        for (const [dept, b] of entries) {
+          if (!dept || dept === 'ALL') continue;
+          const monthly = Number(b.monthlyBudget || b.totalBudget || b.amount || 0);
+          const historyJson = JSON.stringify(b.history || {});
+          await db.prepare(`
+            INSERT INTO budgets (id, department, fiscalYear, monthlyBudget, totalAllocated, totalUsed, totalRemaining, monthsJson, updatedAt)
+            VALUES (?, ?, 2026, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+              monthlyBudget = excluded.monthlyBudget,
+              totalAllocated = excluded.totalAllocated,
+              monthsJson = excluded.monthsJson,
+              updatedAt = CURRENT_TIMESTAMP
+          `).bind(dept, dept, monthly, monthly, Number(b.spent || 0), Number(b.variance ?? (monthly - (b.spent || 0))), historyJson).run().catch(() => {});
+        }
+        return jsonResponse({ success: true });
+      }
+    }
+
+    if (path === '/api/budget-transactions' || path.startsWith('/api/budget-transactions/')) {
+      if (!db) return jsonResponse([]);
+      await db.prepare(`
+        CREATE TABLE IF NOT EXISTS budget_transactions (
+          id TEXT PRIMARY KEY,
+          dept TEXT,
+          department TEXT,
+          type TEXT,
+          actionType TEXT,
+          typeLabel TEXT,
+          amount REAL,
+          delta REAL,
+          previousAmount REAL,
+          newAmount REAL,
+          isAllocation INTEGER DEFAULT 0,
+          actor TEXT,
+          note TEXT,
+          targetMonth TEXT,
+          period TEXT,
+          createdAt TEXT,
+          date TEXT
+        )
+      `).run().catch(() => {});
+
+      if (method === 'GET') {
+        const res = await db.prepare('SELECT * FROM budget_transactions ORDER BY createdAt DESC').all().catch(() => ({ results: [] }));
+        return jsonResponse(res.results || []);
+      }
+
+      if (method === 'POST') {
+        const tx = await request.json().catch(() => ({}));
+        if (tx && tx.id) {
+          await db.prepare(`
+            INSERT INTO budget_transactions (id, dept, department, type, actionType, typeLabel, amount, delta, previousAmount, newAmount, isAllocation, actor, note, targetMonth, period, createdAt, date)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ON CONFLICT(id) DO UPDATE SET
+              amount = excluded.amount,
+              newAmount = excluded.newAmount,
+              typeLabel = excluded.typeLabel
+          `).bind(
+            tx.id,
+            tx.dept || tx.department || 'PD',
+            tx.department || tx.dept || 'PD',
+            tx.type || 'MONTHLY_ALLOCATION',
+            tx.actionType || tx.type || 'MONTHLY_ALLOCATION',
+            tx.typeLabel || 'จัดสรรงบประมาณประจำเดือน',
+            Number(tx.amount || 0),
+            Number(tx.delta || 0),
+            Number(tx.previousAmount || 0),
+            Number(tx.newAmount || 0),
+            tx.isAllocation ? 1 : 0,
+            tx.actor || 'Staff',
+            tx.note || tx.remark || '',
+            tx.targetMonth || tx.period || '',
+            tx.period || tx.targetMonth || '',
+            tx.createdAt || new Date().toISOString(),
+            tx.date || new Date().toISOString()
+          ).run().catch(() => {});
+        }
+        return jsonResponse({ success: true, transaction: tx });
       }
     }
 
