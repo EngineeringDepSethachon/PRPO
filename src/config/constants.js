@@ -213,7 +213,9 @@ export function resolveUserPermissions(user) {
   
   const level = Number(user.level || 1);
   const dept = user.department || 'PD';
-  const isOnline = user.roleId === 'ONLINE_PURCHASER' || user.role_id === 'ONLINE_PURCHASER';
+  const roleStr = String((user.roleId || user.role_id || user.canonicalRole || user.positionKey || '') + ' ' + (user.title || '')).toUpperCase();
+  const isAdmin = level >= 99 || roleStr.includes('ADMIN') || user.isAdmin === true;
+  const isOnline = !isAdmin && (roleStr.includes('ONLINE_PURCHASER') || user.canonicalRole === 'PURCHASER' || user.isOnline === true);
 
   const userDepts = Array.isArray(user.departments) && user.departments.length > 0 ? user.departments : (
     Array.isArray(user.assignedDepartments) && user.assignedDepartments.length > 0 ? user.assignedDepartments : (
@@ -227,8 +229,8 @@ export function resolveUserPermissions(user) {
   const deptDisplay = userDepts.length > 1 ? userDepts.join(', ') : dept;
 
   return {
-    id: user.roleId || user.role_id || (level >= 99 ? 'ADMIN' : level >= 3 ? 'APPROVER' : level >= 2 ? (isOnline ? 'ONLINE_PURCHASER' : 'REVIEWER') : 'REQUESTER'),
-    title: user.title || (level >= 99 ? 'System Admin' : level >= 3 ? `Plant Manager (${deptDisplay})` : level >= 2 ? (isOnline ? 'Online Purchaser' : `Asst. Manager (${deptDisplay})`) : `Requester (${deptDisplay})`),
+    id: user.roleId || user.role_id || (isAdmin ? 'ADMIN' : level >= 3 ? 'APPROVER' : level >= 2 ? (isOnline ? 'ONLINE_PURCHASER' : 'REVIEWER') : 'REQUESTER'),
+    title: user.title || (isAdmin ? 'System Admin' : level >= 3 ? `Plant Manager (${deptDisplay})` : level >= 2 ? (isOnline ? 'Online Purchaser' : `Asst. Manager (${deptDisplay})`) : `Requester (${deptDisplay})`),
     name: user.name || user.employee_name || user.employeeName || 'Staff',
     department: dept,
     departments: userDepts,
@@ -236,27 +238,27 @@ export function resolveUserPermissions(user) {
     allowedDepartments: user.allowedDepartments || userDepts,
     level: level,
 
-    // ─── LEVEL 1+ PERMISSIONS (พนักงานทุกคน) ───
-    canCreatePR: level >= 1,
-    canSubmitPR: level >= 1,
-    canDeleteOwnDraft: level >= 1,
-    canReceiveGoods: level === 1 || level >= 99,
-    canCloseOwnPO: level === 1 || level >= 99,
-    canManageMaster: level >= 1,
-    canDeleteMaster: level >= 1,
+    // ─── LEVEL 1+ PERMISSIONS (พนักงานทุกคน ยกเว้น Online Purchaser) ───
+    canCreatePR: isAdmin || (!isOnline && (user.canCreatePR !== undefined ? Boolean(Number(user.canCreatePR)) : level >= 1)),
+    canSubmitPR: isAdmin || (!isOnline && (user.canSubmitPR !== undefined ? Boolean(Number(user.canSubmitPR)) : level >= 1)),
+    canDeleteOwnDraft: isAdmin || (!isOnline && (user.canDeleteOwnDraft !== undefined ? Boolean(Number(user.canDeleteOwnDraft)) : level >= 1)),
+    canReceiveGoods: isAdmin || (!isOnline && (user.canReceiveGoods !== undefined ? Boolean(Number(user.canReceiveGoods)) : (level === 1 || level >= 99))),
+    canCloseOwnPO: isAdmin || (user.canCloseOwnPO !== undefined ? Boolean(Number(user.canCloseOwnPO)) : (level === 1 || isOnline || level >= 99)),
+    canManageMaster: isAdmin || (!isOnline && (user.canManageMaster !== undefined ? Boolean(Number(user.canManageMaster)) : level >= 1)),
+    canDeleteMaster: isAdmin || (!isOnline && (user.canDeleteMaster !== undefined ? Boolean(Number(user.canDeleteMaster)) : level >= 99)),
 
     // ─── LEVEL 2+ PERMISSIONS (หัวหน้างาน / ผู้ช่วยผู้จัดการ) ───
-    canReview: level >= 2,
-    canViewBudget: level >= 2,
-    canViewBudgetMenu: level >= 2,
-    canViewAllDepts: level >= 99 || level >= 3 || dept === 'ALL' || userDepts.includes('ALL') || userDepts.includes('*'),
+    canReview: isAdmin || (!isOnline && (user.canReview !== undefined ? Boolean(Number(user.canReview)) : level >= 2)),
+    canViewBudget: isAdmin || (!isOnline && (user.canViewBudget !== undefined ? Boolean(Number(user.canViewBudget)) : level >= 2)),
+    canViewBudgetMenu: isAdmin || (!isOnline && (user.canViewBudgetMenu !== undefined ? Boolean(Number(user.canViewBudgetMenu)) : level >= 2)),
+    canViewAllDepts: isAdmin || (user.canViewAllDepts !== undefined ? Boolean(Number(user.canViewAllDepts)) : (level >= 99 || level >= 3 || isOnline || dept === 'ALL' || userDepts.includes('ALL') || userDepts.includes('*'))),
 
     // ─── LEVEL 3+ PERMISSIONS (ผู้จัดการ / ผู้อนุมัติขั้นสุดท้าย) ───
-    canFinalApprove: level >= 3,
-    canSetBudget: level >= 3,
+    canFinalApprove: isAdmin || (user.canFinalApprove !== undefined ? Boolean(Number(user.canFinalApprove)) : level >= 3),
+    canSetBudget: isAdmin || (user.canSetBudget !== undefined ? Boolean(Number(user.canSetBudget)) : level >= 3),
 
     // ─── SPECIAL TASK PERMISSIONS ───
-    canOnlinePurchase: isOnline || level >= 99,
+    canOnlinePurchase: isOnline || isAdmin || Boolean(Number(user.canOnlinePurchase || 0)),
   };
 }
 

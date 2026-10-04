@@ -312,6 +312,7 @@ describe('Domain Suite: Budget Management & Financial Ledger', () => {
       );
 
       // Verify Tab 3 presence and rendered table columns
+
       // Check that +฿246.00 is rendered with emerald bold font, NOT +฿0
       expect(html).toContain('+฿246.00');
       expect(html).toContain('text-emerald-600 font-mono');
@@ -429,6 +430,98 @@ describe('Domain Suite: Budget Management & Financial Ledger', () => {
 
       const budgetsAfter3 = storageService.getBudgets();
       expect(budgetsAfter3['PD']?.spent).toBe(spent1); // budget spent unchanged!
+    });
+  });
+
+  // ── 3. Budget Adjustment & Delta Calculation (1M -> 1.5M = +500,000) ──
+  describe('3. Budget Top Up & Delta Calculation (Starting 1,000,000 to 1,500,000 logs +500,000)', () => {
+    beforeEach(() => {
+      budgetService.resetBudgetData();
+    });
+
+    it('Scenario 3a: allocateMonthlyBudget from 1,000,000 to 1,500,000 records delta = +500,000, amount = 500,000, and TOP_UP', async () => {
+      // Starting baseline has PD = 1,000,000
+      const initialBudgets = storageService.getBudgets();
+      expect(Number(initialBudgets.PD.monthlyBudget)).toBe(1000000);
+
+      // Adjust PD to 1,500,000
+      await budgetService.allocateMonthlyBudget({
+        period: '2026-09',
+        allocations: { PD: 1500000 },
+        previousAmounts: { PD: 1000000 },
+        actor: 'Admin',
+        reason: 'ปรับเพิ่มงบประมาณฝ่ายผลิต'
+      });
+
+      const txs = storageService.getBudgetTransactions();
+      const latestTx = txs.filter(t => t.dept === 'PD' && t.period === '2026-09').pop();
+
+      expect(latestTx).toBeDefined();
+      expect(latestTx.type).toBe('TOP_UP');
+      expect(latestTx.typeLabel).toBe('ปรับเพิ่มงบประมาณ');
+      expect(latestTx.amount).toBe(500000); // 500,000 NOT 1,500,000!
+      expect(latestTx.delta).toBe(500000);
+      expect(latestTx.previousAmount).toBe(1000000);
+      expect(latestTx.newAmount).toBe(1500000);
+      expect(latestTx.isAllocation).toBe(true);
+
+      const updatedBudgets = storageService.getBudgets();
+      expect(updatedBudgets.PD.monthlyBudget).toBe(1500000);
+    });
+
+    it('Scenario 3b: apiService.updateBudget from 1,000,000 to 1,500,000 records delta = +500,000 and TOP_UP', async () => {
+      const initialBudgets = storageService.getBudgets();
+      expect(Number(initialBudgets.PD.monthlyBudget)).toBe(1000000);
+
+      const result = await apiService.updateBudget('PD', 1500000, '2026-09', 'ผู้ดูแลระบบ');
+
+      expect(result.success).toBe(true);
+      expect(result.transaction).toBeDefined();
+      expect(result.transaction.type).toBe('TOP_UP');
+      expect(result.transaction.typeLabel).toBe('ปรับเพิ่มงบประมาณ');
+      expect(result.transaction.amount).toBe(500000);
+      expect(result.transaction.delta).toBe(500000);
+      expect(result.transaction.previousAmount).toBe(1000000);
+      expect(result.transaction.newAmount).toBe(1500000);
+    });
+
+    it('Scenario 3c: BudgetView renders +฿500,000.00 and ปรับเพิ่มงบประมาณ badge, NOT +฿1,500,000.00', async () => {
+      // Log an adjustment transaction from 1,000,000 to 1,500,000
+      const testTx = {
+        id: 'BTX-TEST-1500',
+        dept: 'PD',
+        department: 'PD',
+        type: 'TOP_UP',
+        actionType: 'TOP_UP',
+        typeLabel: 'ปรับเพิ่มงบประมาณ',
+        amount: 500000,
+        delta: 500000,
+        previousAmount: 1000000,
+        newAmount: 1500000,
+        isAllocation: true,
+        note: 'ปรับเพิ่มงบประมาณจาก ฿1,000,000 เป็น ฿1,500,000',
+        createdAt: '2026-09-15T10:00:00.000Z',
+        date: '2026-09-15 10:00:00',
+        targetMonth: '2026-09',
+        period: '2026-09'
+      };
+      storageService.saveBudgetTransactions([testTx]);
+
+      const html = renderToStaticMarkup(
+        <MemoryRouter initialEntries={['/budget?tab=history&month=2026-09']}>
+          <BudgetView
+            currentUser={{ id: 'ADMIN', roleId: 'ADMIN', level: 99, assignedDepartments: ['ALL'] }}
+            prs={[]}
+            pos={[]}
+          />
+        </MemoryRouter>
+      );
+
+      // Verify +฿500,000.00 and badge appear
+      expect(html).toContain('+฿500,000.00');
+      expect(html).toContain('ปรับเพิ่มงบประมาณ');
+      // Verify +฿1,500,000.00 is NOT displayed as the transaction delta
+      expect(html).not.toContain('+฿1,500,000.00');
     });
   });
 });

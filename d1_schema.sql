@@ -27,6 +27,7 @@ CREATE TABLE users (
     id TEXT PRIMARY KEY,
     employeeId TEXT UNIQUE,
     username TEXT NOT NULL UNIQUE,
+    email TEXT,
     password TEXT NOT NULL,
     pin TEXT,
     name TEXT NOT NULL,
@@ -43,8 +44,24 @@ CREATE TABLE users (
     level INTEGER DEFAULT 1,
     status TEXT DEFAULT 'ACTIVE',
     pictureUrl TEXT,
+    signature TEXT,
+    canCreatePR INTEGER DEFAULT 1,
+    canSubmitPR INTEGER DEFAULT 1,
+    canDeleteOwnDraft INTEGER DEFAULT 1,
+    canReview INTEGER DEFAULT 0,
+    canFinalApprove INTEGER DEFAULT 0,
+    canOnlinePurchase INTEGER DEFAULT 0,
+    canReceiveGoods INTEGER DEFAULT 0,
+    canCloseOwnPO INTEGER DEFAULT 0,
+    canManageMaster INTEGER DEFAULT 1,
+    canDeleteMaster INTEGER DEFAULT 0,
+    canViewBudget INTEGER DEFAULT 0,
+    canViewBudgetMenu INTEGER DEFAULT 0,
+    canSetBudget INTEGER DEFAULT 0,
+    canViewAllDepts INTEGER DEFAULT 0,
     description TEXT,
-    createdAt TEXT DEFAULT CURRENT_TIMESTAMP
+    createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
+    updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 3. Storage Locations Table
@@ -187,15 +204,27 @@ DROP TABLE IF EXISTS stock_logs;
 CREATE TABLE stock_logs (
     id TEXT PRIMARY KEY,
     productId TEXT NOT NULL,
-    productName TEXT,
-    type TEXT NOT NULL, -- 'IN', 'OUT', 'ADJUST', 'RETURN'
-    quantity REAL NOT NULL,
-    balance REAL NOT NULL,
-    unit TEXT,
-    referenceNo TEXT,
-    department TEXT NOT NULL,
-    notes TEXT,
-    performedBy TEXT,
+    productCode TEXT,                -- รหัสสินค้า เช่น PD-OIL-068
+    productName TEXT,                -- ชื่อสินค้า
+    type TEXT NOT NULL,              -- 'IN'=รับเข้า, 'OUT'=เบิกจ่าย, 'ADJUST'=ปรับสต็อก, 'RETURN'=คืนของ
+    docType TEXT,                    -- 'GRN'=ใบรับสินค้า, 'ISSUE'=เบิกจ่าย, 'ADJUST'=ปรับ
+    docNo TEXT,                      -- เลขที่เอกสาร เช่น GRN-PO-PD-001, REQ-1234
+    referenceNo TEXT,                -- เลขอ้างอิง (PO No, PR No)
+    poNo TEXT,                       -- เลขที่ PO ที่อ้างอิง (สำหรับ GRN)
+    quantity REAL NOT NULL,          -- จำนวนที่รับ/เบิก (เป็นบวกเสมอ)
+    changeQty REAL,                  -- ±จำนวนที่เปลี่ยนแปลง (ลบ=เบิก, บวก=รับ)
+    balance REAL NOT NULL,           -- ยอดคงเหลือหลังทำรายการ
+    unit TEXT,                       -- หน่วยของสินค้า เช่น ชิ้น, ลิตร, ม้วน
+    department TEXT NOT NULL,        -- แผนกของสินค้า เช่น PD, QC
+    location TEXT,                   -- ห้อง/หน่วยที่เบิกใช้งาน เช่น 'ห้อง K1', 'Lab เคมี'
+    issuedTo TEXT,                   -- ชื่อห้อง/หน่วยงานที่รับของ
+    issueUnit TEXT,                  -- ID หน่วยใช้งาน (usage unit id หรือ name)
+    unitCost REAL DEFAULT 0,         -- ต้นทุนต่อหน่วย ณ เวลาเบิก (Moving Average Cost)
+    totalCost REAL DEFAULT 0,        -- มูลค่ารวม = quantity × unitCost
+    actorId TEXT,                    -- ID/username ผู้ทำรายการ
+    actorName TEXT,                  -- ชื่อผู้ทำรายการ
+    performedBy TEXT,                -- ชื่อผู้ทำรายการ (backward compat)
+    notes TEXT,                      -- หมายเหตุ/เหตุผลการเบิก
     createdAt TEXT DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -233,14 +262,21 @@ INSERT INTO departments (id, code, name, nameEn, prefix, description, monthlyBud
 ('DEPT-ENG', 'ENG', 'ฝ่ายวิศวกรรมและซ่อมบำรุง', 'Engineering & Maintenance', 'ENG', 'ดูแลรักษาเครื่องจักร ระบบสาธารณูปโภค และงานซ่อมบำรุงโรงงาน', 180000, 1, 'cyan', 'วิศวกร ช่างทอง', CURRENT_TIMESTAMP);
 
 -- Users
-INSERT INTO users (id, employeeId, username, password, pin, name, employeeName, displayName, position, department, primaryDepartment, allowedDepartments, roleId, canonicalRole, positionKey, title, level, status, description) VALUES
-('USR-0001', 'EMP-PD-001', 'wichai.pd', 'password123', 'password123', 'คุณวิชัย (PD)', 'คุณวิชัย สุขใจ', 'Wichai (PD)', 'เจ้าหน้าที่ฝ่ายผลิต', 'PD', 'PD', '["PD"]', 'REQUESTER_PD', 'REQUESTER', 'REQUESTER_PD', 'Requester (PD)', 1, 'ACTIVE', 'สร้าง/ส่ง PR ฝ่ายผลิต, เบิกจ่ายสินค้า, ตรวจรับของเข้าสต็อก'),
-('USR-0002', 'EMP-QC-001', 'somying.qc', 'password123', 'password123', 'คุณสมหญิง (QC)', 'คุณสมหญิง รักดี', 'Somying (QC)', 'เจ้าหน้าที่ฝ่ายควบคุมคุณภาพ (QC)', 'QC', 'QC', '["QC"]', 'REQUESTER_QC', 'REQUESTER', 'REQUESTER_QC', 'Requester (QC)', 1, 'ACTIVE', 'สร้าง/ส่ง PR ฝ่าย QC/Lab, เบิกจ่ายสารเคมี, ตรวจรับของ'),
-('USR-0003', 'EMP-MGR-001', 'somchai.am', 'password123', 'password123', 'คุณสมชาย (Asst. Mgr)', 'คุณสมชาย มุ่งมั่น', 'Somchai (Asst Mgr)', 'ผู้ช่วยผู้จัดการฝ่ายผลิต', 'PD', 'PD', '["PD"]', 'ASST_MANAGER', 'REVIEWER', 'ASST_MANAGER', 'Asst. Manager', 2, 'ACTIVE', 'ตรวจสอบและตรวจทาน PR ด่านแรกฝ่ายผลิต (Level 1 Reviewer)'),
-('USR-0004', 'EMP-MGR-002', 'prasert.mgr', 'password123', 'password123', 'คุณประเสริฐ (PD Mgr)', 'คุณประเสริฐ ยิ่งยง', 'Prasert (Mgr)', 'ผู้จัดการฝ่ายผลิต', 'PD', 'PD', '["PD"]', 'DEPT_MANAGER', 'APPROVER', 'DEPT_MANAGER', 'Department Manager', 3, 'ACTIVE', 'อนุมัติ PR วงเงินฝ่ายผลิต'),
-('USR-0005', 'EMP-PUR-001', 'suda.pur', 'password123', 'password123', 'คุณสุดา (Purchasing)', 'คุณสุดา จัดหาดี', 'Suda (PUR)', 'เจ้าหน้าที่จัดซื้ออาวุโส', 'PUR', 'PUR', '["PUR","PD","QC","WH"]', 'PURCHASER', 'PURCHASER', 'PURCHASER', 'Purchasing Officer', 2, 'ACTIVE', 'ตรวจรับ PR, เปรียบเทียบราคา และเปิด PO'),
-('USR-0006', 'EMP-WH-001', 'somkid.wh', 'password123', 'password123', 'คุณสมคิด (Warehouse)', 'คุณสมคิด คลังทอง', 'Somkid (WH)', 'หัวหน้าแผนกคลังสินค้า', 'WH', 'WH', '["WH","PD","QC"]', 'WAREHOUSE', 'WAREHOUSE', 'WAREHOUSE', 'Warehouse Supervisor', 2, 'ACTIVE', 'ตรวจรับของ (GRN), บันทึกเข้าสต็อก, จัดการคลัง'),
-('USR-0007', 'EMP-ADM-001', 'admin', 'password123', 'password123', 'ผู้ดูแลระบบ (Admin)', 'นายแอดมิน สูงสุด', 'System Admin', 'ผู้ดูแลระบบส่วนกลาง', 'ALL', 'ALL', '["ALL","PD","QC","WH","PUR","ENG"]', 'SYSTEM_ADMIN', 'ADMIN', 'SYSTEM_ADMIN', 'System Administrator', 99, 'ACTIVE', 'จัดการ Master Data, สิทธิ์ผู้ใช้งาน, งบประมาณ และตั้งค่าระบบ');
+INSERT INTO users (
+    id, employeeId, username, email, password, pin, name, employeeName, displayName,
+    position, department, primaryDepartment, allowedDepartments, roleId, canonicalRole,
+    positionKey, title, level, status,
+    canCreatePR, canSubmitPR, canDeleteOwnDraft, canReview, canFinalApprove, canOnlinePurchase,
+    canReceiveGoods, canCloseOwnPO, canManageMaster, canDeleteMaster, canViewBudget, canViewBudgetMenu,
+    canSetBudget, canViewAllDepts, description
+) VALUES
+('USR-0001', 'EMP-PD-001', 'wichai.pd', 'wichai@company.com', 'password123', 'password123', 'คุณวิชัย (PD)', 'คุณวิชัย สุขใจ', 'Wichai (PD)', 'เจ้าหน้าที่ฝ่ายผลิต', 'PD', 'PD', '["PD"]', 'REQUESTER_PD', 'REQUESTER', 'REQUESTER_PD', 'Requester (PD)', 1, 'ACTIVE', 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 'สร้าง/ส่ง PR ฝ่ายผลิต, เบิกจ่ายสินค้า, ตรวจรับของเข้าสต็อก'),
+('USR-0002', 'EMP-QC-001', 'somying.qc', 'somying@company.com', 'password123', 'password123', 'คุณสมหญิง (QC)', 'คุณสมหญิง รักดี', 'Somying (QC)', 'เจ้าหน้าที่ฝ่ายควบคุมคุณภาพ (QC)', 'QC', 'QC', '["QC"]', 'REQUESTER_QC', 'REQUESTER', 'REQUESTER_QC', 'Requester (QC)', 1, 'ACTIVE', 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 0, 0, 0, 0, 'สร้าง/ส่ง PR ฝ่าย QC/Lab, เบิกจ่ายสารเคมี, ตรวจรับของ'),
+('USR-0003', 'EMP-MGR-001', 'somchai.am', 'somchai.am@company.com', 'password123', 'password123', 'คุณสมชาย (Asst. Mgr)', 'คุณสมชาย มุ่งมั่น', 'Somchai (Asst Mgr)', 'ผู้ช่วยผู้จัดการฝ่ายผลิต (Asst. Manager)', 'PD', 'PD', '["PD","QC"]', 'ASST_MANAGER', 'REVIEWER', 'REVIEWER', 'Assistant Manager', 2, 'ACTIVE', 1, 1, 1, 1, 0, 0, 0, 0, 1, 0, 1, 1, 0, 1, 'ตรวจทาน PR (Level 1 Reviewer), ดูแลฝ่ายผลิต (PD) และฝ่ายควบคุมคุณภาพ (QC)'),
+('USR-0004', 'EMP-PUR-001', 'nat.on', 'nat.on@company.com', 'password123', 'password123', 'คุณนัท (Online Purchaser)', 'คุณนัท จัดซื้อ', 'Nat (Online)', 'เจ้าหน้าที่จัดซื้อออนไลน์', 'PUR', 'PUR', '["*"]', 'ONLINE_PURCHASER', 'PURCHASER', 'ONLINE_PURCHASER', 'Online Purchaser', 2, 'ACTIVE', 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 1, 'จัดการสั่งซื้อออนไลน์ Shopee/Lazada, บันทึกราคาจริง, ปิด PO Online'),
+('USR-0005', 'EMP-MGR-002', 'prasert.pm', 'prasert.pm@company.com', 'password123', 'password123', 'คุณประเสริฐ (Plant Mgr)', 'คุณประเสริฐ ยิ่งยง', 'Prasert (Plant Mgr)', 'ผู้จัดการโรงงาน (Plant Manager)', 'MGT', 'MGT', '["*"]', 'PLANT_MANAGER', 'APPROVER', 'APPROVER', 'Plant Manager', 3, 'ACTIVE', 1, 1, 1, 1, 1, 0, 0, 0, 1, 0, 1, 1, 1, 1, 'อนุมัติสั่งซื้อ (Final Approver), ออก PO อัตโนมัติ, คุมงบประมาณ'),
+('USR-0006', 'EMP-WH-001', 'somkid.wh', 'somkid.wh@company.com', 'password123', 'password123', 'คุณสมคิด (Warehouse)', 'คุณสมคิด คลังทอง', 'Somkid (WH)', 'หัวหน้าแผนกคลังสินค้า', 'WH', 'WH', '["WH","PD","QC"]', 'WAREHOUSE', 'WAREHOUSE', 'WAREHOUSE', 'Warehouse Supervisor', 2, 'ACTIVE', 1, 1, 1, 0, 0, 0, 1, 1, 1, 0, 1, 1, 0, 1, 'ตรวจรับของ (GRN), บันทึกเข้าสต็อก, จัดการคลัง'),
+('USR-0007', 'EMP-ADM-001', 'admin', 'admin@company.com', 'password123', 'password123', 'ผู้ดูแลระบบ (Admin)', 'นายแอดมิน สูงสุด', 'Admin System', 'ผู้ดูแลระบบส่วนกลาง', 'ALL', 'ALL', '["*"]', 'ADMIN', 'ADMIN', 'ADMIN', 'System Administrator', 99, 'ACTIVE', 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 'ผู้ดูแลระบบ สิทธิ์สูงสุดในการจัดการข้อมูลทุกส่วน');
 
 -- Storage Locations
 INSERT INTO storage_locations (id, name, department) VALUES

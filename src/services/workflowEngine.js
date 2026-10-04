@@ -3380,26 +3380,47 @@ export const workflowEngine = {
     const logNo = `REQ-${Date.now().toString().slice(-4)}`;
     const masterUnits = storageService.getUsageUnits?.() || [];
     const matchedUnit = masterUnits.find(u => u.name === issueUnit || u.id === issueUnit);
+    const prodDept = product.department || product.category || user?.department || 'PD';
+    const unitPrice = Number(product.avgCost || product.standardPrice || product.costPrice || product.price || 0);
+    const totalVal = Math.round(numIssueQty * unitPrice * 100) / 100;
+    const actorDisplayName = user ? (user.name ? `${user.name}${user.title ? ` (${user.title})` : ''}` : (user.username || 'System')) : 'System';
 
     stockLogs.unshift({
-      id: `LOG-${Date.now()}`,
+      id: `LOG-${prodDept}-${Date.now()}`,
       date: timestamp,
+      timestamp: new Date().toISOString(),
       productId: product.id,
       productCode: product.code,
       productName: product.name,
-      department: product.category,
+      name: product.name,
+      department: prodDept,
       type: 'OUT',
+      docType: 'ISSUE',
       docNo: logNo,
+      referenceNo: logNo,
+      quantity: numIssueQty,
       qty: numIssueQty,
+      changeQty: -numIssueQty,
       unit: sUnit,
       balance: newBal,
-      user: `${user.name} (${user.title})`,
-      issueUnit: issueUnit || '',
+      balanceAfter: newBal,
+      unitCost: unitPrice,
+      totalCost: totalVal,
+      user: actorDisplayName,
+      actorId: user?.id || user?.username || '',
+      actorName: user?.name || user?.username || '',
+      performedBy: actorDisplayName,
+      location: matchedUnit?.name || issueUnit || '',
+      locationName: matchedUnit?.name || issueUnit || '',
+      issuedTo: matchedUnit?.name || issueUnit || '',
+      issueUnit: issueUnit || matchedUnit?.name || '',
       unitId: matchedUnit?.id || '',
       unitName: matchedUnit?.name || issueUnit || '',
       locationId: product.locationId || '',
       locationName: product.locationName || '',
-      note: note || `เบิกสินค้าไปใช้งาน`
+      note: note || `เบิกสินค้าไปใช้งาน`,
+      notes: note || `เบิกสินค้าไปใช้งาน`,
+      createdAt: new Date().toISOString()
     });
 
     storageService.saveProducts(products);

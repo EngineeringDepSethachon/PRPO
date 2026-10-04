@@ -1747,6 +1747,15 @@ describe('Domain Suite: Inventory Management & Goods Receiving (GRN)', () => {
     });
 
     it('ensures INITIAL-BALANCE of PD-OIL-068 is 2,400 Liters @ ฿72.50 = ฿174,000.00 (Sanitization & Valuation Bug Elimination)', () => {
+      storageService.saveStockLogs([{
+        id: 'INIT-PROD-PD-001',
+        productId: 'PROD-PD-001',
+        productCode: 'PD-OIL-068',
+        documentNo: 'INITIAL-BALANCE',
+        docNo: 'INITIAL-BALANCE',
+        unitPrice: 14500,
+        totalPrice: 34800000
+      }]);
       const stockLogs = storageService.getStockLogs();
       const oilInitialLog = stockLogs.find(l => 
         (l.id === 'INIT-PROD-PD-001' || l.documentNo === 'INITIAL-BALANCE') &&

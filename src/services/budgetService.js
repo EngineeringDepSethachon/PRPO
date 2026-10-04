@@ -36,12 +36,10 @@ export const generateCleanBudgetBaseline = () => {
       remainingBudget: cfg.monthlyBudget,
       budgetRemaining: cfg.monthlyBudget,
       history: {
-        [activeMonth]: cfg.monthlyBudget,
-        [currentMonthStr]: cfg.monthlyBudget
+        [activeMonth]: cfg.monthlyBudget
       },
       historicalSpent: {
-        [activeMonth]: 0,
-        [currentMonthStr]: 0
+        [activeMonth]: 0
       },
       refundCredits: {}
     };
@@ -345,7 +343,7 @@ export const budgetService = {
    * Allocate monthly budget for specified period (YYYY-MM)
    * Enforces persistence in storageService & localStorage
    */
-  async allocateMonthlyBudget({ period, allocations = {}, actor = 'Asst. Manager', reason = '' }) {
+  async allocateMonthlyBudget({ period, allocations = {}, previousAmounts = {}, actor = 'Asst. Manager', reason = '' }) {
     if (!period || !/^\d{4}-\d{2}$/.test(period)) {
       throw new Error('รูปแบบรอบเดือนไม่ถูกต้อง ต้องเป็น YYYY-MM (ค.ศ.)');
     }
@@ -359,11 +357,26 @@ export const budgetService = {
       if (!budgets[dept]) {
         budgets[dept] = { monthlyBudget: 0, spent: 0, actualExpense: 0, pending: 0, variance: 0, history: {}, historicalSpent: {}, refundCredits: {} };
       }
-      // Strict Zero-based: Previous budget strictly refers to the same period history.
-      // Initial state of any new month is strictly 0. Never fallback to master data!
-      const prevMonthAlloc = (budgets[dept].history[period] !== undefined && budgets[dept].history[period] !== null)
+      if (!budgets[dept].history) budgets[dept].history = {};
+
+      const prevFromHistory = (budgets[dept].history && budgets[dept].history[period] !== undefined && budgets[dept].history[period] !== null)
         ? Number(budgets[dept].history[period])
-        : 0;
+        : null;
+
+      const prevFromExplicit = (previousAmounts && previousAmounts[dept] !== undefined && previousAmounts[dept] !== null && !isNaN(Number(previousAmounts[dept])))
+        ? Number(previousAmounts[dept])
+        : null;
+
+      const prevFromBase = Number(budgets[dept].monthlyBudget || budgets[dept].allocated || budgets[dept].baseAllocated || 0);
+
+      // Determine starting budget for this adjustment:
+      // 1. Explicit previousAmount passed from modal/caller
+      // 2. Existing history for this period
+      // 3. Department base monthlyBudget baseline
+      const prevMonthAlloc = prevFromExplicit !== null
+        ? prevFromExplicit
+        : (prevFromHistory !== null ? prevFromHistory : prevFromBase);
+
       const isInitial = prevMonthAlloc === 0;
 
       budgets[dept].history[period] = numAmount;
@@ -376,29 +389,30 @@ export const budgetService = {
       }
 
       const deltaAmount = numAmount - prevMonthAlloc;
-      const txType = isInitial ? 'MONTHLY_ALLOCATION' : (deltaAmount >= 0 ? 'TOP_UP' : 'SET_BUDGET');
+      const movementAmount = isInitial ? numAmount : Math.abs(deltaAmount);
+      const txType = isInitial ? 'MONTHLY_ALLOCATION' : (deltaAmount >= 0 ? 'TOP_UP' : 'BUDGET_ADJUSTMENT_DOWN');
       const txTypeLabel = isInitial 
         ? 'จัดสรรงบประมาณประจำเดือน' 
-        : (deltaAmount >= 0 ? 'ปรับเพิ่มงบประมาณ' : 'ปรับปรุงงบประมาณ');
+        : (deltaAmount >= 0 ? 'ปรับเพิ่มงบประมาณ' : 'ปรับลดงบประมาณ');
 
-      // Append budget transaction (Allocations are ALWAYS positive inflows, never red expenses)
+      // Append budget transaction (Movement amount reflects the delta change from previous budget)
       const tx = {
         id: `BTX-ALLOC-${dept}-${period}-${Date.now()}`,
         date: today.toISOString().replace('T', ' ').substring(0, 19),
         createdAt: today.toISOString(),
         type: txType,
-        actionType: isInitial ? 'MONTHLY_ALLOCATION' : (deltaAmount >= 0 ? 'TOP_UP' : 'SET_BUDGET'),
+        actionType: txType,
         typeLabel: txTypeLabel,
         dept,
         department: dept,
         departmentName: `ฝ่าย ${dept}`,
-        amount: numAmount, // Authoritative allocated budget
+        amount: movementAmount,
         delta: deltaAmount,
         previousAmount: prevMonthAlloc,
         newAmount: numAmount,
-        isAllocation: true,
+        isAllocation: deltaAmount >= 0,
         actor: actor || 'Asst. Manager',
-        note: reason || (isInitial ? `จัดสรรงบประมาณประจำเดือน ${period}` : `ปรับปรุงงบประมาณรอบเดือน ${period}`),
+        note: reason || (isInitial ? `จัดสรรงบประมาณประจำเดือน ${period}` : (deltaAmount >= 0 ? `ปรับเพิ่มงบประมาณจาก ฿${prevMonthAlloc.toLocaleString()} เป็น ฿${numAmount.toLocaleString()}` : `ปรับลดงบประมาณจาก ฿${prevMonthAlloc.toLocaleString()} เป็น ฿${numAmount.toLocaleString()}`)),
         targetMonth: period,
         period
       };

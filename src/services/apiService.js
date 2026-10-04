@@ -556,10 +556,11 @@ export const apiService = {
     const currentActiveMonth = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
     const monthKey = targetMonth || currentActiveMonth;
 
-    // Strict Zero-based: Previous budget strictly refers to the same month's allocated history
+    // Strict baseline check: Fallback to department's base monthlyBudget if history for this month is not set
+    const baseBudget = Number(budgets[dept]?.monthlyBudget || budgets[dept]?.baseAllocated || budgets[dept]?.allocated || 0);
     const prevInMonth = (budgets[dept]?.history && budgets[dept].history[monthKey] !== undefined && budgets[dept].history[monthKey] !== null)
       ? Number(budgets[dept].history[monthKey])
-      : 0;
+      : baseBudget;
     const prev = previousAmount !== undefined ? Number(previousAmount) : prevInMonth;
     const finalAmount = action === 'TOP_UP' ? prev + Number(delta || 0) : Number(newAmount ?? prev);
 
@@ -585,7 +586,10 @@ export const apiService = {
     }
     storageService.saveBudgets(budgets);
 
-    const isInitial = (action === 'MONTHLY_ALLOCATION') || (prev === 0 && action !== 'BUDGET_ROLLBACK');
+    const isInitial = (action === 'MONTHLY_ALLOCATION' && prev === 0) || (prev === 0 && action !== 'BUDGET_ROLLBACK');
+    const deltaAmount = (delta !== undefined && delta !== null && action === 'TOP_UP')
+      ? Number(delta)
+      : (finalAmount - prev);
     let txType = action || 'ADJUST';
     let txTypeLabel = 'ปรับปรุงงบประมาณ';
     let amountDiff = 0;
@@ -600,16 +604,16 @@ export const apiService = {
       txTypeLabel = 'จัดสรรงบประมาณประจำเดือน';
       amountDiff = finalAmount;
       isAlloc = true;
-    } else if (action === 'TOP_UP') {
+    } else if (action === 'TOP_UP' || deltaAmount > 0) {
       txType = 'TOP_UP';
       txTypeLabel = 'ปรับเพิ่มงบประมาณ';
-      amountDiff = Number(delta || 0);
+      amountDiff = Math.abs(Number(delta || deltaAmount || 0));
       isAlloc = true;
     } else {
-      txType = 'SET_BUDGET';
-      txTypeLabel = (finalAmount - prev >= 0) ? 'ปรับเพิ่มงบประมาณ' : 'ปรับปรุงงบประมาณ';
-      amountDiff = finalAmount;
-      isAlloc = true;
+      txType = deltaAmount >= 0 ? 'TOP_UP' : 'BUDGET_ADJUSTMENT_DOWN';
+      txTypeLabel = deltaAmount >= 0 ? 'ปรับเพิ่มงบประมาณ' : 'ปรับลดงบประมาณ';
+      amountDiff = Math.abs(deltaAmount);
+      isAlloc = deltaAmount >= 0;
     }
 
     const newTx = {
@@ -625,10 +629,10 @@ export const apiService = {
       previousAmount: prev,
       newAmount: finalAmount,
       amount: amountDiff,
-      delta: finalAmount - prev,
+      delta: deltaAmount,
       isAllocation: isAlloc,
       actor: actor || 'Staff',
-      note: reason || (txType === 'MONTHLY_ALLOCATION' ? `จัดสรรงบประมาณประจำเดือน ${monthKey}` : 'ปรับปรุงงบประมาณ'),
+      note: reason || (isInitial ? `จัดสรรงบประมาณประจำเดือน ${monthKey}` : (deltaAmount >= 0 ? `ปรับเพิ่มงบประมาณจาก ฿${prev.toLocaleString()} เป็น ฿${finalAmount.toLocaleString()}` : `ปรับลดงบประมาณจาก ฿${prev.toLocaleString()} เป็น ฿${finalAmount.toLocaleString()}`)),
       targetMonth: monthKey,
       period: monthKey
     };
@@ -645,13 +649,14 @@ export const apiService = {
     const monthKey = targetMonth || currentActiveMonth;
     const budgets = await this.getBudgets();
     const deptObj = budgets[department] || {};
-    // Strict Zero-based: Previous budget strictly refers to the same month's allocated history
+    // Strict baseline check: Fallback to department's base monthlyBudget if history for this month is not set
+    const baseBudget = Number(deptObj.monthlyBudget || deptObj.baseAllocated || deptObj.allocated || 0);
     const prevInMonth = (deptObj.history && deptObj.history[monthKey] !== undefined && deptObj.history[monthKey] !== null)
       ? Number(deptObj.history[monthKey])
-      : 0;
+      : baseBudget;
     const isInitial = prevInMonth === 0;
     const delta = isInitial ? Number(newAmount) : (Number(newAmount) - prevInMonth);
-    const action = isInitial ? 'MONTHLY_ALLOCATION' : 'SET_BUDGET';
+    const action = isInitial ? 'MONTHLY_ALLOCATION' : (delta >= 0 ? 'TOP_UP' : 'BUDGET_ADJUSTMENT_DOWN');
 
     return this.adjustBudget({
       dept: department,
@@ -659,7 +664,7 @@ export const apiService = {
       newAmount: Number(newAmount),
       previousAmount: prevInMonth,
       delta,
-      reason: reason || (isInitial ? `จัดสรรงบประมาณประจำเดือน ${monthKey}` : `ปรับปรุงงบประมาณประจำเดือน ${monthKey}`),
+      reason: reason || (isInitial ? `จัดสรรงบประมาณประจำเดือน ${monthKey}` : (delta >= 0 ? `ปรับเพิ่มงบประมาณจาก ฿${prevInMonth.toLocaleString()} เป็น ฿${Number(newAmount).toLocaleString()}` : `ปรับลดงบประมาณจาก ฿${prevInMonth.toLocaleString()} เป็น ฿${Number(newAmount).toLocaleString()}`)),
       actor: actor || 'ผู้ดูแลระบบ',
       targetMonth: monthKey
     });
@@ -1307,6 +1312,7 @@ export const apiService = {
     const productCode = payload.productCode || payload.code || payload.sku;
     const department = payload.department || payload.category;
     const issuedTo = payload.issuedTo || payload.issueUnit || payload.unitName || '';
+    const location = payload.location || payload.unit || payload.targetLocation || payload.targetUnit || issuedTo || '';
     const reason = payload.reason || payload.note || 'เบิกจ่ายด่วน';
     const requesterId = payload.requesterId || payload.userId || (payload.user && (payload.user.id || payload.user.username)) || '';
     const requesterName = payload.requesterName || payload.userName || (payload.user && (payload.user.name || payload.user.displayName)) || issuedTo || '';
@@ -1321,6 +1327,7 @@ export const apiService = {
           department,
           quantity,
           issuedTo,
+          location,
           reason,
           requesterId,
           requesterName
@@ -1332,35 +1339,42 @@ export const apiService = {
       }
     }
 
+    // Sync with Cloudflare Pages / D1 backend if running in Web App mode
+    let backendResult = null;
+    if (!isGAS()) {
+      try {
+        const issueRes = await fetch('/api/stock/issue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productId,
+            productCode,
+            department,
+            quantity,
+            issuedTo,
+            location,
+            reason,
+            requesterId,
+            requesterName,
+            user
+          })
+        });
+        if (issueRes.ok) {
+          backendResult = await issueRes.json();
+        }
+      } catch (backendErr) {
+        console.warn('[apiService] issueStock /api/stock/issue warning:', backendErr.message);
+      }
+    }
+
     // Update workflow engine & storageService for immediate local state
     const updatedProduct = await workflowEngine.quickIssueStock(
       productId,
       quantity,
       user,
       reason,
-      issuedTo
+      location || issuedTo
     );
-
-    // Sync with local express backend if in dev/express mode
-    try {
-      if (updatedProduct && !isGAS()) {
-        await fetch(`/api/products/${productId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedProduct)
-        }).catch(() => {});
-      }
-      const logs = storageService.getStockLogs();
-      if (logs && logs.length > 0 && !isGAS()) {
-        await fetch('/api/stock-logs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(logs)
-        }).catch(() => {});
-      }
-    } catch (e) {
-      console.warn('[apiService] issueStock backend sync warning:', e.message);
-    }
 
     try {
       const pName = updatedProduct?.name || gasResult?.updatedProduct?.name || productId;
@@ -1379,12 +1393,12 @@ export const apiService = {
     }
 
     const latestLogs = storageService.getStockLogs();
-    const finalLog = gasResult?.logEntry || (latestLogs && latestLogs[0]);
+    const finalLog = backendResult?.logEntry || gasResult?.logEntry || (latestLogs && latestLogs[0]);
 
     return {
       success: true,
-      updatedProduct: gasResult?.updatedProduct || updatedProduct,
-      product: gasResult?.updatedProduct || updatedProduct,
+      updatedProduct: backendResult?.updatedProduct || gasResult?.updatedProduct || updatedProduct,
+      product: backendResult?.updatedProduct || gasResult?.updatedProduct || updatedProduct,
       logEntry: finalLog
     };
   },

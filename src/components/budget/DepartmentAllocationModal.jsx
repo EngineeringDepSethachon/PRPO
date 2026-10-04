@@ -133,8 +133,11 @@ function DepartmentAllocationModalContent({
         allocations: {
           [department]: numericAmount
         },
+        previousAmounts: {
+          [department]: Number(currentAmount) || 0
+        },
         actor: actorName,
-        reason: reason.trim() || `จัดสรรงบประมาณ ${department} ประจำเดือน ${targetPeriod}`
+        reason: reason.trim() || `ปรับปรุงงบประมาณ ${department} ประจำเดือน ${targetPeriod}`
       });
 
       modalService.success(

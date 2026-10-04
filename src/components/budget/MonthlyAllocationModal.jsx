@@ -97,9 +97,19 @@ function MonthlyAllocationModalContent({
         ENG: Number(engAmount) || 0
       };
 
+      const currentBudgets = storageService.getBudgets() || {};
+      const previousAmounts = {
+        PD: Number(currentBudgets['PD']?.history?.[periodDisplay.raw] ?? currentBudgets['PD']?.monthlyBudget ?? 1000000),
+        QC: Number(currentBudgets['QC']?.history?.[periodDisplay.raw] ?? currentBudgets['QC']?.monthlyBudget ?? 150000),
+        WH: Number(currentBudgets['WH']?.history?.[periodDisplay.raw] ?? currentBudgets['WH']?.monthlyBudget ?? 120000),
+        PUR: Number(currentBudgets['PUR']?.history?.[periodDisplay.raw] ?? currentBudgets['PUR']?.monthlyBudget ?? 100000),
+        ENG: Number(currentBudgets['ENG']?.history?.[periodDisplay.raw] ?? currentBudgets['ENG']?.monthlyBudget ?? 205000)
+      };
+
       await budgetService.allocateMonthlyBudget({
         period: periodDisplay.raw, // Strictly 'YYYY-MM'
         allocations,
+        previousAmounts,
         actor: actorName,
         reason: reason.trim()
       });

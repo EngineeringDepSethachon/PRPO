@@ -674,7 +674,12 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
       const matchDept = deptsToShow.includes(txDept);
       if (!matchDept) return false;
 
-      // Period matching: matches selectedMonthKey or falls within period if specified
+      // In Budget Ledger (history tab), show complete transaction journal matching GAS .gs behavior
+      if (activeTab === 'history') {
+        return true;
+      }
+
+      // Period matching for overview cards: matches selectedMonthKey or falls within period if specified
       if (tx.period || tx.targetMonth) {
         const txPeriod = tx.period || tx.targetMonth;
         return txPeriod === selectedMonthKey;
@@ -685,7 +690,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
       }
       return true;
     });
-  }, [pos, prs, deptsToShow, selectedMonthKey, context?.budgetTransactions, budgetRevision]);
+  }, [pos, prs, deptsToShow, selectedMonthKey, activeTab, context?.budgetTransactions, budgetRevision]);
 
   const _handleEditSave = async (dept) => {
     if (!editBaseValue || isNaN(editBaseValue) || Number(editBaseValue) < 0) return;
@@ -695,7 +700,28 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
     }
     try {
       const actorName = currentUser?.name || currentRole?.name || 'ผู้ดูแลระบบ';
-      await apiService.updateBudget(dept, Number(editBaseValue), selectedMonthKey, actorName, 'ปรับยอดงบประมาณประจำเดือน (Quick Edit)');
+      const currentDeptSummary = dynamicSummary?.current?.[dept];
+      const prevAmount = Number(currentDeptSummary?.baseAllocated ?? currentDeptSummary?.allocated) || 0;
+      const newAmt = Number(editBaseValue);
+      const delta = newAmt - prevAmount;
+      const isInitial = prevAmount === 0;
+      const action = isInitial ? 'MONTHLY_ALLOCATION' : (delta >= 0 ? 'TOP_UP' : 'BUDGET_ADJUSTMENT_DOWN');
+      const reason = isInitial 
+        ? `จัดสรรงบประมาณประจำเดือน ${selectedMonthKey}` 
+        : (delta >= 0 
+            ? `ปรับเพิ่มงบประมาณจาก ฿${prevAmount.toLocaleString()} เป็น ฿${newAmt.toLocaleString()}` 
+            : `ปรับลดงบประมาณจาก ฿${prevAmount.toLocaleString()} เป็น ฿${newAmt.toLocaleString()}`);
+
+      await apiService.adjustBudget({
+        dept,
+        action,
+        newAmount: newAmt,
+        previousAmount: prevAmount,
+        delta,
+        reason,
+        actor: actorName,
+        targetMonth: selectedMonthKey
+      });
       setEditingBudget(null);
       if (onRefresh) onRefresh();
     } catch (e) {
@@ -1775,30 +1801,54 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                     let isIncome = false;
                     let isExpense = false;
 
-                    if (rawType === 'BUDGET_ADJUSTMENT_DOWN') {
-                      badgeText = 'คืนงบประมาณ (ประหยัด)';
-                      badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
-                      isIncome = true;
-                    } else if (rawType === 'BUDGET_ADJUSTMENT_UP') {
-                      badgeText = 'เพิ่มเงินงบประมาณ (เกินงบ)';
-                      badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
+                    const hasDelta = tx.delta !== undefined && tx.delta !== null && !isNaN(Number(tx.delta));
+                    let deltaVal = hasDelta ? Number(tx.delta) : null;
+
+                    // Fallback 1: Calculate delta if previousAmount and newAmount exist
+                    if (deltaVal === null && tx.previousAmount !== undefined && tx.newAmount !== undefined) {
+                      const p = Number(tx.previousAmount);
+                      const n = Number(tx.newAmount);
+                      if (!isNaN(p) && !isNaN(n) && p > 0 && n > 0 && p !== n) {
+                        deltaVal = n - p;
+                      }
+                    }
+
+                    // Fallback 2: Parse note string "จาก ฿... เป็น ฿..."
+                    if (deltaVal === null && typeof tx.note === 'string') {
+                      const match = tx.note.match(/จาก\s*฿?([0-9,]+(?:\.[0-9]+)?)\s*เป็น\s*฿?([0-9,]+(?:\.[0-9]+)?)/);
+                      if (match) {
+                        const p = parseFloat(match[1].replace(/,/g, ''));
+                        const n = parseFloat(match[2].replace(/,/g, ''));
+                        if (!isNaN(p) && !isNaN(n) && p > 0 && n > 0 && p !== n) {
+                          deltaVal = n - p;
+                        }
+                      }
+                    }
+
+                    if (rawType === 'BUDGET_ADJUSTMENT_DOWN' || (deltaVal !== null && deltaVal < 0 && (rawType === 'SET_BUDGET' || rawType === 'ADJUST'))) {
+                      badgeText = 'ปรับลดงบประมาณ';
+                      badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
                       isExpense = true;
+                    } else if (rawType === 'BUDGET_ADJUSTMENT_UP' || rawType === 'TOP_UP' || (deltaVal !== null && deltaVal > 0 && (rawType === 'SET_BUDGET' || rawType === 'ADJUST'))) {
+                      badgeText = 'ปรับเพิ่มงบประมาณ';
+                      badgeClass = 'bg-teal-50 text-teal-700 border-teal-200';
+                      isIncome = true;
                     } else if (isRefund || isClaimRefund) {
                       badgeText = 'คืนงบประมาณ';
                       badgeClass = 'bg-emerald-50 text-emerald-700 border-emerald-200';
                       isIncome = true;
-                    } else if (isMonthlyAlloc) {
+                    } else if (isMonthlyAlloc && deltaVal === null) {
                       badgeText = 'จัดสรรงบประมาณ';
                       badgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
                       isIncome = true;
-                    } else if (isTopUp) {
+                    } else if (deltaVal !== null && deltaVal > 0) {
                       badgeText = 'ปรับเพิ่มงบประมาณ';
                       badgeClass = 'bg-teal-50 text-teal-700 border-teal-200';
                       isIncome = true;
-                    } else if (isSetBudget) {
-                      badgeText = 'ปรับปรุงงบประมาณ';
-                      badgeClass = 'bg-indigo-50 text-indigo-700 border-indigo-200';
-                      isIncome = true;
+                    } else if (deltaVal !== null && deltaVal < 0) {
+                      badgeText = 'ปรับลดงบประมาณ';
+                      badgeClass = 'bg-amber-50 text-amber-700 border-amber-200';
+                      isExpense = true;
                     } else if (isActualSpend) {
                       badgeText = 'ใช้จ่ายจริง';
                       badgeClass = 'bg-rose-50 text-rose-700 border-rose-200';
@@ -1816,10 +1866,13 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                     }
 
                     // Strict amount sign formatting based on transaction nature (Income vs Expense)
-                    const isAllocRecord = isMonthlyAlloc || isTopUp || isSetBudget || Boolean(tx.isAllocation);
-                    const displayAmount = isAllocRecord && (tx.newAmount !== undefined || tx.amount !== undefined)
-                      ? Math.max(0, Number(tx.newAmount ?? tx.amount ?? 0))
-                      : Math.abs(amountNum);
+                    let displayAmount = 0;
+                    if (deltaVal !== null && deltaVal !== 0) {
+                      displayAmount = Math.abs(deltaVal);
+                    } else {
+                      displayAmount = Math.abs(amountNum || Number(tx.newAmount ?? 0));
+                    }
+
                     const signPrefix = isIncome ? '+฿' : isExpense ? '-฿' : '฿';
                     const absAmountFormatted = displayAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
                     const amountColor = isIncome ? 'text-emerald-600' : isExpense ? 'text-rose-600' : 'text-slate-600';
