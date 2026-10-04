@@ -75,7 +75,36 @@ export async function onRequest(context) {
           }
         }
 
-        const safeUser = { ...user, allowedDepartments: depts, departments: depts };
+        const rawLevel = Number(user.level || 1);
+        const roleStr = String((user.roleId || '') + ' ' + (user.canonicalRole || '')).toUpperCase();
+        const isAdmin = rawLevel >= 99 || cleanUser === 'admin' || roleStr.includes('ADMIN');
+        const level = isAdmin ? 99 : rawLevel;
+        const isApprover = isAdmin || level >= 3 || roleStr.includes('APPROV') || roleStr.includes('PLANT_MANAGER');
+        const isPurchaser = isAdmin || roleStr.includes('PURCHAS') || roleStr.includes('ONLINE_PURCHASER');
+        const isReviewer = isAdmin || isApprover || level >= 2 || roleStr.includes('REVIEW') || roleStr.includes('ASST_MANAGER');
+        const isRequester = isAdmin || roleStr.includes('REQUEST') || roleStr.includes('PD') || roleStr.includes('QC');
+
+        const permissions = {
+          PR_CREATION: Boolean(isAdmin || isRequester),
+          REVIEW: Boolean(isAdmin || isReviewer),
+          APPROVAL: Boolean(isAdmin || isApprover),
+          PURCHASING: Boolean(isAdmin || isPurchaser),
+          INVENTORY: Boolean(isAdmin || isRequester),
+          ADMIN: Boolean(isAdmin)
+        };
+
+        const safeUser = {
+          ...user,
+          level,
+          isAdmin,
+          isApprover,
+          isReviewer,
+          isPurchaser,
+          isRequester,
+          permissions,
+          allowedDepartments: depts,
+          departments: depts
+        };
         delete safeUser.password;
 
         const token = `token_${user.id}_${Date.now()}`;
@@ -139,7 +168,16 @@ export async function onRequest(context) {
       const users = (usersRes.results || []).map(u => {
         const safe = { ...u };
         delete safe.password;
-        safe.allowedDepartments = parseJsonSafe(u.allowedDepartments, [u.department]);
+        const rawLvl = Number(u.level || 1);
+        const rStr = String((u.roleId || '') + ' ' + (u.canonicalRole || '')).toUpperCase();
+        const isAdm = rawLvl >= 99 || (u.username && u.username.toLowerCase() === 'admin') || rStr.includes('ADMIN');
+        safe.level = isAdm ? 99 : rawLvl;
+        safe.isAdmin = isAdm;
+        safe.isApprover = isAdm || safe.level >= 3 || rStr.includes('APPROV');
+        safe.isReviewer = isAdm || safe.isApprover || safe.level >= 2 || rStr.includes('REVIEW') || rStr.includes('ASST');
+        safe.isPurchaser = isAdm || rStr.includes('PURCHAS');
+        safe.isRequester = isAdm || safe.level >= 1;
+        safe.allowedDepartments = parseJsonSafe(u.allowedDepartments, [u.department || 'PD']);
         safe.departments = safe.allowedDepartments;
         return safe;
       });
@@ -613,6 +651,15 @@ export async function onRequest(context) {
           if (!user) return errorResponse('User not found', 404);
           const safeUser = { ...user };
           delete safeUser.password;
+          const rawLvl = Number(user.level || 1);
+          const rStr = String((user.roleId || '') + ' ' + (user.canonicalRole || '')).toUpperCase();
+          const isAdm = rawLvl >= 99 || (user.username && user.username.toLowerCase() === 'admin') || rStr.includes('ADMIN');
+          safeUser.level = isAdm ? 99 : rawLvl;
+          safeUser.isAdmin = isAdm;
+          safeUser.isApprover = isAdm || safeUser.level >= 3 || rStr.includes('APPROV');
+          safeUser.isReviewer = isAdm || safeUser.isApprover || safeUser.level >= 2 || rStr.includes('REVIEW') || rStr.includes('ASST');
+          safeUser.isPurchaser = isAdm || rStr.includes('PURCHAS');
+          safeUser.isRequester = isAdm || safeUser.level >= 1;
           safeUser.allowedDepartments = parseJsonSafe(user.allowedDepartments, [user.department || 'PD']);
           safeUser.assignedDepartments = parseJsonSafe(user.assignedDepartments, safeUser.allowedDepartments);
           safeUser.departments = safeUser.allowedDepartments;
@@ -623,6 +670,15 @@ export async function onRequest(context) {
         const users = (res.results || []).map(u => {
           const safe = { ...u };
           delete safe.password;
+          const rawLvl = Number(u.level || 1);
+          const rStr = String((u.roleId || '') + ' ' + (u.canonicalRole || '')).toUpperCase();
+          const isAdm = rawLvl >= 99 || (u.username && u.username.toLowerCase() === 'admin') || rStr.includes('ADMIN');
+          safe.level = isAdm ? 99 : rawLvl;
+          safe.isAdmin = isAdm;
+          safe.isApprover = isAdm || safe.level >= 3 || rStr.includes('APPROV');
+          safe.isReviewer = isAdm || safe.isApprover || safe.level >= 2 || rStr.includes('REVIEW') || rStr.includes('ASST');
+          safe.isPurchaser = isAdm || rStr.includes('PURCHAS');
+          safe.isRequester = isAdm || safe.level >= 1;
           safe.allowedDepartments = parseJsonSafe(u.allowedDepartments, [u.department || 'PD']);
           safe.assignedDepartments = parseJsonSafe(u.assignedDepartments, safe.allowedDepartments);
           safe.departments = safe.allowedDepartments;
@@ -648,10 +704,17 @@ export async function onRequest(context) {
           ? u.allowedDepartments
           : (Array.isArray(u.assignedDepartments) ? u.assignedDepartments : [primaryDept]));
         const roleId = u.roleId || 'REQUESTER_PD';
-        const canonicalRole = u.canonicalRole || (roleId.includes('ADMIN') ? 'ADMIN' : (roleId.includes('APPROVER') || roleId.includes('MANAGER') ? 'APPROVER' : (roleId.includes('PURCHASER') ? 'PURCHASER' : 'REQUESTER')));
+        const roleUpper = String(roleId).toUpperCase();
+        const canonicalRole = u.canonicalRole || (
+          roleUpper.includes('ADMIN') ? 'ADMIN' :
+          (roleUpper.includes('ASST') || roleUpper.includes('REVIEW')) ? 'REVIEWER' :
+          (roleUpper.includes('APPROV') || roleUpper.includes('MANAGER') || roleUpper.includes('PLANT')) ? 'APPROVER' :
+          (roleUpper.includes('PURCHAS') || roleUpper.includes('BUYER')) ? 'PURCHASER' : 'REQUESTER'
+        );
         const posKey = u.positionKey || roleId;
         const title = u.title || position || 'Officer';
-        const level = Number(u.level || 1);
+        const defaultLevel = canonicalRole === 'ADMIN' ? 99 : (canonicalRole === 'APPROVER' ? 3 : (canonicalRole === 'REVIEWER' || canonicalRole === 'PURCHASER' ? 2 : 1));
+        const level = Number(u.level || defaultLevel);
         const status = u.status || 'ACTIVE';
         const pic = u.pictureUrl || '';
         const desc = u.description || '';
@@ -683,6 +746,7 @@ export async function onRequest(context) {
             signature = COALESCE(excluded.signature, users.signature)
         `).bind(id, empId, username, rawPass, pin, name, empName, dispName, position, dept, primaryDept, allowedDepts, roleId, canonicalRole, posKey, title, level, status, pic, desc, sig).run();
 
+        const isAdm = level >= 99 || canonicalRole === 'ADMIN' || (username && username.toLowerCase() === 'admin');
         const savedSafeUser = {
           ...u,
           id,
@@ -702,6 +766,11 @@ export async function onRequest(context) {
           positionKey: posKey,
           title,
           level,
+          isAdmin: isAdm,
+          isApprover: isAdm || level >= 3 || canonicalRole === 'APPROVER',
+          isReviewer: isAdm || level >= 2 || canonicalRole === 'REVIEWER',
+          isPurchaser: isAdm || canonicalRole === 'PURCHASER',
+          isRequester: isAdm || level >= 1,
           status,
           signature: sig,
           pictureUrl: pic,
@@ -778,6 +847,34 @@ export async function onRequest(context) {
       `).bind(cleanDept, cleanDept, numAmount, numAmount, numAmount, JSON.stringify(history)).run().catch(() => {});
 
       return jsonResponse({ success: true, budget: { department: cleanDept, monthlyBudget: numAmount, history } });
+    }
+
+    if (path === '/api/budgets/allocate' && method === 'POST') {
+      if (!db) return jsonResponse({ success: false });
+      const { period, allocations } = await request.json().catch(() => ({}));
+      const mKey = period || '2026-10';
+      if (allocations && typeof allocations === 'object') {
+        for (const [dept, amt] of Object.entries(allocations)) {
+          if (!dept || dept === 'ALL') continue;
+          const numAmt = Number(amt || 0);
+          const existing = await db.prepare('SELECT * FROM budgets WHERE id = ?').bind(dept).first().catch(() => null);
+          let history = {};
+          if (existing?.monthsJson) {
+            history = parseJsonSafe(existing.monthsJson, {});
+          }
+          history[mKey] = numAmt;
+          await db.prepare(`
+            INSERT INTO budgets (id, department, fiscalYear, monthlyBudget, totalAllocated, totalUsed, totalRemaining, monthsJson, updatedAt)
+            VALUES (?, ?, 2026, ?, ?, 0, ?, ?, CURRENT_TIMESTAMP)
+            ON CONFLICT(id) DO UPDATE SET
+              monthlyBudget = excluded.monthlyBudget,
+              totalAllocated = excluded.totalAllocated,
+              monthsJson = excluded.monthsJson,
+              updatedAt = CURRENT_TIMESTAMP
+          `).bind(dept, dept, numAmt, numAmt, numAmt, JSON.stringify(history)).run().catch(() => {});
+        }
+      }
+      return jsonResponse({ success: true, period: mKey, allocations });
     }
 
     if (path === '/api/budgets' || path.startsWith('/api/budgets/')) {
