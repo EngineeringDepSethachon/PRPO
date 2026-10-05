@@ -1424,19 +1424,33 @@ export const apiService = {
   // --- Master Data CRUD ---
   async saveProduct(product, user = null) {
     const products = await this.getProducts();
-    const isUpdate = Boolean(product.id && product._mode !== 'CREATE');
-    const targetCode = String(product.code || product.sku || '').trim().toUpperCase();
     const rawCat = product.category || product.department || 'PD';
     const cat = String(rawCat).replace(/^DEPT-/, '').trim().toUpperCase() || 'PD';
     product.category = cat;
     product.department = cat;
     product.dept = cat;
 
+    const targetCode = String(product.code || product.sku || '').trim().toUpperCase();
+
+    const isUpdate = Boolean(product._mode === 'EDIT' || product.isEdit || (product.id && product._mode !== 'CREATE'));
+
+    // Check if an existing product with this code exists in this department
+    const existingInDept = products.find(p => {
+      const isSameDept = matchDepartment(p.department || p.category || p.dept, cat);
+      const pCode = String(p.code || p.sku || '').trim().toUpperCase();
+      return isSameDept && targetCode && pCode === targetCode;
+    });
+
+    if (isUpdate && existingInDept && !product.id) {
+      product.id = existingInDept.id;
+    }
+
     if (targetCode) {
       const isDuplicate = products.some(p => {
         const pId = String(p.id || '').trim();
         const pCode = String(p.code || p.sku || '').trim().toUpperCase();
         if (isUpdate && product.id && pId === String(product.id).trim()) return false;
+        if (isUpdate && existingInDept && (pId === String(existingInDept.id).trim() || p === existingInDept)) return false;
         const isSameDept = matchDepartment(p.department || p.category || p.dept, cat);
         return isSameDept && pCode === targetCode;
       });
@@ -1453,13 +1467,13 @@ export const apiService = {
       const saved = await callGAS('apiSaveMasterItem', 'Products', product);
       const savedProduct = (saved && typeof saved === 'object' && saved.id) ? saved : product;
       const targetId = String(savedProduct.id || '').trim().toLowerCase();
-      const targetCode = String(savedProduct.code || savedProduct.sku || '').trim().toLowerCase();
+      const targetCodeStr = String(savedProduct.code || savedProduct.sku || '').trim().toLowerCase();
       const updatedList = isUpdate 
         ? products.map(p => {
             const pId = String(p.id || '').trim().toLowerCase();
             const pCode = String(p.code || p.sku || '').trim().toLowerCase();
             const isSameDept = matchDepartment(p.department || p.category || p.dept, cat);
-            return (pId === targetId || (isSameDept && pCode === targetCode)) ? savedProduct : p;
+            return (pId === targetId || (isSameDept && pCode === targetCodeStr)) ? savedProduct : p;
           }) 
         : [savedProduct, ...products];
       storageService.saveProducts(updatedList);
@@ -1490,13 +1504,13 @@ export const apiService = {
           ? { ...product, ...resData }
           : product;
         const targetId = String(product.id || '').trim().toLowerCase();
-        const targetCode = String(product.code || '').trim().toLowerCase();
+        const targetCodeStr = String(product.code || '').trim().toLowerCase();
         const updatedList = isUpdate 
           ? products.map(p => {
               const pId = String(p.id || '').trim().toLowerCase();
               const pCode = String(p.code || '').trim().toLowerCase();
               const isSameDept = matchDepartment(p.department || p.category || p.dept, cat);
-              return (pId === targetId || (isSameDept && pCode === targetCode)) ? saved : p;
+              return (pId === targetId || (isSameDept && pCode === targetCodeStr)) ? saved : p;
             }) 
           : [saved, ...products];
         storageService.saveProducts(updatedList);
@@ -2018,15 +2032,24 @@ export const apiService = {
   },
 
   async saveUser(user, actor = null) {
-    const isUpdate = Boolean(user.id);
     const users = storageService.getUsers();
+    const existingUser = users.find(u => 
+      (user.id && String(u.id).trim().toLowerCase() === String(user.id).trim().toLowerCase()) ||
+      (user.username && String(u.username).trim().toLowerCase() === String(user.username).trim().toLowerCase()) ||
+      (user.employeeId && String(u.employeeId).trim().toLowerCase() === String(user.employeeId).trim().toLowerCase())
+    );
+    const isUpdate = Boolean(user.id || existingUser);
 
     // Check duplicate username if username is provided
     if (user.username) {
-      const isDuplicate = users.some(u =>
-        u.username?.trim().toLowerCase() === user.username.trim().toLowerCase() &&
-        u.id !== user.id
-      );
+      const isDuplicate = users.some(u => {
+        const uName = String(u.username || '').trim().toLowerCase();
+        const targetName = String(user.username || '').trim().toLowerCase();
+        if (uName !== targetName) return false;
+        if (user.id && String(u.id).trim().toLowerCase() === String(user.id).trim().toLowerCase()) return false;
+        if (existingUser && u === existingUser) return false;
+        return true;
+      });
       if (isDuplicate) {
         throw new Error(`Username "${user.username}" มีอยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น`);
       }
@@ -2039,26 +2062,51 @@ export const apiService = {
 
     const userPayload = {
       ...user,
+      id: user.id || (existingUser ? existingUser.id : undefined),
       primaryDepartment: primaryDept,
       department: primaryDept,
       allowedDepartments: allowedDepts
     };
 
     if (isGAS()) {
+      let saved = null;
       try {
-        await callGAS('apiSaveUser', userPayload);
+        saved = await callGAS('apiSaveUser', userPayload);
       } catch (e) {
         console.warn('[apiService] GAS apiSaveUser error, trying apiUpsertUser:', e.message);
         try {
-          await callGAS('apiUpsertUser', userPayload);
+          saved = await callGAS('apiUpsertUser', userPayload);
         } catch (e2) {
           console.warn('[apiService] GAS apiUpsertUser error:', e2.message);
         }
       }
+      const savedUser = (saved && typeof saved === 'object' && (saved.id || saved.username)) ? saved : userPayload;
+      const targetId = String(savedUser.id || user.id || '').trim().toLowerCase();
+      const targetUname = String(savedUser.username || user.username || '').trim().toLowerCase();
+      const updatedList = isUpdate 
+        ? users.map(u => {
+            const uId = String(u.id || '').trim().toLowerCase();
+            const uName = String(u.username || '').trim().toLowerCase();
+            return ((targetId && uId === targetId) || (targetUname && uName === targetUname)) ? savedUser : u;
+          })
+        : [...users, savedUser];
+      storageService.saveUsers(updatedList);
+
+      auditService.logAction({
+        action: isUpdate ? 'USER_UPDATED' : 'USER_CREATED',
+        actor: actor || 'Admin',
+        department: savedUser.primaryDepartment || 'ALL',
+        docNo: savedUser.id || savedUser.username,
+        docType: 'USER',
+        details: `${isUpdate ? 'แก้ไขข้อมูลผู้ใช้' : 'เพิ่มผู้ใช้ใหม่'} "${savedUser.name}" (${savedUser.position || savedUser.title || savedUser.roleId}) แผนก: ${savedUser.primaryDepartment} [${(savedUser.allowedDepartments || []).join(', ')}]`
+      });
+
+      return savedUser;
     }
 
     try {
-      const url = isUpdate ? `/api/users/${user.id}` : '/api/users';
+      const targetUserId = user.id || (existingUser ? existingUser.id : user.username);
+      const url = isUpdate && targetUserId ? `/api/users/${encodeURIComponent(targetUserId)}` : '/api/users';
       const method = isUpdate ? 'PUT' : 'POST';
       const res = await fetch(url, {
         method,
@@ -2070,14 +2118,22 @@ export const apiService = {
         const saved = (resData && (resData.id || resData.username || resData.employeeId) && resData.name)
           ? { ...userPayload, ...resData }
           : userPayload;
-        const updatedList = isUpdate ? users.map(u => u.id === user.id ? saved : u) : [...users, saved];
+        const targetId = String(saved.id || user.id || '').trim().toLowerCase();
+        const targetUname = String(saved.username || user.username || '').trim().toLowerCase();
+        const updatedList = isUpdate 
+          ? users.map(u => {
+              const uId = String(u.id || '').trim().toLowerCase();
+              const uName = String(u.username || '').trim().toLowerCase();
+              return ((targetId && uId === targetId) || (targetUname && uName === targetUname)) ? saved : u;
+            }) 
+          : [...users, saved];
         storageService.saveUsers(updatedList);
 
         auditService.logAction({
           action: isUpdate ? 'USER_UPDATED' : 'USER_CREATED',
           actor: actor || 'Admin',
           department: saved.primaryDepartment || 'ALL',
-          docNo: saved.id,
+          docNo: saved.id || saved.username,
           docType: 'USER',
           details: `${isUpdate ? 'แก้ไขข้อมูลผู้ใช้' : 'เพิ่มผู้ใช้ใหม่'} "${saved.name}" (${saved.position || saved.title || saved.roleId}) แผนก: ${saved.primaryDepartment} [${(saved.allowedDepartments || []).join(', ')}]`
         });

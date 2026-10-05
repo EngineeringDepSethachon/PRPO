@@ -351,6 +351,7 @@ export const budgetService = {
     const budgets = storageService.getBudgets() || {};
     const today = new Date();
     const currentPeriodStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const createdTransactions = {};
 
     for (const [dept, amount] of Object.entries(allocations)) {
       const numAmount = Math.max(0, Number(amount) || 0);
@@ -381,12 +382,10 @@ export const budgetService = {
 
       budgets[dept].history[period] = numAmount;
 
-      // If active current month or 2026-09/2026-10, update base monthlyBudget
-      if (period === currentPeriodStr || period === '2026-09' || period === '2026-10') {
-        budgets[dept].monthlyBudget = numAmount;
-        budgets[dept].variance = numAmount - (budgets[dept].spent || 0);
-        budgets[dept].remainingBudget = budgets[dept].variance;
-      }
+      // Update active base monthlyBudget and variance
+      budgets[dept].monthlyBudget = numAmount;
+      budgets[dept].variance = numAmount - (budgets[dept].spent || 0);
+      budgets[dept].remainingBudget = budgets[dept].variance;
 
       const deltaAmount = numAmount - prevMonthAlloc;
       const movementAmount = isInitial ? numAmount : Math.abs(deltaAmount);
@@ -416,18 +415,8 @@ export const budgetService = {
         targetMonth: period,
         period
       };
+      createdTransactions[dept] = tx;
       storageService.appendBudgetTransaction(tx);
-
-      // Async persistence to D1 backend
-      try {
-        if (typeof fetch === 'function') {
-          fetch('/api/budget-transactions', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(tx)
-          }).catch(() => {});
-        }
-      } catch {}
     }
 
     // Explicit Persistence on localStorage & storageService
@@ -469,13 +458,22 @@ export const budgetService = {
       console.warn('[budgetService] Audit log error:', e);
     }
 
-    // Backend sync attempt
+    // Backend sync attempt with atomic transaction payload
     try {
       if (typeof fetch === 'function') {
+        const firstTx = Object.values(createdTransactions)[0];
         await fetch('/api/budgets/allocate', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ period, allocations, actor, reason })
+          body: JSON.stringify({
+            period,
+            allocations,
+            previousAmounts,
+            actor,
+            reason,
+            transactions: createdTransactions,
+            transactionId: firstTx?.id
+          })
         }).catch(() => {});
       }
     } catch {}

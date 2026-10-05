@@ -657,10 +657,49 @@ function upsertRecordById(sheetName, idField, record) {
 
   if (lastRow > 1) {
     const idValues = sheet.getRange(2, idColIndex + 1, lastRow - 1, 1).getValues();
+    const targetStr = String(targetId).trim().toLowerCase();
     for (let i = 0; i < idValues.length; i++) {
-      if (String(idValues[i][0]).trim() === String(targetId).trim()) {
+      if (String(idValues[i][0]).trim().toLowerCase() === targetStr) {
         rowIndexToUpdate = i + 2;
         break;
+      }
+    }
+
+    // Fallback for USERS: match by username or employeeId
+    if (rowIndexToUpdate === -1 && (sheetName === SHEET_NAMES.USERS || sheetName === 'Users')) {
+      const unameColIdx = headers.indexOf('username');
+      const empColIdx = headers.indexOf('employeeId');
+      const targetUname = String(record.username || '').trim().toLowerCase();
+      const targetEmp = String(record.employeeId || '').trim().toLowerCase();
+      if (unameColIdx !== -1 || empColIdx !== -1) {
+        const fullRows = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
+        for (let u = 0; u < fullRows.length; u++) {
+          const rowUname = unameColIdx !== -1 ? String(fullRows[u][unameColIdx]).trim().toLowerCase() : '';
+          const rowEmp = empColIdx !== -1 ? String(fullRows[u][empColIdx]).trim().toLowerCase() : '';
+          if ((targetUname && rowUname === targetUname) || (targetEmp && rowEmp === targetEmp)) {
+            rowIndexToUpdate = u + 2;
+            break;
+          }
+        }
+      }
+    }
+
+    // Fallback for PRODUCTS / VENDORS: match by code
+    if (rowIndexToUpdate === -1 && (sheetName === SHEET_NAMES.PRODUCTS || sheetName === SHEET_NAMES.VENDORS || sheetName === 'Products' || sheetName === 'Vendors')) {
+      const codeColIdx = headers.indexOf('code') !== -1 ? headers.indexOf('code') : (headers.indexOf('sku') !== -1 ? headers.indexOf('sku') : headers.indexOf('vendorCode'));
+      const deptColIdx = headers.indexOf('department') !== -1 ? headers.indexOf('department') : headers.indexOf('category');
+      const targetCodeStr = String(record.code || record.sku || record.vendorCode || '').trim().toUpperCase();
+      const targetDeptStr = String(record.department || record.category || '').trim().toUpperCase();
+      if (codeColIdx !== -1 && targetCodeStr) {
+        const fullRows = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
+        for (let p = 0; p < fullRows.length; p++) {
+          const rowCode = String(fullRows[p][codeColIdx]).trim().toUpperCase();
+          const rowDept = deptColIdx !== -1 ? String(fullRows[p][deptColIdx]).trim().toUpperCase() : '';
+          if (rowCode === targetCodeStr && (!targetDeptStr || !rowDept || rowDept === targetDeptStr || rowDept === 'ALL')) {
+            rowIndexToUpdate = p + 2;
+            break;
+          }
+        }
       }
     }
   }

@@ -9,24 +9,13 @@ var _pendingAttachments = [];
  */
 
 /**
- * HTTP GET Entry Point for Standalone Web App & API Health Check.
- * Returns JSON status if requested, or serves HTML if running as a web app.
+ * HTTP GET Entry Point for Standalone Web App.
+ * Serves the single-file HTML bundle built by Vite.
  * 
  * @param {Object} e HTTP Event object
- * @returns {GoogleAppsScript.HTML.HtmlOutput|GoogleAppsScript.Content.TextOutput}
+ * @returns {GoogleAppsScript.HTML.HtmlOutput}
  */
 function doGet(e) {
-  var params = (e && e.parameter) ? e.parameter : {};
-  if (params.format === 'json' || params.ping === '1' || params.action === 'status') {
-    return ContentService.createTextOutput(JSON.stringify({
-      success: true,
-      service: 'PRPO_PDQC Backend API Gateway',
-      status: 'ONLINE',
-      version: '3.1.0-decoupled',
-      timestamp: new Date().toISOString()
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-
   try {
     const output = HtmlService.createHtmlOutputFromFile('index')
       .setTitle(CONFIG.DEFAULTS.APP_TITLE)
@@ -35,234 +24,37 @@ function doGet(e) {
 
     return output;
   } catch (err) {
-    return ContentService.createTextOutput(JSON.stringify({
-      success: true,
-      service: 'PRPO_PDQC Backend API Gateway',
-      status: 'READY',
-      version: '3.1.0-decoupled',
-      timestamp: new Date().toISOString()
-    })).setMimeType(ContentService.MimeType.JSON);
+    // If index.html is not yet uploaded/bundled, render helpful diagnostic page
+    return HtmlService.createHtmlOutput(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>${CONFIG.DEFAULTS.APP_TITLE}</title>
+          <style>
+            body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: #0f172a; color: #f8fafc; padding: 40px 20px; display: flex; justify-content: center; }
+            .card { background: #1e293b; border: 1px solid #334155; border-radius: 12px; max-width: 600px; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+            h2 { color: #38bdf8; margin-top: 0; }
+            p { line-height: 1.6; color: #94a3b8; }
+            .badge { background: #0369a1; color: #e0f2fe; padding: 4px 10px; border-radius: 6px; font-size: 12px; font-weight: bold; }
+            .btn { background: #2563eb; color: #fff; padding: 10px 20px; border: none; border-radius: 6px; cursor: pointer; text-decoration: none; font-weight: bold; display: inline-block; margin-top: 16px; }
+            .btn:hover { background: #1d4ed8; }
+            code { background: #0f172a; padding: 2px 6px; border-radius: 4px; color: #f43f5e; }
+          </style>
+        </head>
+        <body>
+          <div class="card">
+            <span class="badge">GAS BACKEND ACTIVE</span>
+            <h2>${CONFIG.DEFAULTS.APP_TITLE}</h2>
+            <p>ระบบหลังบ้าน Google Apps Script ทำงานเรียบร้อยแล้ว พร้อมรับการเชื่อมต่อจาก Frontend Single HTML Bundle</p>
+            <p><strong>ผู้เข้าใช้งานปัจจุบัน:</strong> <code>${getCurrentUserEmail() || 'Unidentified'}</code></p>
+            <p><strong>สถานะ:</strong> รอการ Build ไฟล์ <code>dist/index.html</code> และ Deploy ขึ้น GAS ผ่าน clasp หรือ Script Editor</p>
+            <a href="javascript:void(0)" onclick="google.script.run.withSuccessHandler(alert).apiGetSystemStatus()" class="btn">ทดสอบระบบ (Diagnostic Ping)</a>
+          </div>
+        </body>
+      </html>
+    `).setTitle(CONFIG.DEFAULTS.APP_TITLE);
   }
-}
-
-/**
- * ─────────────────────────────────────────────────────────────────────────────
- * HTTP POST Entry Point (Decoupled REST/RPC Web API Gateway)
- * ─────────────────────────────────────────────────────────────────────────────
- * Receives external HTTP POST requests from GitHub Pages / external frontends.
- * Features:
- * - CORS-friendly (handles text/plain request body without preflight)
- * - HMAC-SHA256 Token Verification & Server-side Session validation
- * - Optional API_SECRET_KEY guardrail
- * - Standardized envelope wrapping: { success: true, data: ... } or { success: false, error: ... }
- * 
- * @param {Object} e HTTP POST Event object
- * @returns {GoogleAppsScript.Content.TextOutput} JSON response
- */
-function doPost(e) {
-  try {
-    var contents = (e && e.postData && e.postData.contents) ? e.postData.contents : '{}';
-    var req = {};
-    try {
-      req = JSON.parse(contents);
-    } catch (parseErr) {
-      return ContentService.createTextOutput(JSON.stringify({
-        success: false,
-        error: 'INVALID_JSON: ' + parseErr.message
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    var action = req.action;
-    var args = Array.isArray(req.args) ? req.args : (req.payload ? [req.payload] : []);
-    var clientToken = req.token || (req.currentUser && req.currentUser.token);
-    var clientApiKey = req.apiKey;
-
-    if (!action || typeof action !== 'string') {
-      return ContentService.createTextOutput(JSON.stringify({
-        success: false,
-        error: 'MISSING_ACTION: Parameter "action" is required'
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // 1. Check Optional API Secret Key (if configured in Script Properties)
-    var configuredApiKey = getScriptProperty('API_SECRET_KEY');
-    if (configuredApiKey && configuredApiKey.trim() !== '') {
-      if (clientApiKey !== configuredApiKey && clientToken !== configuredApiKey) {
-        return ContentService.createTextOutput(JSON.stringify({
-          success: false,
-          error: 'UNAUTHORIZED_API_KEY: Invalid or missing API security key'
-        })).setMimeType(ContentService.MimeType.JSON);
-      }
-    }
-
-    // 2. Action Whitelist & Security Check
-    var publicActions = ['apiLogin', 'apiGetSystemStatus'];
-    var verifiedUser = null;
-
-    if (!publicActions.includes(action)) {
-      if (clientToken) {
-        try {
-          verifiedUser = verifyAuthToken(clientToken);
-        } catch (authErr) {
-          return ContentService.createTextOutput(JSON.stringify({
-            success: false,
-            error: 'UNAUTHORIZED_TOKEN: ' + authErr.message
-          })).setMimeType(ContentService.MimeType.JSON);
-        }
-      } else {
-        if (req.currentUser && typeof req.currentUser === 'object') {
-          // Backward compatibility fallback during initial cutover
-          verifiedUser = req.currentUser;
-        } else {
-          return ContentService.createTextOutput(JSON.stringify({
-            success: false,
-            error: 'AUTH_REQUIRED: Action "' + action + '" requires a valid authentication token'
-          })).setMimeType(ContentService.MimeType.JSON);
-        }
-      }
-    }
-
-    // 3. Dispatch to internal API function
-    var fn = this[action];
-    if (typeof fn !== 'function') {
-      return ContentService.createTextOutput(JSON.stringify({
-        success: false,
-        error: 'ACTION_NOT_FOUND: Method "' + action + '" does not exist'
-      })).setMimeType(ContentService.MimeType.JSON);
-    }
-
-    // Pass verified user as userContext argument
-    var result;
-    if (args.length === 0) {
-      result = fn({}, verifiedUser);
-    } else if (args.length === 1) {
-      result = fn(args[0], verifiedUser);
-    } else {
-      result = fn(...args, verifiedUser);
-    }
-
-    var responseData = result;
-    if (result && typeof result === 'object' && 'success' in result) {
-      responseData = (result.data !== undefined) ? result.data : result;
-    }
-
-    return ContentService.createTextOutput(JSON.stringify({
-      success: true,
-      data: responseData
-    })).setMimeType(ContentService.MimeType.JSON);
-
-  } catch (err) {
-    console.error('[doPost Exception]', err);
-    return ContentService.createTextOutput(JSON.stringify({
-      success: false,
-      error: err.message || String(err)
-    })).setMimeType(ContentService.MimeType.JSON);
-  }
-}
-
-/**
- * ─────────────────────────────────────────────────────────────────────────────
- * HMAC-SHA256 Token Management & Zero-Trust Authentication Helpers
- * ─────────────────────────────────────────────────────────────────────────────
- */
-
-/**
- * Retrieves or lazily creates a cryptographically random SERVER_SECRET_KEY in ScriptProperties.
- * @returns {string} 64+ char secret key
- */
-function getOrCreateServerSecret() {
-  var props = PropertiesService.getScriptProperties();
-  var secret = props.getProperty('SERVER_SECRET_KEY');
-  if (!secret || secret.trim() === '') {
-    secret = Utilities.getUuid() + '-' + Utilities.getUuid() + '-' + Utilities.getUuid();
-    props.setProperty('SERVER_SECRET_KEY', secret);
-  }
-  return secret;
-}
-
-/**
- * Generates an HMAC-SHA256 signed session token for an authenticated user.
- * 
- * @param {Object} userProfile Authenticated user record
- * @returns {string} Signed token: header.payload.signature
- */
-function generateAuthToken(userProfile) {
-  if (!userProfile) return null;
-  var secret = getOrCreateServerSecret();
-  var header = { alg: 'HS256', typ: 'JWT' };
-  var payload = {
-    userId: userProfile.id || userProfile.employeeId,
-    username: userProfile.username,
-    role: userProfile.roleId || userProfile.role || userProfile.canonicalRole || 'REQUESTER',
-    canonicalRole: userProfile.canonicalRole || userProfile.roleId || 'REQUESTER',
-    department: userProfile.department || userProfile.primaryDepartment || 'PD',
-    isAdmin: !!(userProfile.isAdmin || userProfile.role === 'ADMIN' || userProfile.canonicalRole === 'ADMIN'),
-    isApprover: !!userProfile.isApprover,
-    isReviewer: !!userProfile.isReviewer,
-    isPurchaser: !!userProfile.isPurchaser,
-    isRequester: !!userProfile.isRequester,
-    exp: Date.now() + (8 * 3600 * 1000) // Valid for 8 hours
-  };
-
-  var encodedHeader = Utilities.base64EncodeWebSafe(JSON.stringify(header));
-  var encodedPayload = Utilities.base64EncodeWebSafe(JSON.stringify(payload));
-  var stringToSign = encodedHeader + '.' + encodedPayload;
-  var signatureBytes = Utilities.computeHmacSha256Signature(stringToSign, secret);
-  var encodedSignature = Utilities.base64EncodeWebSafe(signatureBytes);
-
-  return stringToSign + '.' + encodedSignature;
-}
-
-/**
- * Validates and decodes an HMAC-SHA256 session token.
- * 
- * @param {string} tokenStr The token to verify
- * @returns {Object} Verified user context
- * @throws {Error} If token is missing, expired, or signature is invalid
- */
-function verifyAuthToken(tokenStr) {
-  if (!tokenStr || typeof tokenStr !== 'string') {
-    throw new Error('AUTH_TOKEN_MISSING: กรุณาเข้าสู่ระบบก่อนทำรายการ');
-  }
-  var parts = tokenStr.split('.');
-  if (parts.length !== 3) {
-    throw new Error('AUTH_TOKEN_MALFORMED: โครงสร้างโทเคนไม่ถูกต้อง');
-  }
-
-  var encodedHeader = parts[0];
-  var encodedPayload = parts[1];
-  var encodedSig = parts[2];
-  var secret = getOrCreateServerSecret();
-
-  var stringToSign = encodedHeader + '.' + encodedPayload;
-  var expectedSigBytes = Utilities.computeHmacSha256Signature(stringToSign, secret);
-  var expectedSig = Utilities.base64EncodeWebSafe(expectedSigBytes);
-
-  if (encodedSig !== expectedSig) {
-    throw new Error('AUTH_TOKEN_TAMPERED: ลายมือชื่อดิจิทัลไม่ถูกต้อง (อาจถูกดัดแปลง)');
-  }
-
-  var payloadJson = Utilities.newBlob(Utilities.base64DecodeWebSafe(encodedPayload)).getDataAsString();
-  var payload = JSON.parse(payloadJson);
-
-  if (payload.exp && payload.exp < Date.now()) {
-    throw new Error('AUTH_TOKEN_EXPIRED: เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง');
-  }
-
-  return {
-    id: payload.userId,
-    employeeId: payload.userId,
-    username: payload.username,
-    role: payload.role,
-    roleId: payload.role,
-    canonicalRole: payload.canonicalRole,
-    department: payload.department,
-    isAdmin: payload.isAdmin,
-    isApprover: payload.isApprover,
-    isReviewer: payload.isReviewer,
-    isPurchaser: payload.isPurchaser,
-    isRequester: payload.isRequester
-  };
 }
 
 /**
@@ -706,15 +498,7 @@ function apiLogin(username, password, rawPayload, userContext) {
   return handleApiRequest(function(payload, user) {
     var u = cleanUser || payload.username || payload.employeeId;
     var p = cleanPass || payload.password;
-    var authUser = authenticateUserByPassword(u, p);
-    if (authUser && typeof authUser === 'object') {
-      try {
-        authUser.token = generateAuthToken(authUser);
-      } catch (tokenErr) {
-        console.warn('[apiLogin] Failed to sign token: ' + tokenErr.message);
-      }
-    }
-    return authUser;
+    return authenticateUserByPassword(u, p);
   }, 'Login', rawPayload, userContext);
 }
 
@@ -733,7 +517,8 @@ function apiGetUsers(rawPayload, userContext) {
 function apiUpsertUser(userObj, userContext) {
   return handleApiRequest(function(payload, user) {
     var target = payload ? Object.assign({}, payload) : {};
-    target.department = target.department || target.dept || user.department || 'PD';
+    target.department = target.department || target.primaryDepartment || target.dept || user.department || 'PD';
+    target.primaryDepartment = target.primaryDepartment || target.department;
     target.updatedAt = new Date().toISOString();
     if (!target.id && !target.employeeId && !target.username) {
       target.id = 'USR-' + Date.now();
@@ -853,11 +638,22 @@ function apiSaveMasterItem(collectionOrPayload, itemOrUser, userContext) {
         if (sheetName === SHEET_NAMES.PRODUCTS) {
           var existingDept = existing.department || existing.category || existing.dept || 'PD';
           var itemDept = targetItem.department || targetItem.category || targetItem.dept || 'PD';
-          return matchDepartment(existingDept, itemDept);
+          var isSameDept = matchDepartment(existingDept, itemDept);
+          // If editing an existing item (by mode or if existing has same code in dept but empty id), it's the same item, not a duplicate!
+          if (isSameDept && (targetItem._mode === 'EDIT' || targetItem.isEdit || !existing.id)) {
+            if (!targetItem.id && existing.id) targetItem.id = existing.id;
+            return false;
+          }
+          return isSameDept;
         } else {
           var exDept = String(existing.department || 'ALL').trim().toUpperCase();
           var itDept = String(targetItem.department || 'ALL').trim().toUpperCase();
-          return (exDept === 'ALL' || itDept === 'ALL' || matchDepartment(exDept, itDept));
+          var isVendorMatch = (exDept === 'ALL' || itDept === 'ALL' || matchDepartment(exDept, itDept));
+          if (isVendorMatch && (targetItem._mode === 'EDIT' || targetItem.isEdit || !existing.id)) {
+            if (!targetItem.id && existing.id) targetItem.id = existing.id;
+            return false;
+          }
+          return isVendorMatch;
         }
       });
 
@@ -3850,14 +3646,23 @@ function apiAppendBudgetTransaction(txObj, userContext) {
     targetTx.actorRole = targetTx.actorRole || user.role || 'ADMIN';
 
     // ── Idempotency Guard ──────────────────────────────────────────────────
-    // For cancellation/refund event types, prevent double-writing the same
-    // transaction if the caller is retried or the button is pressed twice.
+    // Prevent double-writing the same transaction if the caller is retried or submitted twice.
+    var cleanId = String(targetTx.id || '').trim();
+    var existingTxs = batchReadRecords(SHEET_NAMES.BUDGET_TRANSACTIONS) || [];
+
+    if (cleanId) {
+      var idDuplicate = existingTxs.find(function(ex) { return String(ex.id || '').trim() === cleanId; });
+      if (idDuplicate) {
+        console.log('[apiAppendBudgetTransaction] Idempotency Guard: Skipped duplicate transaction by ID=' + cleanId);
+        return idDuplicate;
+      }
+    }
+
     var IDEMPOTENT_TYPES = ['PR_CANCEL_RELEASE', 'PO_CANCEL_RELEASE', 'BUDGET_ROLLBACK', 'CLAIM_REFUND'];
-    var txType = String(targetTx.type || '').toUpperCase();
+    var txType = String(targetTx.type || targetTx.actionType || '').toUpperCase();
     var txDocRef = String(targetTx.docRef || targetTx.docNo || targetTx.referenceDoc || '').trim();
 
     if (IDEMPOTENT_TYPES.indexOf(txType) !== -1 && txDocRef) {
-      var existingTxs = batchReadRecords(SHEET_NAMES.BUDGET_TRANSACTIONS);
       var duplicate = existingTxs.find(function(ex) {
         return String(ex.type || '').toUpperCase() === txType &&
                String(ex.docRef || ex.docNo || ex.referenceDoc || '').trim() === txDocRef;
@@ -3865,6 +3670,29 @@ function apiAppendBudgetTransaction(txObj, userContext) {
       if (duplicate) {
         console.log('[apiAppendBudgetTransaction] Idempotency Guard: Skipped duplicate ' + txType + ' for docRef=' + txDocRef);
         return duplicate; // Return existing record — no sheet write
+      }
+    }
+
+    // Near-duplicate check for allocation / adjustment within 45s
+    if (['MONTHLY_ALLOCATION', 'SET_BUDGET', 'TOP_UP', 'BUDGET_ADJUSTMENT_DOWN', 'BUDGET_ADJUSTMENT_UP'].indexOf(txType) !== -1) {
+      var targetAmt = Number(targetTx.amount || 0);
+      var targetPeriod = String(targetTx.period || targetTx.targetMonth || '');
+      var txTime = new Date(targetTx.createdAt || 0).getTime();
+      var nearDup = existingTxs.find(function(ex) {
+        var exDept = String(ex.dept || ex.department || '').toUpperCase();
+        var exType = String(ex.type || ex.actionType || '').toUpperCase();
+        var exAmt = Number(ex.amount || 0);
+        var exPeriod = String(ex.period || ex.targetMonth || '');
+        var exTime = new Date(ex.createdAt || 0).getTime();
+        return exDept === String(dept).toUpperCase() &&
+               exType === txType &&
+               (targetPeriod ? exPeriod === targetPeriod : true) &&
+               Math.abs(exAmt - targetAmt) < 0.01 &&
+               Math.abs(exTime - txTime) < 45000;
+      });
+      if (nearDup) {
+        console.log('[apiAppendBudgetTransaction] Idempotency Guard: Skipped near-duplicate ' + txType + ' for dept=' + dept);
+        return nearDup;
       }
     }
     // ─────────────────────────────────────────────────────────────────────
@@ -4808,6 +4636,40 @@ function upsertRecordFast(sheetName, idField, record) {
     if (String(values[i][idColIndex]).trim().toLowerCase() === targetStr) {
       rowIndexToUpdate = i + 1; // 1-based index
       break;
+    }
+  }
+
+  // 1.1 Fallback: สำหรับ PRODUCTS และ VENDORS ค้นหาด้วย code / sku / vendorCode + department
+  if (rowIndexToUpdate === -1 && (sheetName === SHEET_NAMES.PRODUCTS || sheetName === SHEET_NAMES.VENDORS)) {
+    var codeColIdx = headers.indexOf('code') !== -1 ? headers.indexOf('code') : (headers.indexOf('sku') !== -1 ? headers.indexOf('sku') : headers.indexOf('vendorCode'));
+    var deptColIdx = headers.indexOf('department') !== -1 ? headers.indexOf('department') : headers.indexOf('category');
+    var targetCodeStr = String(record.code || record.sku || record.vendorCode || '').trim().toUpperCase();
+    var targetDeptStr = String(record.department || record.category || '').trim().toUpperCase();
+    if (codeColIdx !== -1 && targetCodeStr) {
+      for (var j = 1; j < values.length; j++) {
+        var rowCode = String(values[j][codeColIdx]).trim().toUpperCase();
+        var rowDept = deptColIdx !== -1 ? String(values[j][deptColIdx]).trim().toUpperCase() : '';
+        if (rowCode === targetCodeStr && (!targetDeptStr || !rowDept || rowDept === targetDeptStr || rowDept === 'ALL' || (typeof matchDepartment === 'function' && matchDepartment(rowDept, targetDeptStr)))) {
+          rowIndexToUpdate = j + 1;
+          break;
+        }
+      }
+    }
+  }
+
+  // 1.2 Fallback: สำหรับ USERS ค้นหาด้วย username หรือ employeeId
+  if (rowIndexToUpdate === -1 && sheetName === SHEET_NAMES.USERS) {
+    var unameColIdx = headers.indexOf('username');
+    var empColIdx = headers.indexOf('employeeId');
+    var targetUname = String(record.username || '').trim().toLowerCase();
+    var targetEmp = String(record.employeeId || '').trim().toLowerCase();
+    for (var u = 1; u < values.length; u++) {
+      var rowUname = unameColIdx !== -1 ? String(values[u][unameColIdx]).trim().toLowerCase() : '';
+      var rowEmp = empColIdx !== -1 ? String(values[u][empColIdx]).trim().toLowerCase() : '';
+      if ((targetUname && rowUname === targetUname) || (targetEmp && rowEmp === targetEmp)) {
+        rowIndexToUpdate = u + 1;
+        break;
+      }
     }
   }
   

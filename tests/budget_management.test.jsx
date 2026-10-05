@@ -524,4 +524,153 @@ describe('Domain Suite: Budget Management & Financial Ledger', () => {
       expect(html).not.toContain('+฿1,500,000.00');
     });
   });
+
+  // ══════════════════════════════════════════════════════════════════
+  // Sub-Suite 4: Budget Reduction, Single-Unit Calculator & Deduplication Guard
+  // ══════════════════════════════════════════════════════════════════
+  describe('4. Budget Reduction, Single-Unit Calculator & Deduplication Guard', () => {
+    beforeEach(() => {
+      vi.clearAllMocks();
+      localStorage.clear();
+      storageService.resetData();
+      budgetService.resetBudgetData();
+    });
+
+    it('Scenario 4a: Budget reduction from ฿1,000,000 to ฿950,000 logs BUDGET_ADJUSTMENT_DOWN with delta -50,000', async () => {
+      await budgetService.allocateMonthlyBudget({
+        period: '2026-09',
+        allocations: { PD: 950000 },
+        previousAmounts: { PD: 1000000 },
+        actor: 'Admin',
+        reason: 'ปรับลดงบประมาณตามแผนชะลอการสั่งซื้อ'
+      });
+
+      const txs = storageService.getBudgetTransactions();
+      const latestTx = txs.find(t => t.dept === 'PD' && t.period === '2026-09');
+
+      expect(latestTx).toBeDefined();
+      expect(latestTx.type).toBe('BUDGET_ADJUSTMENT_DOWN');
+      expect(latestTx.typeLabel).toBe('ปรับลดงบประมาณ');
+      expect(latestTx.amount).toBe(50000);
+      expect(latestTx.delta).toBe(-50000);
+      expect(latestTx.previousAmount).toBe(1000000);
+      expect(latestTx.newAmount).toBe(950000);
+      expect(latestTx.isAllocation).toBe(false);
+
+      const budgets = storageService.getBudgets();
+      expect(budgets.PD.monthlyBudget).toBe(950000);
+      expect(budgets.PD.variance).toBe(950000);
+    });
+
+    it('Scenario 4b: Supports single-unit increment down to ฿1 (e.g. 1,000,000 to 1,000,001)', async () => {
+      await budgetService.allocateMonthlyBudget({
+        period: '2026-09',
+        allocations: { PD: 1000001 },
+        previousAmounts: { PD: 1000000 },
+        actor: 'Admin',
+        reason: 'เพิ่มงบประมาณ 1 บาท'
+      });
+
+      const txs = storageService.getBudgetTransactions();
+      const latestTx = txs.find(t => t.dept === 'PD' && t.period === '2026-09');
+
+      expect(latestTx).toBeDefined();
+      expect(latestTx.type).toBe('TOP_UP');
+      expect(latestTx.amount).toBe(1);
+      expect(latestTx.delta).toBe(1);
+      expect(latestTx.newAmount).toBe(1000001);
+    });
+
+    it('Scenario 4c: Supports single-unit reduction down to ฿1 (e.g. 1,000,000 to 999,999)', async () => {
+      await budgetService.allocateMonthlyBudget({
+        period: '2026-09',
+        allocations: { PD: 999999 },
+        previousAmounts: { PD: 1000000 },
+        actor: 'Admin',
+        reason: 'ลดงบประมาณ 1 บาท'
+      });
+
+      const txs = storageService.getBudgetTransactions();
+      const latestTx = txs.find(t => t.dept === 'PD' && t.period === '2026-09');
+
+      expect(latestTx).toBeDefined();
+      expect(latestTx.type).toBe('BUDGET_ADJUSTMENT_DOWN');
+      expect(latestTx.amount).toBe(1);
+      expect(latestTx.delta).toBe(-1);
+      expect(latestTx.newAmount).toBe(999999);
+    });
+
+    it('Scenario 4d: Deduplication Guard prevents double-entry when saving budget transactions', async () => {
+      const tx1 = {
+        id: 'BTX-ALLOC-PD-2026-09-100',
+        dept: 'PD',
+        department: 'PD',
+        type: 'TOP_UP',
+        actionType: 'TOP_UP',
+        typeLabel: 'ปรับเพิ่มงบประมาณ',
+        amount: 50000,
+        delta: 50000,
+        previousAmount: 1000000,
+        newAmount: 1050000,
+        createdAt: '2026-09-15T12:00:00.000Z',
+        date: '2026-09-15 12:00:00',
+        period: '2026-09',
+        targetMonth: '2026-09'
+      };
+
+      // Near-duplicate with different ID created within 5 seconds
+      const tx2 = {
+        id: 'BTX-ALLOC-PD-2026-09-105',
+        dept: 'PD',
+        department: 'PD',
+        type: 'TOP_UP',
+        actionType: 'TOP_UP',
+        typeLabel: 'ปรับเพิ่มงบประมาณ',
+        amount: 50000,
+        delta: 50000,
+        previousAmount: 1000000,
+        newAmount: 1050000,
+        createdAt: '2026-09-15T12:00:05.000Z',
+        date: '2026-09-15 12:00:05',
+        period: '2026-09',
+        targetMonth: '2026-09'
+      };
+
+      // Save transactions containing duplicate
+      storageService.saveBudgetTransactions([tx1, tx2]);
+
+      const stored = storageService.getBudgetTransactions();
+      const pdTxs = stored.filter(t => t.dept === 'PD' && t.period === '2026-09');
+      // Must be deduplicated to exactly 1 record!
+      expect(pdTxs.length).toBe(1);
+      expect(pdTxs[0].id).toBe('BTX-ALLOC-PD-2026-09-100');
+    });
+
+    it('Scenario 4e: DepartmentAllocationModal renders calculator controls, operators (+, -, =), and single-unit buttons', async () => {
+      const DepartmentAllocationModal = (await import('../src/components/budget/DepartmentAllocationModal')).default;
+
+      const html = renderToStaticMarkup(
+        <DepartmentAllocationModal
+          isOpen={true}
+          onClose={() => {}}
+          department="PD"
+          departmentName="ฝ่ายผลิต"
+          targetPeriod="2026-09"
+          currentAmount={1000000}
+        />
+      );
+
+      // Verify calculator features
+      expect(html).toContain('คำนวณงบประมาณ: ฝ่ายผลิต');
+      expect(html).toContain('กำหนดวงเงินตรง (=)');
+      expect(html).toContain('เติมงบเพิ่ม (+)');
+      expect(html).toContain('ปรับลดงบ (-)');
+      expect(html).toContain('ปุ่มลัดปรับค่า (รองรับหลักหน่วย 1 ถึง 100,000)');
+      expect(html).toContain('+1');
+      expect(html).toContain('+10');
+      expect(html).toContain('+100');
+      expect(html).toContain('+1,000');
+      expect(html).toContain('฿1,000,000');
+    });
+  });
 });

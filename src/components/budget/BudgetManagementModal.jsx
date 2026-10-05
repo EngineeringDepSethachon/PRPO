@@ -90,7 +90,7 @@ function BudgetManagementModalContent({
     }
   }, [scopedDeptList, selectedDept]);
 
-  const [actionType, setActionType] = useState('TOP_UP'); // 'TOP_UP' | 'SET_BUDGET'
+  const [actionType, setActionType] = useState('TOP_UP'); // 'TOP_UP' | 'REDUCE' | 'SET_BUDGET'
   const [adjustAmount, setAdjustAmount] = useState('');
   const [reason, setReason] = useState('');
   const targetMonth = useMemo(() => {
@@ -114,12 +114,15 @@ function BudgetManagementModalContent({
     if (actionType === 'TOP_UP') {
       return currentAllocated + numInput;
     }
+    if (actionType === 'REDUCE') {
+      return Math.max(0, currentAllocated - numInput);
+    }
     return numInput > 0 ? numInput : currentAllocated;
   }, [actionType, currentAllocated, numInput]);
 
   const deltaAmount = calculatedNewBudget - currentAllocated;
 
-  // Handle Quick Chips (+10,000, +50,000, etc.)
+  // Handle Quick Chips (+1, +10, +100, +1,000, etc.)
   const handleQuickAdd = (val) => {
     const current = Number(adjustAmount) || 0;
     setAdjustAmount(String(current + val));
@@ -131,8 +134,8 @@ function BudgetManagementModalContent({
     if (!scopedDeptList.some(d => d.code === selectedDept)) {
       return modalService.error('ปฏิเสธการเข้าถึง', 'คุณไม่มีสิทธิ์จัดการงบประมาณของแผนกนี้');
     }
-    if (numInput <= 0 && actionType === 'TOP_UP') {
-      return modalService.warning('กรุณาระบุจำนวนเงิน', 'ยอดเงินที่ต้องการเติมต้องมากกว่า 0 บาท');
+    if (numInput <= 0 && (actionType === 'TOP_UP' || actionType === 'REDUCE')) {
+      return modalService.warning('กรุณาระบุจำนวนเงิน', 'ยอดเงินที่ต้องการปรับต้องมากกว่า 0 บาท');
     }
     if (numInput <= 0 && actionType === 'SET_BUDGET') {
       return modalService.warning('กรุณาระบุจำนวนเงิน', 'วงเงินงบประมาณต้องมากกว่า 0 บาท');
@@ -143,7 +146,9 @@ function BudgetManagementModalContent({
 
     const actionText = actionType === 'TOP_UP' 
       ? `เติมงบประมาณพิเศษ +฿${numInput.toLocaleString()}` 
-      : `ปรับวงเงินงบประมาณใหม่เป็น ฿${calculatedNewBudget.toLocaleString()}`;
+      : actionType === 'REDUCE'
+        ? `ปรับลดงบประมาณ -฿${numInput.toLocaleString()}`
+        : `ปรับวงเงินงบประมาณใหม่เป็น ฿${calculatedNewBudget.toLocaleString()}`;
 
     const confirmed = await modalService.confirm({
       title: 'ยืนยันการปรับยอดงบประมาณ',
@@ -441,6 +446,31 @@ function BudgetManagementModalContent({
 
                   <label 
                     className={`flex items-start gap-3 p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                      actionType === 'REDUCE'
+                        ? 'bg-rose-50/80 border-rose-500 ring-2 ring-rose-500/20'
+                        : 'bg-white border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    <input 
+                      type="radio" 
+                      name="actionType" 
+                      value="REDUCE" 
+                      checked={actionType === 'REDUCE'} 
+                      onChange={() => setActionType('REDUCE')}
+                      className="mt-0.5 text-rose-600 focus:ring-rose-500"
+                    />
+                    <div>
+                      <div className="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">
+                        <span>🔻 ปรับลดงบประมาณ (Budget Reduction)</span>
+                      </div>
+                      <p className="text-[11px] text-slate-500 mt-0.5">
+                        ลดยอดเงินงบประมาณจากวงเงินปัจจุบัน (เหมาะกับกรณีชะลอการสั่งซื้อหรือปรับลดเป้าหมาย)
+                      </p>
+                    </div>
+                  </label>
+
+                  <label 
+                    className={`flex items-start gap-3 p-3.5 rounded-2xl border cursor-pointer transition-all ${
                       actionType === 'SET_BUDGET'
                         ? 'bg-indigo-50/80 border-indigo-500 ring-2 ring-indigo-500/20'
                         : 'bg-white border-slate-200 hover:bg-slate-50'
@@ -470,7 +500,7 @@ function BudgetManagementModalContent({
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
                   <label className="text-xs font-bold text-slate-700 block">
-                    3. จำนวนเงิน {actionType === 'TOP_UP' ? 'ที่ต้องการเติมเพิ่ม (บาท)' : 'วงเงินงบประมาณใหม่ (บาท)'} <span className="text-rose-500">*</span>
+                    3. จำนวนเงิน {actionType === 'TOP_UP' ? 'ที่ต้องการเติมเพิ่ม (บาท)' : actionType === 'REDUCE' ? 'ที่ต้องการปรับลด (บาท)' : 'วงเงินงบประมาณใหม่ (บาท)'} <span className="text-rose-500">*</span>
                   </label>
                   <span className="text-[11px] text-slate-400 font-mono">
                     วงเงินปัจจุบัน: ฿{currentAllocated.toLocaleString()}
@@ -479,24 +509,24 @@ function BudgetManagementModalContent({
 
                 <div className="relative">
                   <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 font-bold text-sm">
-                    ฿
+                    {actionType === 'TOP_UP' ? '+' : actionType === 'REDUCE' ? '-' : '฿'}
                   </div>
                   <input
                     type="number"
                     min="0"
-                    step="1000"
+                    step="any"
                     value={adjustAmount}
                     onChange={e => setAdjustAmount(e.target.value)}
-                    placeholder={actionType === 'TOP_UP' ? 'ระบุยอดเงินที่ต้องการเติม เช่น 50000' : 'ระบุวงเงินใหม่ เช่น 300000'}
+                    placeholder={actionType === 'TOP_UP' ? 'ระบุยอดเงินที่ต้องการเติม เช่น 50000 หรือ 1' : actionType === 'REDUCE' ? 'ระบุยอดเงินที่ต้องการลด เช่น 25000 หรือ 1' : 'ระบุวงเงินใหม่ เช่น 300000'}
                     className="w-full pl-9 pr-4 py-3 rounded-2xl border border-slate-300 font-mono font-bold text-slate-900 text-base sm:text-lg focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all"
                     required
                   />
                 </div>
 
                 {/* Quick Helper Chips */}
-                <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <span className="text-[11px] text-slate-400 font-medium">ปุ่มลัด:</span>
-                  {[10000, 25000, 50000, 100000].map(val => (
+                <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                  <span className="text-[11px] text-slate-400 font-medium">ปุ่มลัด (หลักหน่วยถึงหลักหมื่น):</span>
+                  {[1, 10, 100, 1000, 10000, 25000, 50000, 100000].map(val => (
                     <button
                       key={val}
                       type="button"

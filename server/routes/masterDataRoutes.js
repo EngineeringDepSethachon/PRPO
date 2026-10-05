@@ -106,14 +106,15 @@ router.put('/products/:id', async (req, res) => {
     const { id } = req.params;
     const targetId = decodeURIComponent(String(id || '')).trim().toLowerCase();
     const updated = req.body;
+    const targetCode = String(updated.code || updated.sku || targetId).trim().toLowerCase();
     const rawProducts = await readFile('products.json', []);
     const products = (Array.isArray(rawProducts) ? rawProducts : [])
       .flatMap(p => Array.isArray(p) ? p : [p])
       .filter(p => p && typeof p === 'object' && (p.name || p.itemName || p.title) && !isBlacklistedProduct(p));
     const idx = products.findIndex(p => {
       const pId = String(p.id || '').trim().toLowerCase();
-      const pCode = String(p.code || '').trim().toLowerCase();
-      return pId === targetId || pCode === targetId;
+      const pCode = String(p.code || p.sku || '').trim().toLowerCase();
+      return (targetId && pId === targetId) || (targetCode && pCode === targetCode);
     });
     if (idx !== -1) {
       products[idx] = { ...products[idx], ...updated };
@@ -288,12 +289,36 @@ router.post('/users', async (req, res) => {
       return res.json(data);
     }
     const users = await readFile('users.json', initialUsers);
-    const newId = data.id || `USR-${Date.now().toString().slice(-4)}`;
+    const targetId = String(data.id || '').trim().toLowerCase();
+    const targetUname = String(data.username || '').trim().toLowerCase();
+    const targetEmpId = String(data.employeeId || '').trim().toLowerCase();
+
+    const existingIdx = users.findIndex(u => {
+      const uId = String(u.id || '').trim().toLowerCase();
+      const uName = String(u.username || '').trim().toLowerCase();
+      const uEmp = String(u.employeeId || '').trim().toLowerCase();
+      return (targetId && uId === targetId) || (targetUname && uName === targetUname) || (targetEmpId && uEmp === targetEmpId);
+    });
+
     const primaryDept = data.primaryDepartment || data.department || 'PD';
     const allowedDepts = Array.isArray(data.allowedDepartments) && data.allowedDepartments.length > 0 
       ? data.allowedDepartments 
       : (primaryDept === 'ALL' ? ['*'] : [primaryDept]);
 
+    if (existingIdx !== -1) {
+      const merged = {
+        ...users[existingIdx],
+        ...data,
+        primaryDepartment: primaryDept,
+        department: primaryDept,
+        allowedDepartments: allowedDepts
+      };
+      users[existingIdx] = merged;
+      await writeFile('users.json', users);
+      return res.json(merged);
+    }
+
+    const newId = data.id || `USR-${Date.now().toString().slice(-4)}`;
     const newUser = {
       ...data,
       id: newId,
@@ -313,9 +338,18 @@ router.post('/users', async (req, res) => {
 router.put('/users/:id', async (req, res) => {
   try {
     const { id } = req.params;
+    const targetId = decodeURIComponent(String(id || '')).trim().toLowerCase();
     const updated = req.body;
+    const targetUname = String(updated.username || '').trim().toLowerCase();
+    const targetEmpId = String(updated.employeeId || '').trim().toLowerCase();
+
     const users = await readFile('users.json', initialUsers);
-    const idx = users.findIndex(u => u.id === id);
+    const idx = users.findIndex(u => {
+      const uId = String(u.id || '').trim().toLowerCase();
+      const uName = String(u.username || '').trim().toLowerCase();
+      const uEmp = String(u.employeeId || '').trim().toLowerCase();
+      return (targetId && uId === targetId) || (targetUname && uName === targetUname) || (targetEmpId && uEmp === targetEmpId);
+    });
     
     const primaryDept = updated.primaryDepartment || updated.department || (idx !== -1 ? users[idx].primaryDepartment : 'PD');
     const allowedDepts = Array.isArray(updated.allowedDepartments) 
@@ -325,7 +359,7 @@ router.put('/users/:id', async (req, res) => {
     const merged = {
       ...(idx !== -1 ? users[idx] : {}),
       ...updated,
-      id,
+      id: (idx !== -1 && users[idx].id) ? users[idx].id : id,
       primaryDepartment: primaryDept,
       department: primaryDept,
       allowedDepartments: allowedDepts

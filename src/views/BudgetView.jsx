@@ -376,6 +376,12 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
   const budgetTransactions = useMemo(() => {
     // 1. Get Static Txs (Filter only Manual Adjustments & Allocations)
     let staticTxs = storageService.getBudgetTransactions() || [];
+    if (Array.isArray(context?.budgetTransactions) && context.budgetTransactions.length > 0) {
+      const map = new Map();
+      context.budgetTransactions.forEach(t => { if (t && t.id) map.set(t.id, t); });
+      staticTxs.forEach(t => { if (t && t.id && !map.has(t.id)) map.set(t.id, t); });
+      staticTxs = Array.from(map.values());
+    }
     const validStaticTypes = new Set(['MONTHLY_ALLOCATION', 'SET_BUDGET', 'TOP_UP', 'BUDGET_ADJUSTMENT_DOWN', 'BUDGET_ADJUSTMENT_UP', 'PR_RELEASE', 'REFUND_SETTLEMENT', 'BUDGET_ROLLBACK', 'BUDGET_RESTORED_CLAIM_REFUND']);
     let allTxs = staticTxs.filter(tx => validStaticTypes.has(String(tx.type || tx.transactionType || tx.actionType || '').toUpperCase()));
 
@@ -666,10 +672,37 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
       });
     }
 
+    // Deduplicate allTxs by ID and signature to prevent double-entry display
+    const seenIds = new Set();
+    const seenSigs = new Set();
+    const dedupedTxs = [];
+
+    for (const tx of allTxs) {
+      if (!tx) continue;
+      const cleanId = String(tx.id || '').trim();
+      if (cleanId && seenIds.has(cleanId)) continue;
+      if (cleanId) seenIds.add(cleanId);
+
+      const dept = String(tx.dept || tx.department || '').replace(/^ฝ่าย\s*/i, '').trim().toUpperCase();
+      const period = String(tx.period || tx.targetMonth || '').trim();
+      const type = String(tx.type || tx.actionType || '').toUpperCase();
+      const amt = Math.round(Number(tx.amount || 0) * 100);
+      const timeMs = new Date(tx.createdAt || tx.date || 0).getTime();
+      const timeBucket = Math.floor(timeMs / 45000);
+
+      if (timeBucket > 0 && ['MONTHLY_ALLOCATION', 'SET_BUDGET', 'TOP_UP', 'BUDGET_ADJUSTMENT_DOWN', 'BUDGET_ADJUSTMENT_UP'].includes(type)) {
+        const sig = `${dept}|${period}|${type}|${amt}|${timeBucket}`;
+        if (seenSigs.has(sig)) continue;
+        seenSigs.add(sig);
+      }
+
+      dedupedTxs.push(tx);
+    }
+
     // Sort descending by date
-    allTxs.sort((a, b) => new Date(b.createdAt || b.date || 0).getTime() - new Date(a.createdAt || a.date || 0).getTime());
+    dedupedTxs.sort((a, b) => new Date(b.createdAt || b.date || 0).getTime() - new Date(a.createdAt || a.date || 0).getTime());
     // -------------------------------------------
-    return allTxs.filter(tx => {
+    return dedupedTxs.filter(tx => {
       const txDept = String(tx.dept || tx.department || '').replace(/^ฝ่าย\s*/i, '').trim().toUpperCase();
       const matchDept = deptsToShow.includes(txDept);
       if (!matchDept) return false;

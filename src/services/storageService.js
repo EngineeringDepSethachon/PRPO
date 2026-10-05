@@ -2345,11 +2345,31 @@ export const storageService = {
   getBudgetTransactions() {
     const data = _getItem(STORAGE_KEYS.BUDGET_TRANSACTIONS);
     if (!Array.isArray(data)) return [];
-    return data.map(tx => {
+    const seenIds = new Set();
+    const seenSigs = new Set();
+    const result = [];
+
+    for (const tx of data) {
+      if (!tx) continue;
+      const cleanId = String(tx.id || '').trim();
+      if (cleanId && seenIds.has(cleanId)) continue;
+      if (cleanId) seenIds.add(cleanId);
+
       const doc = tx.referenceDoc || tx.docNo || tx.poNumber || tx.poNo || tx.refDocNo || tx.refId || tx.referencePo || (tx.note?.match(/PO-[A-Z0-9-]+/i)?.[0]) || '';
       const dept = String(tx.dept || tx.department || 'PD').replace(/^ฝ่าย\s*/i, '').trim().toUpperCase() || 'PD';
       const amt = Number(tx.amount ?? tx.refundAmount ?? tx.creditAmount ?? 0);
-      return {
+      const period = String(tx.period || tx.targetMonth || '').trim();
+      const type = String(tx.type || tx.actionType || '').toUpperCase();
+      const timeMs = new Date(tx.createdAt || tx.date || 0).getTime();
+      const timeBucket = Math.floor(timeMs / 45000); // 45-second window deduplication for manual adjustments
+
+      if (['MONTHLY_ALLOCATION', 'SET_BUDGET', 'TOP_UP', 'BUDGET_ADJUSTMENT_DOWN', 'BUDGET_ADJUSTMENT_UP'].includes(type) && timeBucket > 0) {
+        const sig = `${dept}|${period}|${type}|${Math.round(amt * 100)}|${timeBucket}`;
+        if (seenSigs.has(sig)) continue;
+        seenSigs.add(sig);
+      }
+
+      result.push({
         ...tx,
         dept,
         department: tx.department || dept,
@@ -2360,21 +2380,66 @@ export const storageService = {
         refId: tx.refId || doc,
         amount: amt,
         refundAmount: Number(tx.refundAmount ?? amt)
-      };
-    });
+      });
+    }
+
+    return result;
   },
   saveBudgetTransactions(transactions) {
-    _setItem(STORAGE_KEYS.BUDGET_TRANSACTIONS, transactions);
+    if (!Array.isArray(transactions)) {
+      _setItem(STORAGE_KEYS.BUDGET_TRANSACTIONS, []);
+      return;
+    }
+    const seenIds = new Set();
+    const seenSigs = new Set();
+    const deduplicated = [];
+
+    for (const tx of transactions) {
+      if (!tx) continue;
+      const cleanId = String(tx.id || '').trim();
+      if (cleanId && seenIds.has(cleanId)) continue;
+      if (cleanId) seenIds.add(cleanId);
+
+      const dept = String(tx.dept || tx.department || 'PD').replace(/^ฝ่าย\s*/i, '').trim().toUpperCase() || 'PD';
+      const period = String(tx.period || tx.targetMonth || '').trim();
+      const type = String(tx.type || tx.actionType || '').toUpperCase();
+      const amt = Math.round(Number(tx.amount ?? tx.refundAmount ?? 0) * 100);
+      const timeMs = new Date(tx.createdAt || tx.date || 0).getTime();
+      const timeBucket = Math.floor(timeMs / 45000);
+
+      if (['MONTHLY_ALLOCATION', 'SET_BUDGET', 'TOP_UP', 'BUDGET_ADJUSTMENT_DOWN', 'BUDGET_ADJUSTMENT_UP'].includes(type) && timeBucket > 0) {
+        const sig = `${dept}|${period}|${type}|${amt}|${timeBucket}`;
+        if (seenSigs.has(sig)) continue;
+        seenSigs.add(sig);
+      }
+
+      deduplicated.push(tx);
+    }
+
+    _setItem(STORAGE_KEYS.BUDGET_TRANSACTIONS, deduplicated);
   },
   appendBudgetTransaction(tx) {
+    if (!tx) return;
     const existing = this.getBudgetTransactions();
 
-    // ── Client-Side Idempotency Guard ──────────────────────────────────────
-    // For financial event types that are strictly one-per-document, check if
-    // a record with the same type+docRef already exists before writing.
-    const IDEMPOTENT_TYPES = new Set(['PR_CANCEL_RELEASE', 'PO_CANCEL_RELEASE', 'BUDGET_ROLLBACK', 'CLAIM_REFUND']);
-    const txType = String(tx.type || '').toUpperCase();
+    const cleanId = tx.id || `BTX-${Date.now()}`;
+    const txType = String(tx.type || tx.actionType || '').toUpperCase();
     const txDocRef = String(tx.docRef || tx.docNo || tx.referenceDoc || tx.refDocNo || '').trim();
+    const dept = String(tx.dept || tx.department || 'PD').replace(/^ฝ่าย\s*/i, '').trim().toUpperCase() || 'PD';
+    const period = String(tx.period || tx.targetMonth || '').trim();
+    const amt = Number(tx.amount ?? tx.refundAmount ?? tx.creditAmount ?? 0);
+    const txTime = new Date(tx.createdAt || tx.date || Date.now()).getTime();
+
+    // ── Idempotency Guard ──
+    // 1. By exact ID
+    const isIdDuplicate = existing.some(ex => String(ex.id || '').trim() === String(cleanId).trim());
+    if (isIdDuplicate) {
+      console.warn(`[storageService] Idempotency Guard: Skipped duplicate transaction by ID: ${cleanId}`);
+      return;
+    }
+
+    // 2. Strict one-per-document types (Refunds & Releases)
+    const IDEMPOTENT_TYPES = new Set(['PR_CANCEL_RELEASE', 'PO_CANCEL_RELEASE', 'BUDGET_ROLLBACK', 'CLAIM_REFUND']);
     if (IDEMPOTENT_TYPES.has(txType) && txDocRef) {
       const isDuplicate = existing.some(ex =>
         String(ex.type || '').toUpperCase() === txType &&
@@ -2385,14 +2450,32 @@ export const storageService = {
         return; // No localStorage write, no GAS call
       }
     }
-    // ──────────────────────────────────────────────────────────────────────
 
-    const cleanId = tx.id || `BTX-${Date.now()}`;
+    // 3. Near-duplicate allocation / adjustment guard (same dept + period + type + amount within 45 seconds)
+    if (['MONTHLY_ALLOCATION', 'SET_BUDGET', 'TOP_UP', 'BUDGET_ADJUSTMENT_DOWN', 'BUDGET_ADJUSTMENT_UP'].includes(txType)) {
+      const isNearDuplicate = existing.some(ex => {
+        const exDept = String(ex.dept || ex.department || '').replace(/^ฝ่าย\s*/i, '').trim().toUpperCase();
+        const exPeriod = String(ex.period || ex.targetMonth || '').trim();
+        const exType = String(ex.type || ex.actionType || '').toUpperCase();
+        const exAmt = Number(ex.amount ?? ex.refundAmount ?? 0);
+        const exTime = new Date(ex.createdAt || ex.date || 0).getTime();
+        return exDept === dept &&
+               (period ? exPeriod === period : true) &&
+               exType === txType &&
+               Math.abs(exAmt - amt) < 0.01 &&
+               Math.abs(exTime - txTime) < 45000;
+      });
+      if (isNearDuplicate) {
+        console.warn(`[storageService] Idempotency Guard: Skipped near-duplicate ${txType} for ${dept} in ${period}`);
+        return;
+      }
+    }
+
     const normalizedTx = {
       ...tx,
       id: cleanId,
-      amount: Number(tx.amount ?? tx.refundAmount ?? tx.creditAmount ?? 0),
-      refundAmount: Number(tx.refundAmount ?? tx.amount ?? 0),
+      amount: amt,
+      refundAmount: Number(tx.refundAmount ?? amt),
       docNo: tx.docNo || tx.referenceDoc || tx.poNumber || tx.refId || tx.refDocNo || '',
       referenceDoc: tx.referenceDoc || tx.docNo || tx.poNumber || tx.refId || tx.refDocNo || '',
       poNumber: tx.poNumber || tx.docNo || tx.referenceDoc || tx.refId || '',

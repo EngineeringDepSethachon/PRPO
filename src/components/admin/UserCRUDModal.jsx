@@ -124,9 +124,10 @@ export default function UserCRUDModal({
     setIsSaving(true);
     try {
       const selectedRole = ROLE_OPTIONS.find(r => r.id === selectedRoleId) || ROLE_OPTIONS[0];
-      const isAllDepts = allowedDepts.includes('*') || allowedDepts.includes('ALL') || selectedRole.defaultDept === 'ALL';
-      const deptsToSave = allowedDepts.length > 0 ? allowedDepts : (primaryDept === 'ALL' ? ['*'] : [primaryDept]);
-      const assignedDepartments = isAllDepts ? ['ALL'] : deptsToSave;
+      const hasWildcard = allowedDepts.includes('*') || allowedDepts.includes('ALL');
+      const isAllDepts = hasWildcard || (allowedDepts.length === 0 && selectedRole.defaultDept === 'ALL');
+      const deptsToSave = allowedDepts.length > 0 ? allowedDepts : (isAllDepts ? ['*'] : [primaryDept]);
+      const assignedDepartments = hasWildcard ? ['ALL'] : deptsToSave;
 
       const payload = {
         id: user?.id || undefined,

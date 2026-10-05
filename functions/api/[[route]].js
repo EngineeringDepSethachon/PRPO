@@ -415,23 +415,31 @@ export async function onRequest(context) {
           const locId = p.locationId || p.defaultLocationId || '';
           const dept = p.department || cat;
 
-          await db.prepare(`
-            INSERT INTO products (id, code, name, category, purchaseUnit, usageUnit, conversionRate, minStock, currentStock, standardPrice, defaultLocationId, department, isDeleted, updatedAt)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
-            ON CONFLICT(id) DO UPDATE SET
-              name = excluded.name,
-              category = excluded.category,
-              purchaseUnit = excluded.purchaseUnit,
-              usageUnit = excluded.usageUnit,
-              conversionRate = excluded.conversionRate,
-              currentStock = excluded.currentStock,
-              standardPrice = excluded.standardPrice,
-              defaultLocationId = excluded.defaultLocationId,
-              department = excluded.department,
-              minStock = excluded.minStock,
-              isDeleted = 0,
-              updatedAt = CURRENT_TIMESTAMP
-          `).bind(id, code, name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock, price, locId, dept).run();
+          // Check if product already exists by id OR code (case-insensitive)
+          const existing = await db.prepare('SELECT * FROM products WHERE id = ? OR UPPER(code) = UPPER(?) LIMIT 1').bind(id, code).first();
+          if (existing) {
+            await db.prepare(`
+              UPDATE products SET
+                name = COALESCE(?, name),
+                category = COALESCE(?, category),
+                purchaseUnit = COALESCE(?, purchaseUnit),
+                usageUnit = COALESCE(?, usageUnit),
+                conversionRate = COALESCE(?, conversionRate),
+                minStock = COALESCE(?, minStock),
+                currentStock = COALESCE(?, currentStock),
+                standardPrice = COALESCE(?, standardPrice),
+                defaultLocationId = COALESCE(?, defaultLocationId),
+                department = COALESCE(?, department),
+                isDeleted = 0,
+                updatedAt = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).bind(name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock, price, locId, dept, existing.id).run();
+          } else {
+            await db.prepare(`
+              INSERT INTO products (id, code, name, category, purchaseUnit, usageUnit, conversionRate, minStock, currentStock, standardPrice, defaultLocationId, department, isDeleted, updatedAt)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+            `).bind(id, code, name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock, price, locId, dept).run();
+          }
         }
         return jsonResponse(Array.isArray(body) || body.products ? { success: true, count: prods.length } : prods[0]);
       }
@@ -453,22 +461,38 @@ export async function onRequest(context) {
           const locId = p.locationId || p.defaultLocationId || null;
           const dept = p.department || cat;
 
-          await db.prepare(`
-            UPDATE products SET
-              name = COALESCE(?, name),
-              category = COALESCE(?, category),
-              purchaseUnit = COALESCE(?, purchaseUnit),
-              usageUnit = COALESCE(?, usageUnit),
-              conversionRate = COALESCE(?, conversionRate),
-              minStock = COALESCE(?, minStock),
-              currentStock = COALESCE(?, currentStock),
-              standardPrice = COALESCE(?, standardPrice),
-              defaultLocationId = COALESCE(?, defaultLocationId),
-              department = COALESCE(?, department),
-              isDeleted = 0,
-              updatedAt = CURRENT_TIMESTAMP
-            WHERE id = ? OR code = ?
-          `).bind(name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock, price, locId, dept, id, code).run();
+          // Find existing product by subId, id, or code
+          let existing = null;
+          if (subId) {
+            existing = await db.prepare('SELECT * FROM products WHERE id = ? OR UPPER(code) = UPPER(?) LIMIT 1').bind(subId, subId).first();
+          }
+          if (!existing && (id || code)) {
+            existing = await db.prepare('SELECT * FROM products WHERE id = ? OR UPPER(code) = UPPER(?) LIMIT 1').bind(id || '', code || '').first();
+          }
+
+          if (existing) {
+            await db.prepare(`
+              UPDATE products SET
+                name = COALESCE(?, name),
+                category = COALESCE(?, category),
+                purchaseUnit = COALESCE(?, purchaseUnit),
+                usageUnit = COALESCE(?, usageUnit),
+                conversionRate = COALESCE(?, conversionRate),
+                minStock = COALESCE(?, minStock),
+                currentStock = COALESCE(?, currentStock),
+                standardPrice = COALESCE(?, standardPrice),
+                defaultLocationId = COALESCE(?, defaultLocationId),
+                department = COALESCE(?, department),
+                isDeleted = 0,
+                updatedAt = CURRENT_TIMESTAMP
+              WHERE id = ?
+            `).bind(name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock, price, locId, dept, existing.id).run();
+          } else {
+            await db.prepare(`
+              INSERT INTO products (id, code, name, category, purchaseUnit, usageUnit, conversionRate, minStock, currentStock, standardPrice, defaultLocationId, department, isDeleted, updatedAt)
+              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP)
+            `).bind(id || `PROD-${Date.now()}`, code, name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock || 0, price || 0, locId, dept).run();
+          }
         }
 
         return jsonResponse(Array.isArray(body) || body.products ? { success: true, count: prods.length } : prods[0]);
@@ -684,8 +708,8 @@ export async function onRequest(context) {
 
       if (method === 'POST' || method === 'PUT') {
         const u = await request.json().catch(() => ({}));
-        const id = u.id || subId || `USR-${Date.now()}`;
-        const empId = u.employeeId || '';
+        const rawId = (u.id || subId || '').trim();
+        const empId = (u.employeeId || '').trim();
         const username = (u.username || '').trim();
         const email = (u.email || (username ? `${username.toLowerCase()}@company.com` : '')).trim();
         const rawPass = (u.password || '').trim();
@@ -733,63 +757,104 @@ export async function onRequest(context) {
         const canViewAllDepts = u.canViewAllDepts !== undefined ? (u.canViewAllDepts ? 1 : 0) : (isOnline || level >= 2 || dept === 'ALL' ? 1 : 0);
         const now = new Date().toISOString();
 
-        await db.prepare(`
-          INSERT INTO users (
-            id, employeeId, username, email, password, pin, name, employeeName, displayName,
-            position, department, primaryDepartment, allowedDepartments, roleId, canonicalRole,
-            positionKey, title, level, status, pictureUrl, description, signature,
+        // 1. Find existing user by subId, id, username, or employeeId
+        let existingUser = null;
+        if (subId) {
+          existingUser = await db.prepare('SELECT * FROM users WHERE id = ? OR username = ? OR (employeeId IS NOT NULL AND employeeId != "" AND employeeId = ?) LIMIT 1').bind(subId, subId, subId).first();
+        }
+        if (!existingUser && rawId) {
+          existingUser = await db.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').bind(rawId).first();
+        }
+        if (!existingUser && username) {
+          existingUser = await db.prepare('SELECT * FROM users WHERE username = ? LIMIT 1').bind(username).first();
+        }
+        if (!existingUser && empId) {
+          existingUser = await db.prepare('SELECT * FROM users WHERE employeeId = ? LIMIT 1').bind(empId).first();
+        }
+
+        if (existingUser) {
+          // 2. Perform direct UPDATE on the existing record
+          await db.prepare(`
+            UPDATE users SET
+              employeeId = CASE WHEN ? != '' THEN ? ELSE employeeId END,
+              username = CASE WHEN ? != '' THEN ? ELSE username END,
+              email = COALESCE(?, email),
+              password = CASE WHEN ? != '' THEN ? ELSE password END,
+              pin = CASE WHEN ? != '' THEN ? ELSE pin END,
+              name = ?,
+              employeeName = ?,
+              displayName = ?,
+              position = ?,
+              department = ?,
+              primaryDepartment = ?,
+              allowedDepartments = ?,
+              roleId = ?,
+              canonicalRole = ?,
+              positionKey = ?,
+              title = ?,
+              level = ?,
+              status = ?,
+              pictureUrl = ?,
+              description = ?,
+              signature = COALESCE(?, signature),
+              canCreatePR = ?,
+              canSubmitPR = ?,
+              canDeleteOwnDraft = ?,
+              canReview = ?,
+              canFinalApprove = ?,
+              canOnlinePurchase = ?,
+              canReceiveGoods = ?,
+              canCloseOwnPO = ?,
+              canManageMaster = ?,
+              canDeleteMaster = ?,
+              canViewBudget = ?,
+              canViewBudgetMenu = ?,
+              canSetBudget = ?,
+              canViewAllDepts = ?,
+              updatedAt = ?
+            WHERE id = ?
+          `).bind(
+            empId, empId,
+            username, username,
+            email || null,
+            rawPass, rawPass,
+            pin, pin,
+            name, empName, dispName,
+            position, dept, primaryDept, allowedDepts,
+            roleId, canonicalRole, posKey, title,
+            level, status, pic, desc, sig,
             canCreatePR, canSubmitPR, canDeleteOwnDraft, canReview, canFinalApprove, canOnlinePurchase,
             canReceiveGoods, canCloseOwnPO, canManageMaster, canDeleteMaster, canViewBudget, canViewBudgetMenu,
-            canSetBudget, canViewAllDepts, updatedAt
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          ON CONFLICT(id) DO UPDATE SET
-            employeeId = excluded.employeeId,
-            username = excluded.username,
-            email = COALESCE(excluded.email, users.email),
-            password = CASE WHEN excluded.password != '' THEN excluded.password ELSE users.password END,
-            pin = CASE WHEN excluded.pin != '' THEN excluded.pin ELSE users.pin END,
-            name = excluded.name,
-            employeeName = excluded.employeeName,
-            displayName = excluded.displayName,
-            position = excluded.position,
-            department = excluded.department,
-            primaryDepartment = excluded.primaryDepartment,
-            allowedDepartments = excluded.allowedDepartments,
-            roleId = excluded.roleId,
-            canonicalRole = excluded.canonicalRole,
-            positionKey = excluded.positionKey,
-            title = excluded.title,
-            level = excluded.level,
-            status = excluded.status,
-            pictureUrl = excluded.pictureUrl,
-            description = excluded.description,
-            signature = COALESCE(excluded.signature, users.signature),
-            canCreatePR = excluded.canCreatePR,
-            canSubmitPR = excluded.canSubmitPR,
-            canDeleteOwnDraft = excluded.canDeleteOwnDraft,
-            canReview = excluded.canReview,
-            canFinalApprove = excluded.canFinalApprove,
-            canOnlinePurchase = excluded.canOnlinePurchase,
-            canReceiveGoods = excluded.canReceiveGoods,
-            canCloseOwnPO = excluded.canCloseOwnPO,
-            canManageMaster = excluded.canManageMaster,
-            canDeleteMaster = excluded.canDeleteMaster,
-            canViewBudget = excluded.canViewBudget,
-            canViewBudgetMenu = excluded.canViewBudgetMenu,
-            canSetBudget = excluded.canSetBudget,
-            canViewAllDepts = excluded.canViewAllDepts,
-            updatedAt = excluded.updatedAt
-        `).bind(
-          id, empId, username, email, rawPass, pin, name, empName, dispName,
-          position, dept, primaryDept, allowedDepts, roleId, canonicalRole,
-          posKey, title, level, status, pic, desc, sig,
-          canCreatePR, canSubmitPR, canDeleteOwnDraft, canReview, canFinalApprove, canOnlinePurchase,
-          canReceiveGoods, canCloseOwnPO, canManageMaster, canDeleteMaster, canViewBudget, canViewBudgetMenu,
-          canSetBudget, canViewAllDepts, now
-        ).run();
+            canSetBudget, canViewAllDepts, now,
+            existingUser.id
+          ).run();
 
-        const savedUserRow = await db.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').bind(id).first();
-        return jsonResponse(formatSafeUser(savedUserRow || u));
+          const updatedUserRow = await db.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').bind(existingUser.id).first();
+          return jsonResponse(formatSafeUser(updatedUserRow || { ...existingUser, ...u }));
+        } else {
+          // 3. New user INSERT
+          const newId = rawId || `USR-${Date.now()}`;
+          await db.prepare(`
+            INSERT INTO users (
+              id, employeeId, username, email, password, pin, name, employeeName, displayName,
+              position, department, primaryDepartment, allowedDepartments, roleId, canonicalRole,
+              positionKey, title, level, status, pictureUrl, description, signature,
+              canCreatePR, canSubmitPR, canDeleteOwnDraft, canReview, canFinalApprove, canOnlinePurchase,
+              canReceiveGoods, canCloseOwnPO, canManageMaster, canDeleteMaster, canViewBudget, canViewBudgetMenu,
+              canSetBudget, canViewAllDepts, updatedAt
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `).bind(
+            newId, empId, username, email, rawPass, pin, name, empName, dispName,
+            position, dept, primaryDept, allowedDepts, roleId, canonicalRole,
+            posKey, title, level, status, pic, desc, sig,
+            canCreatePR, canSubmitPR, canDeleteOwnDraft, canReview, canFinalApprove, canOnlinePurchase,
+            canReceiveGoods, canCloseOwnPO, canManageMaster, canDeleteMaster, canViewBudget, canViewBudgetMenu,
+            canSetBudget, canViewAllDepts, now
+          ).run();
+
+          const savedUserRow = await db.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').bind(newId).first();
+          return jsonResponse(formatSafeUser(savedUserRow || u));
+        }
       }
 
       if (method === 'DELETE' && subId) {
@@ -1119,7 +1184,7 @@ export async function onRequest(context) {
 
     if (path === '/api/budgets/allocate' && method === 'POST') {
       if (!db) return jsonResponse({ success: false });
-      const { period, allocations, previousAmounts, reason, actor } = await request.json().catch(() => ({}));
+      const { period, allocations, previousAmounts, reason, actor, transactionId, transactions } = await request.json().catch(() => ({}));
       const mKey = period || '2026-10';
       if (allocations && typeof allocations === 'object') {
         const now = new Date().toISOString();
@@ -1165,7 +1230,7 @@ export async function onRequest(context) {
               updatedAt = CURRENT_TIMESTAMP
           `).bind(cleanDept, cleanDept, numAmt, numAmt, numAmt, JSON.stringify(history)).run().catch(() => {});
 
-          const txId = `BTX-ALLOC-${cleanDept}-${mKey}-${Date.now()}`;
+          const txId = transactionId || (transactions && (transactions[cleanDept]?.id || transactions[dept]?.id)) || `BTX-ALLOC-${cleanDept}-${mKey}-${Date.now()}`;
           await db.prepare(`
             INSERT INTO budget_transactions (id, dept, department, type, actionType, typeLabel, amount, delta, previousAmount, newAmount, isAllocation, actor, note, targetMonth, period, createdAt, date)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)

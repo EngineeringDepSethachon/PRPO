@@ -708,11 +708,12 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
     }
 
     // Derive primaryDepartment and allowedDepartments from assignedDepts
-    const isAllDepts = assignedDepts.includes('ALL') || roleId === 'ADMIN' || roleId === 'PLANT_MANAGER' || roleId === 'ONLINE_PURCHASER';
-    const defaultPrimaryDept = (roleId === 'ONLINE_PURCHASER') ? 'PUR' : (roleId === 'ADMIN' || roleId === 'PLANT_MANAGER') ? 'MGT' : (assignedDepts.find(d => d !== 'ALL') || 'MGT');
-    const primaryDept = isAllDepts ? defaultPrimaryDept : (assignedDepts.find(d => d !== 'ALL') || defaultPrimaryDept);
-    const finalAssigned = isAllDepts ? ['*'] : assignedDepts;
-    const allowedForPerms = isAllDepts ? ['*'] : assignedDepts;
+    const chosenDept = assignedDepts.find(d => d !== 'ALL' && d !== '*');
+    const isAllDepts = assignedDepts.includes('ALL') || assignedDepts.includes('*') || (!chosenDept && (roleId === 'ADMIN' || roleId === 'PLANT_MANAGER' || roleId === 'ONLINE_PURCHASER'));
+    const defaultPrimaryDept = (roleId === 'ONLINE_PURCHASER') ? 'PUR' : (roleId === 'ADMIN' || roleId === 'PLANT_MANAGER') ? 'MGT' : (user?.primaryDepartment || user?.department || 'PD');
+    const primaryDept = chosenDept || (isAllDepts ? defaultPrimaryDept : (user?.primaryDepartment || user?.department || defaultPrimaryDept));
+    const finalAssigned = isAllDepts ? ['*'] : (assignedDepts.length > 0 ? assignedDepts : [primaryDept]);
+    const allowedForPerms = isAllDepts ? ['*'] : (assignedDepts.length > 0 ? assignedDepts : [primaryDept]);
     const roleLevel = ROLE_OPTIONS.find(r => r.id === roleId)?.level || 1;
 
     setIsSaving(true);

@@ -156,16 +156,6 @@ function serializeRecordToRow(record, headers) {
       }
     }
 
-    // Formula Injection Defense: escape strings starting with =, +, -, @ to prevent spreadsheet formula execution
-    if (typeof val === 'string' && strVal.length > 0) {
-      const firstChar = strVal.charAt(0);
-      if (firstChar === '=' || firstChar === '+' || firstChar === '-' || firstChar === '@') {
-        if (isNaN(Number(strVal))) {
-          strVal = "'" + strVal;
-        }
-      }
-    }
-
     return strVal;
   });
 }
@@ -513,34 +503,7 @@ function createNotification(params) {
  * @param {string} sheetName Name of the sheet tab
  * @returns {Object[]} Array of row objects mapped by header keys
  */
-const MASTER_CACHE_SHEETS = ['Departments', 'UsageUnits', 'StorageLocations', 'Vendors'];
-
-/**
- * Invalidates the CacheService RAM cache for a sheet tab if cached.
- * @param {string} sheetName Name of the sheet tab
- */
-function invalidateMasterCache(sheetName) {
-  if (MASTER_CACHE_SHEETS.includes(sheetName)) {
-    try {
-      CacheService.getScriptCache().remove('CACHE_' + sheetName);
-    } catch (e) {}
-  }
-}
-
 function batchReadRecords(sheetName) {
-  // Check RAM micro-cache for Master Data to accelerate reads by 10-20x (~20ms response)
-  if (MASTER_CACHE_SHEETS.includes(sheetName)) {
-    try {
-      const cache = CacheService.getScriptCache();
-      const cached = cache.get('CACHE_' + sheetName);
-      if (cached) {
-        return JSON.parse(cached);
-      }
-    } catch (cacheErr) {
-      console.warn(`[CacheService] Read error for ${sheetName}: ${cacheErr.message}`);
-    }
-  }
-
   const sheet = getSheet(sheetName);
   const dataRange = sheet.getDataRange();
   const values = dataRange.getValues();
@@ -582,16 +545,6 @@ function batchReadRecords(sheetName) {
     }
 
     records.push(record);
-  }
-
-  // Populate RAM micro-cache for Master Data (valid for 30 minutes, max 95KB)
-  if (MASTER_CACHE_SHEETS.includes(sheetName) && records.length > 0) {
-    try {
-      const jsonStr = JSON.stringify(records);
-      if (jsonStr.length < 95000) {
-        CacheService.getScriptCache().put('CACHE_' + sheetName, jsonStr, 1800);
-      }
-    } catch (saveErr) {}
   }
 
   return records;
@@ -704,10 +657,49 @@ function upsertRecordById(sheetName, idField, record) {
 
   if (lastRow > 1) {
     const idValues = sheet.getRange(2, idColIndex + 1, lastRow - 1, 1).getValues();
+    const targetStr = String(targetId).trim().toLowerCase();
     for (let i = 0; i < idValues.length; i++) {
-      if (String(idValues[i][0]).trim() === String(targetId).trim()) {
+      if (String(idValues[i][0]).trim().toLowerCase() === targetStr) {
         rowIndexToUpdate = i + 2;
         break;
+      }
+    }
+
+    // Fallback for USERS: match by username or employeeId
+    if (rowIndexToUpdate === -1 && (sheetName === SHEET_NAMES.USERS || sheetName === 'Users')) {
+      const unameColIdx = headers.indexOf('username');
+      const empColIdx = headers.indexOf('employeeId');
+      const targetUname = String(record.username || '').trim().toLowerCase();
+      const targetEmp = String(record.employeeId || '').trim().toLowerCase();
+      if (unameColIdx !== -1 || empColIdx !== -1) {
+        const fullRows = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
+        for (let u = 0; u < fullRows.length; u++) {
+          const rowUname = unameColIdx !== -1 ? String(fullRows[u][unameColIdx]).trim().toLowerCase() : '';
+          const rowEmp = empColIdx !== -1 ? String(fullRows[u][empColIdx]).trim().toLowerCase() : '';
+          if ((targetUname && rowUname === targetUname) || (targetEmp && rowEmp === targetEmp)) {
+            rowIndexToUpdate = u + 2;
+            break;
+          }
+        }
+      }
+    }
+
+    // Fallback for PRODUCTS / VENDORS: match by code
+    if (rowIndexToUpdate === -1 && (sheetName === SHEET_NAMES.PRODUCTS || sheetName === SHEET_NAMES.VENDORS || sheetName === 'Products' || sheetName === 'Vendors')) {
+      const codeColIdx = headers.indexOf('code') !== -1 ? headers.indexOf('code') : (headers.indexOf('sku') !== -1 ? headers.indexOf('sku') : headers.indexOf('vendorCode'));
+      const deptColIdx = headers.indexOf('department') !== -1 ? headers.indexOf('department') : headers.indexOf('category');
+      const targetCodeStr = String(record.code || record.sku || record.vendorCode || '').trim().toUpperCase();
+      const targetDeptStr = String(record.department || record.category || '').trim().toUpperCase();
+      if (codeColIdx !== -1 && targetCodeStr) {
+        const fullRows = sheet.getRange(2, 1, lastRow - 1, headers.length).getValues();
+        for (let p = 0; p < fullRows.length; p++) {
+          const rowCode = String(fullRows[p][codeColIdx]).trim().toUpperCase();
+          const rowDept = deptColIdx !== -1 ? String(fullRows[p][deptColIdx]).trim().toUpperCase() : '';
+          if (rowCode === targetCodeStr && (!targetDeptStr || !rowDept || rowDept === targetDeptStr || rowDept === 'ALL')) {
+            rowIndexToUpdate = p + 2;
+            break;
+          }
+        }
       }
     }
   }
@@ -721,7 +713,6 @@ function upsertRecordById(sheetName, idField, record) {
     sheet.getRange(nextRow, 1, 1, headers.length).setValues([rowValues]);
   }
 
-  invalidateMasterCache(sheetName);
   return record;
 }
 
@@ -764,7 +755,6 @@ function deleteRecordById(sheetName, idField, idValue) {
     if (remainingRows.length > 0) {
       sheet.getRange(2, 1, remainingRows.length, lastCol).setValues(remainingRows);
     }
-    invalidateMasterCache(sheetName);
   }
 
   return found;

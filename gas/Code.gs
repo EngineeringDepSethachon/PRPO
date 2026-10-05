@@ -517,7 +517,8 @@ function apiGetUsers(rawPayload, userContext) {
 function apiUpsertUser(userObj, userContext) {
   return handleApiRequest(function(payload, user) {
     var target = payload ? Object.assign({}, payload) : {};
-    target.department = target.department || target.dept || user.department || 'PD';
+    target.department = target.department || target.primaryDepartment || target.dept || user.department || 'PD';
+    target.primaryDepartment = target.primaryDepartment || target.department;
     target.updatedAt = new Date().toISOString();
     if (!target.id && !target.employeeId && !target.username) {
       target.id = 'USR-' + Date.now();
@@ -637,11 +638,22 @@ function apiSaveMasterItem(collectionOrPayload, itemOrUser, userContext) {
         if (sheetName === SHEET_NAMES.PRODUCTS) {
           var existingDept = existing.department || existing.category || existing.dept || 'PD';
           var itemDept = targetItem.department || targetItem.category || targetItem.dept || 'PD';
-          return matchDepartment(existingDept, itemDept);
+          var isSameDept = matchDepartment(existingDept, itemDept);
+          // If editing an existing item (by mode or if existing has same code in dept but empty id), it's the same item, not a duplicate!
+          if (isSameDept && (targetItem._mode === 'EDIT' || targetItem.isEdit || !existing.id)) {
+            if (!targetItem.id && existing.id) targetItem.id = existing.id;
+            return false;
+          }
+          return isSameDept;
         } else {
           var exDept = String(existing.department || 'ALL').trim().toUpperCase();
           var itDept = String(targetItem.department || 'ALL').trim().toUpperCase();
-          return (exDept === 'ALL' || itDept === 'ALL' || matchDepartment(exDept, itDept));
+          var isVendorMatch = (exDept === 'ALL' || itDept === 'ALL' || matchDepartment(exDept, itDept));
+          if (isVendorMatch && (targetItem._mode === 'EDIT' || targetItem.isEdit || !existing.id)) {
+            if (!targetItem.id && existing.id) targetItem.id = existing.id;
+            return false;
+          }
+          return isVendorMatch;
         }
       });
 
@@ -3634,14 +3646,23 @@ function apiAppendBudgetTransaction(txObj, userContext) {
     targetTx.actorRole = targetTx.actorRole || user.role || 'ADMIN';
 
     // ── Idempotency Guard ──────────────────────────────────────────────────
-    // For cancellation/refund event types, prevent double-writing the same
-    // transaction if the caller is retried or the button is pressed twice.
+    // Prevent double-writing the same transaction if the caller is retried or submitted twice.
+    var cleanId = String(targetTx.id || '').trim();
+    var existingTxs = batchReadRecords(SHEET_NAMES.BUDGET_TRANSACTIONS) || [];
+
+    if (cleanId) {
+      var idDuplicate = existingTxs.find(function(ex) { return String(ex.id || '').trim() === cleanId; });
+      if (idDuplicate) {
+        console.log('[apiAppendBudgetTransaction] Idempotency Guard: Skipped duplicate transaction by ID=' + cleanId);
+        return idDuplicate;
+      }
+    }
+
     var IDEMPOTENT_TYPES = ['PR_CANCEL_RELEASE', 'PO_CANCEL_RELEASE', 'BUDGET_ROLLBACK', 'CLAIM_REFUND'];
-    var txType = String(targetTx.type || '').toUpperCase();
+    var txType = String(targetTx.type || targetTx.actionType || '').toUpperCase();
     var txDocRef = String(targetTx.docRef || targetTx.docNo || targetTx.referenceDoc || '').trim();
 
     if (IDEMPOTENT_TYPES.indexOf(txType) !== -1 && txDocRef) {
-      var existingTxs = batchReadRecords(SHEET_NAMES.BUDGET_TRANSACTIONS);
       var duplicate = existingTxs.find(function(ex) {
         return String(ex.type || '').toUpperCase() === txType &&
                String(ex.docRef || ex.docNo || ex.referenceDoc || '').trim() === txDocRef;
@@ -3649,6 +3670,29 @@ function apiAppendBudgetTransaction(txObj, userContext) {
       if (duplicate) {
         console.log('[apiAppendBudgetTransaction] Idempotency Guard: Skipped duplicate ' + txType + ' for docRef=' + txDocRef);
         return duplicate; // Return existing record — no sheet write
+      }
+    }
+
+    // Near-duplicate check for allocation / adjustment within 45s
+    if (['MONTHLY_ALLOCATION', 'SET_BUDGET', 'TOP_UP', 'BUDGET_ADJUSTMENT_DOWN', 'BUDGET_ADJUSTMENT_UP'].indexOf(txType) !== -1) {
+      var targetAmt = Number(targetTx.amount || 0);
+      var targetPeriod = String(targetTx.period || targetTx.targetMonth || '');
+      var txTime = new Date(targetTx.createdAt || 0).getTime();
+      var nearDup = existingTxs.find(function(ex) {
+        var exDept = String(ex.dept || ex.department || '').toUpperCase();
+        var exType = String(ex.type || ex.actionType || '').toUpperCase();
+        var exAmt = Number(ex.amount || 0);
+        var exPeriod = String(ex.period || ex.targetMonth || '');
+        var exTime = new Date(ex.createdAt || 0).getTime();
+        return exDept === String(dept).toUpperCase() &&
+               exType === txType &&
+               (targetPeriod ? exPeriod === targetPeriod : true) &&
+               Math.abs(exAmt - targetAmt) < 0.01 &&
+               Math.abs(exTime - txTime) < 45000;
+      });
+      if (nearDup) {
+        console.log('[apiAppendBudgetTransaction] Idempotency Guard: Skipped near-duplicate ' + txType + ' for dept=' + dept);
+        return nearDup;
       }
     }
     // ─────────────────────────────────────────────────────────────────────
@@ -4592,6 +4636,40 @@ function upsertRecordFast(sheetName, idField, record) {
     if (String(values[i][idColIndex]).trim().toLowerCase() === targetStr) {
       rowIndexToUpdate = i + 1; // 1-based index
       break;
+    }
+  }
+
+  // 1.1 Fallback: สำหรับ PRODUCTS และ VENDORS ค้นหาด้วย code / sku / vendorCode + department
+  if (rowIndexToUpdate === -1 && (sheetName === SHEET_NAMES.PRODUCTS || sheetName === SHEET_NAMES.VENDORS)) {
+    var codeColIdx = headers.indexOf('code') !== -1 ? headers.indexOf('code') : (headers.indexOf('sku') !== -1 ? headers.indexOf('sku') : headers.indexOf('vendorCode'));
+    var deptColIdx = headers.indexOf('department') !== -1 ? headers.indexOf('department') : headers.indexOf('category');
+    var targetCodeStr = String(record.code || record.sku || record.vendorCode || '').trim().toUpperCase();
+    var targetDeptStr = String(record.department || record.category || '').trim().toUpperCase();
+    if (codeColIdx !== -1 && targetCodeStr) {
+      for (var j = 1; j < values.length; j++) {
+        var rowCode = String(values[j][codeColIdx]).trim().toUpperCase();
+        var rowDept = deptColIdx !== -1 ? String(values[j][deptColIdx]).trim().toUpperCase() : '';
+        if (rowCode === targetCodeStr && (!targetDeptStr || !rowDept || rowDept === targetDeptStr || rowDept === 'ALL' || (typeof matchDepartment === 'function' && matchDepartment(rowDept, targetDeptStr)))) {
+          rowIndexToUpdate = j + 1;
+          break;
+        }
+      }
+    }
+  }
+
+  // 1.2 Fallback: สำหรับ USERS ค้นหาด้วย username หรือ employeeId
+  if (rowIndexToUpdate === -1 && sheetName === SHEET_NAMES.USERS) {
+    var unameColIdx = headers.indexOf('username');
+    var empColIdx = headers.indexOf('employeeId');
+    var targetUname = String(record.username || '').trim().toLowerCase();
+    var targetEmp = String(record.employeeId || '').trim().toLowerCase();
+    for (var u = 1; u < values.length; u++) {
+      var rowUname = unameColIdx !== -1 ? String(values[u][unameColIdx]).trim().toLowerCase() : '';
+      var rowEmp = empColIdx !== -1 ? String(values[u][empColIdx]).trim().toLowerCase() : '';
+      if ((targetUname && rowUname === targetUname) || (targetEmp && rowEmp === targetEmp)) {
+        rowIndexToUpdate = u + 1;
+        break;
+      }
     }
   }
   
