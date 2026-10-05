@@ -477,9 +477,29 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
           user={selectedUser}
           departments={departmentsList}
           onClose={() => setIsModalOpen(false)}
-          onSaved={() => {
+          onSaved={async (savedUser) => {
             setIsModalOpen(false);
-            fetchUsers();
+            if (savedUser) {
+              setUsersList(prev => {
+                const targetId = String(savedUser.id || '').trim().toLowerCase();
+                const targetUname = String(savedUser.username || '').trim().toLowerCase();
+                const oldId = String(selectedUser?.id || '').trim().toLowerCase();
+                const oldUname = String(selectedUser?.username || '').trim().toLowerCase();
+                let matched = false;
+                const next = prev.map(u => {
+                  const uId = String(u.id || '').trim().toLowerCase();
+                  const uName = String(u.username || '').trim().toLowerCase();
+                  if ((targetId && uId === targetId) || (targetUname && uName === targetUname) || (oldId && uId === oldId) || (oldUname && uName === oldUname)) {
+                    matched = true;
+                    return { ...u, ...savedUser };
+                  }
+                  return u;
+                });
+                if (!matched) next.push(savedUser);
+                return next;
+              });
+            }
+            await fetchUsers();
             if (onRefresh) onRefresh();
           }}
         />
@@ -740,12 +760,12 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
         updatedAt: new Date().toISOString()
       };
 
-      await apiService.saveUser(payload);
+      const savedUser = await apiService.saveUser(payload);
       modalService.success(
         isEdit ? 'แก้ไขข้อมูลผู้ใช้สำเร็จ' : 'เพิ่มผู้ใช้ใหม่สำเร็จ',
         `บันทึกข้อมูลและลายเซ็นของ "${payload.employeeName}" เรียบร้อยแล้ว`
       );
-      onSaved();
+      if (onSaved) onSaved(savedUser || payload);
     } catch (err) {
       modalService.error('เกิดข้อผิดพลาดในการบันทึก', err.message);
     } finally {

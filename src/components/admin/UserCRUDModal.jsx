@@ -37,6 +37,7 @@ export default function UserCRUDModal({
   const [name, setName] = useState(user?.name || user?.displayName || '');
   const [employeeName, setEmployeeName] = useState(user?.employeeName || user?.name || '');
   const [username, setUsername] = useState(user?.username || '');
+  const [password, setPassword] = useState(user?.password || '');
   const [position, setPosition] = useState(user?.position || user?.title || '');
   const [selectedRoleId, setSelectedRoleId] = useState(normalizeRoleId(user?.roleId));
   const [primaryDept, setPrimaryDept] = useState(user?.primaryDepartment || user?.department || 'ALL');
@@ -133,7 +134,7 @@ export default function UserCRUDModal({
         id: user?.id || undefined,
         employeeId: user?.employeeId || `EMP-${primaryDept !== 'ALL' ? primaryDept : 'SYS'}-${Date.now().toString().slice(-3)}`,
         username: username.trim().toLowerCase(),
-        password: user?.password || '',
+        password: password || user?.password || '',
         name: name.trim(),
         employeeName: employeeName.trim() || name.trim(),
         displayName: name.trim(),
@@ -264,6 +265,22 @@ export default function UserCRUDModal({
                 placeholder="เช่น wichai.pd หรือ user@company.com"
                 disabled={isSelf}
                 className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50/50 focus:bg-white disabled:opacity-60 transition-all font-mono"
+              />
+            </div>
+
+            {/* Password Field */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
+                <Lock className="w-3.5 h-3.5 text-slate-400" />
+                <span>รหัสผ่าน / Password</span>
+                {!isEdit && <span className="text-rose-500">*</span>}
+              </label>
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder={isEdit ? "เว้นว่างไว้หากไม่ต้องการเปลี่ยนรหัสผ่าน" : "รหัสผ่านเข้าใช้งาน"}
+                className="w-full px-3.5 py-2 rounded-xl border border-slate-200 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50/50 focus:bg-white transition-all font-mono"
               />
             </div>
           </div>

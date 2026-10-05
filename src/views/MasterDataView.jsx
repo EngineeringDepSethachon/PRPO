@@ -1923,8 +1923,9 @@ function MasterDataContent({
           departments={departmentsList}
           currentRole={currentRole} 
           currentUser={currentUser}
-          onRefresh={() => {
-            if (onRefresh) onRefresh();
+          onRefresh={async () => {
+            setUsersList(storageService.getUsers() || []);
+            if (onRefresh) await onRefresh();
             setUsersList(storageService.getUsers() || []);
           }} 
         />

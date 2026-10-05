@@ -177,7 +177,7 @@ export async function onRequest(context) {
         db.prepare('SELECT * FROM storage_locations').all().catch(() => ({ results: [] })),
         db.prepare('SELECT * FROM usage_units').all().catch(() => ({ results: [] })),
         db.prepare('SELECT * FROM departments WHERE isActive = 1').all().catch(() => ({ results: [] })),
-        db.prepare('SELECT * FROM users WHERE status = "ACTIVE"').all().catch(() => ({ results: [] })),
+        db.prepare('SELECT * FROM users ORDER BY name ASC').all().catch(() => ({ results: [] })),
         db.prepare('SELECT * FROM prs ORDER BY createdAt DESC').all().catch(() => ({ results: [] })),
         db.prepare('SELECT * FROM pos ORDER BY createdAt DESC').all().catch(() => ({ results: [] })),
         db.prepare('SELECT * FROM stock_logs ORDER BY createdAt DESC LIMIT 200').all().catch(() => ({ results: [] })),
@@ -691,12 +691,115 @@ export async function onRequest(context) {
       if (!db) return jsonResponse([]);
       const subId = path.startsWith('/api/users/') ? decodeURIComponent(path.replace('/api/users/', '')) : null;
 
-      // Auto ensure signature column in D1 users table
-      await db.prepare('ALTER TABLE users ADD COLUMN signature TEXT').run().catch(() => {});
+      // Idempotently ensure users table and all columns exist in D1
+      await db.prepare(`
+        CREATE TABLE IF NOT EXISTS users (
+          id TEXT PRIMARY KEY,
+          employeeId TEXT,
+          username TEXT NOT NULL,
+          email TEXT,
+          password TEXT NOT NULL DEFAULT 'password123',
+          pin TEXT,
+          name TEXT NOT NULL DEFAULT 'User',
+          employeeName TEXT,
+          displayName TEXT,
+          position TEXT,
+          department TEXT NOT NULL DEFAULT 'PD',
+          primaryDepartment TEXT,
+          allowedDepartments TEXT,
+          roleId TEXT NOT NULL DEFAULT 'REQUESTER',
+          canonicalRole TEXT,
+          positionKey TEXT,
+          title TEXT,
+          level INTEGER DEFAULT 1,
+          status TEXT DEFAULT 'ACTIVE',
+          pictureUrl TEXT,
+          signature TEXT,
+          canCreatePR INTEGER DEFAULT 1,
+          canSubmitPR INTEGER DEFAULT 1,
+          canDeleteOwnDraft INTEGER DEFAULT 1,
+          canReview INTEGER DEFAULT 0,
+          canFinalApprove INTEGER DEFAULT 0,
+          canOnlinePurchase INTEGER DEFAULT 0,
+          canReceiveGoods INTEGER DEFAULT 0,
+          canCloseOwnPO INTEGER DEFAULT 0,
+          canManageMaster INTEGER DEFAULT 1,
+          canDeleteMaster INTEGER DEFAULT 0,
+          canViewBudget INTEGER DEFAULT 0,
+          canViewBudgetMenu INTEGER DEFAULT 0,
+          canSetBudget INTEGER DEFAULT 0,
+          canViewAllDepts INTEGER DEFAULT 0,
+          description TEXT,
+          createdAt TEXT,
+          updatedAt TEXT
+        )
+      `).run().catch(() => {});
+
+      const ensureCols = [
+        'employeeId TEXT',
+        'email TEXT',
+        'password TEXT DEFAULT "password123"',
+        'pin TEXT',
+        'name TEXT DEFAULT "User"',
+        'employeeName TEXT',
+        'displayName TEXT',
+        'position TEXT',
+        'department TEXT DEFAULT "PD"',
+        'primaryDepartment TEXT DEFAULT "PD"',
+        'allowedDepartments TEXT DEFAULT \'["PD"]\'',
+        'roleId TEXT DEFAULT "REQUESTER"',
+        'canonicalRole TEXT DEFAULT "REQUESTER"',
+        'positionKey TEXT',
+        'title TEXT',
+        'level INTEGER DEFAULT 1',
+        'status TEXT DEFAULT "ACTIVE"',
+        'pictureUrl TEXT',
+        'signature TEXT',
+        'canCreatePR INTEGER DEFAULT 1',
+        'canSubmitPR INTEGER DEFAULT 1',
+        'canDeleteOwnDraft INTEGER DEFAULT 1',
+        'canReview INTEGER DEFAULT 0',
+        'canFinalApprove INTEGER DEFAULT 0',
+        'canOnlinePurchase INTEGER DEFAULT 0',
+        'canReceiveGoods INTEGER DEFAULT 0',
+        'canCloseOwnPO INTEGER DEFAULT 0',
+        'canManageMaster INTEGER DEFAULT 1',
+        'canDeleteMaster INTEGER DEFAULT 0',
+        'canViewBudget INTEGER DEFAULT 0',
+        'canViewBudgetMenu INTEGER DEFAULT 0',
+        'canSetBudget INTEGER DEFAULT 0',
+        'canViewAllDepts INTEGER DEFAULT 0',
+        'description TEXT',
+        'createdAt TEXT',
+        'updatedAt TEXT'
+      ];
+      for (const col of ensureCols) {
+        await db.prepare(`ALTER TABLE users ADD COLUMN ${col}`).run().catch(() => {});
+      }
+
+      // Auto seed default users if D1 users table is empty
+      const userCountRes = await db.prepare('SELECT COUNT(*) as count FROM users').first().catch(() => null);
+      if (userCountRes && Number(userCountRes.count) === 0) {
+        const seedUsers = [
+          { id: 'USR-0001', employeeId: 'EMP-PD-001', username: 'wichai.pd', email: 'wichai@company.com', password: 'password123', pin: 'password123', name: 'คุณวิชัย (PD)', employeeName: 'คุณวิชัย สุขใจ', displayName: 'Wichai (PD)', position: 'เจ้าหน้าที่ฝ่ายผลิต', department: 'PD', primaryDepartment: 'PD', allowedDepartments: '["PD"]', roleId: 'REQUESTER_PD', canonicalRole: 'REQUESTER', positionKey: 'REQUESTER_PD', title: 'Requester (PD)', level: 1, status: 'ACTIVE' },
+          { id: 'USR-0002', employeeId: 'EMP-QC-001', username: 'somying.qc', email: 'somying@company.com', password: 'password123', pin: 'password123', name: 'คุณสมหญิง (QC)', employeeName: 'คุณสมหญิง รักดี', displayName: 'Somying (QC)', position: 'เจ้าหน้าที่ฝ่ายควบคุมคุณภาพ (QC)', department: 'QC', primaryDepartment: 'QC', allowedDepartments: '["QC"]', roleId: 'REQUESTER_QC', canonicalRole: 'REQUESTER', positionKey: 'REQUESTER_QC', title: 'Requester (QC)', level: 1, status: 'ACTIVE' },
+          { id: 'USR-0003', employeeId: 'EMP-MGR-001', username: 'somchai.am', email: 'somchai.am@company.com', password: 'password123', pin: 'password123', name: 'คุณสมชาย (Asst. Mgr)', employeeName: 'คุณสมชาย มุ่งมั่น', displayName: 'Somchai (Asst Mgr)', position: 'ผู้ช่วยผู้จัดการฝ่ายผลิต (Asst. Manager)', department: 'PD', primaryDepartment: 'PD', allowedDepartments: '["PD","QC"]', roleId: 'ASST_MANAGER', canonicalRole: 'REVIEWER', positionKey: 'REVIEWER', title: 'Assistant Manager', level: 2, status: 'ACTIVE' },
+          { id: 'USR-0004', employeeId: 'EMP-PUR-001', username: 'nat.on', email: 'nat.on@company.com', password: 'password123', pin: 'password123', name: 'คุณนัท (Online Purchaser)', employeeName: 'คุณนัท จัดซื้อ', displayName: 'Nat (Online)', position: 'เจ้าหน้าที่จัดซื้อออนไลน์', department: 'PUR', primaryDepartment: 'PUR', allowedDepartments: '["*"]', roleId: 'ONLINE_PURCHASER', canonicalRole: 'PURCHASER', positionKey: 'ONLINE_PURCHASER', title: 'Online Purchaser', level: 2, status: 'ACTIVE' },
+          { id: 'USR-0005', employeeId: 'EMP-MGR-002', username: 'prasert.pm', email: 'prasert.pm@company.com', password: 'password123', pin: 'password123', name: 'คุณประเสริฐ (Plant Mgr)', employeeName: 'คุณประเสริฐ ยิ่งยง', displayName: 'Prasert (Plant Mgr)', position: 'ผู้จัดการโรงงาน (Plant Manager)', department: 'MGT', primaryDepartment: 'MGT', allowedDepartments: '["*"]', roleId: 'PLANT_MANAGER', canonicalRole: 'APPROVER', positionKey: 'APPROVER', title: 'Plant Manager', level: 3, status: 'ACTIVE' },
+          { id: 'USR-0006', employeeId: 'EMP-WH-001', username: 'somkid.wh', email: 'somkid.wh@company.com', password: 'password123', pin: 'password123', name: 'คุณสมคิด (Warehouse)', employeeName: 'คุณสมคิด คลังทอง', displayName: 'Somkid (WH)', position: 'หัวหน้าแผนกคลังสินค้า', department: 'WH', primaryDepartment: 'WH', allowedDepartments: '["WH","PD","QC"]', roleId: 'WAREHOUSE', canonicalRole: 'WAREHOUSE', positionKey: 'WAREHOUSE', title: 'Warehouse Supervisor', level: 2, status: 'ACTIVE' },
+          { id: 'USR-0007', employeeId: 'EMP-ADM-001', username: 'admin', email: 'admin@company.com', password: 'password123', pin: 'password123', name: 'ผู้ดูแลระบบ (Admin)', employeeName: 'นายแอดมิน สูงสุด', displayName: 'Admin System', position: 'ผู้ดูแลระบบส่วนกลาง', department: 'ALL', primaryDepartment: 'ALL', allowedDepartments: '["*"]', roleId: 'ADMIN', canonicalRole: 'ADMIN', positionKey: 'ADMIN', title: 'System Administrator', level: 99, status: 'ACTIVE' }
+        ];
+        for (const su of seedUsers) {
+          await db.prepare(`
+            INSERT INTO users (id, employeeId, username, email, password, pin, name, employeeName, displayName, position, department, primaryDepartment, allowedDepartments, roleId, canonicalRole, positionKey, title, level, status, createdAt, updatedAt)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+          `).bind(su.id, su.employeeId, su.username, su.email, su.password, su.pin, su.name, su.employeeName, su.displayName, su.position, su.department, su.primaryDepartment, su.allowedDepartments, su.roleId, su.canonicalRole, su.positionKey, su.title, su.level, su.status).run().catch(() => {});
+        }
+      }
 
       if (method === 'GET') {
         if (subId) {
-          const user = await db.prepare('SELECT * FROM users WHERE id = ? OR username = ? LIMIT 1').bind(subId, subId).first();
+          const user = await db.prepare('SELECT * FROM users WHERE id = ? OR username = ? OR LOWER(username) = LOWER(?) LIMIT 1').bind(subId, subId, subId).first();
           if (!user) return errorResponse('User not found', 404);
           return jsonResponse(formatSafeUser(user));
         }
@@ -713,7 +816,7 @@ export async function onRequest(context) {
         const username = (u.username || '').trim();
         const email = (u.email || (username ? `${username.toLowerCase()}@company.com` : '')).trim();
         const rawPass = (u.password || '').trim();
-        const pin = u.pin || rawPass || '';
+        const pin = (u.pin || rawPass || '').trim();
         const name = (u.name || u.employeeName || '').trim();
         const empName = u.employeeName || name;
         const dispName = u.displayName || name;
@@ -757,100 +860,166 @@ export async function onRequest(context) {
         const canViewAllDepts = u.canViewAllDepts !== undefined ? (u.canViewAllDepts ? 1 : 0) : (isOnline || level >= 2 || dept === 'ALL' ? 1 : 0);
         const now = new Date().toISOString();
 
-        // 1. Find existing user by subId, id, username, or employeeId
+        // 1. Flexible lookup for existing record
         let existingUser = null;
         if (subId) {
-          existingUser = await db.prepare('SELECT * FROM users WHERE id = ? OR username = ? OR (employeeId IS NOT NULL AND employeeId != "" AND employeeId = ?) LIMIT 1').bind(subId, subId, subId).first();
+          existingUser = await db.prepare(
+            'SELECT * FROM users WHERE id = ? OR username = ? OR LOWER(username) = LOWER(?) OR (employeeId IS NOT NULL AND employeeId != "" AND employeeId = ?) LIMIT 1'
+          ).bind(subId, subId, subId, subId).first().catch(() => null);
         }
         if (!existingUser && rawId) {
-          existingUser = await db.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').bind(rawId).first();
-        }
-        if (!existingUser && username) {
-          existingUser = await db.prepare('SELECT * FROM users WHERE username = ? LIMIT 1').bind(username).first();
+          existingUser = await db.prepare(
+            'SELECT * FROM users WHERE id = ? OR username = ? OR LOWER(username) = LOWER(?) LIMIT 1'
+          ).bind(rawId, rawId, rawId).first().catch(() => null);
         }
         if (!existingUser && empId) {
-          existingUser = await db.prepare('SELECT * FROM users WHERE employeeId = ? LIMIT 1').bind(empId).first();
+          existingUser = await db.prepare(
+            'SELECT * FROM users WHERE employeeId = ? LIMIT 1'
+          ).bind(empId).first().catch(() => null);
+        }
+        if (!existingUser && username) {
+          existingUser = await db.prepare(
+            'SELECT * FROM users WHERE username = ? OR LOWER(username) = LOWER(?) LIMIT 1'
+          ).bind(username, username).first().catch(() => null);
+        }
+
+        // 2. Validate duplicate username against OTHER users
+        if (username) {
+          const excludeId = existingUser ? existingUser.id : (rawId || '___NONE___');
+          const dupUser = await db.prepare(
+            'SELECT id, username FROM users WHERE LOWER(username) = LOWER(?) AND id != ? LIMIT 1'
+          ).bind(username, excludeId).first().catch(() => null);
+          if (dupUser) {
+            return errorResponse(`Username "${username}" มีอยู่ในระบบแล้ว กรุณาใช้ชื่ออื่น`, 400);
+          }
         }
 
         if (existingUser) {
-          // 2. Perform direct UPDATE on the existing record
-          await db.prepare(`
-            UPDATE users SET
-              employeeId = CASE WHEN ? != '' THEN ? ELSE employeeId END,
-              username = CASE WHEN ? != '' THEN ? ELSE username END,
-              email = COALESCE(?, email),
-              password = CASE WHEN ? != '' THEN ? ELSE password END,
-              pin = CASE WHEN ? != '' THEN ? ELSE pin END,
-              name = ?,
-              employeeName = ?,
-              displayName = ?,
-              position = ?,
-              department = ?,
-              primaryDepartment = ?,
-              allowedDepartments = ?,
-              roleId = ?,
-              canonicalRole = ?,
-              positionKey = ?,
-              title = ?,
-              level = ?,
-              status = ?,
-              pictureUrl = ?,
-              description = ?,
-              signature = COALESCE(?, signature),
-              canCreatePR = ?,
-              canSubmitPR = ?,
-              canDeleteOwnDraft = ?,
-              canReview = ?,
-              canFinalApprove = ?,
-              canOnlinePurchase = ?,
-              canReceiveGoods = ?,
-              canCloseOwnPO = ?,
-              canManageMaster = ?,
-              canDeleteMaster = ?,
-              canViewBudget = ?,
-              canViewBudgetMenu = ?,
-              canSetBudget = ?,
-              canViewAllDepts = ?,
-              updatedAt = ?
-            WHERE id = ?
-          `).bind(
-            empId, empId,
-            username, username,
-            email || null,
-            rawPass, rawPass,
-            pin, pin,
-            name, empName, dispName,
-            position, dept, primaryDept, allowedDepts,
-            roleId, canonicalRole, posKey, title,
-            level, status, pic, desc, sig,
-            canCreatePR, canSubmitPR, canDeleteOwnDraft, canReview, canFinalApprove, canOnlinePurchase,
-            canReceiveGoods, canCloseOwnPO, canManageMaster, canDeleteMaster, canViewBudget, canViewBudgetMenu,
-            canSetBudget, canViewAllDepts, now,
-            existingUser.id
-          ).run();
+          // UPDATE
+          try {
+            await db.prepare(`
+              UPDATE users SET
+                employeeId = CASE WHEN ? != '' THEN ? ELSE employeeId END,
+                username = CASE WHEN ? != '' THEN ? ELSE username END,
+                email = CASE WHEN ? != '' THEN ? ELSE email END,
+                password = CASE WHEN ? != '' THEN ? ELSE password END,
+                pin = CASE WHEN ? != '' THEN ? ELSE pin END,
+                name = ?,
+                employeeName = ?,
+                displayName = ?,
+                position = ?,
+                department = ?,
+                primaryDepartment = ?,
+                allowedDepartments = ?,
+                roleId = ?,
+                canonicalRole = ?,
+                positionKey = ?,
+                title = ?,
+                level = ?,
+                status = ?,
+                pictureUrl = ?,
+                description = ?,
+                signature = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE signature END,
+                canCreatePR = ?,
+                canSubmitPR = ?,
+                canDeleteOwnDraft = ?,
+                canReview = ?,
+                canFinalApprove = ?,
+                canOnlinePurchase = ?,
+                canReceiveGoods = ?,
+                canCloseOwnPO = ?,
+                canManageMaster = ?,
+                canDeleteMaster = ?,
+                canViewBudget = ?,
+                canViewBudgetMenu = ?,
+                canSetBudget = ?,
+                canViewAllDepts = ?,
+                updatedAt = ?
+              WHERE id = ?
+            `).bind(
+              empId, empId,
+              username, username,
+              email, email,
+              rawPass, rawPass,
+              pin, pin,
+              name, empName, dispName,
+              position, dept, primaryDept, allowedDepts,
+              roleId, canonicalRole, posKey, title,
+              level, status, pic, desc,
+              sig, sig, sig,
+              canCreatePR, canSubmitPR, canDeleteOwnDraft, canReview, canFinalApprove, canOnlinePurchase,
+              canReceiveGoods, canCloseOwnPO, canManageMaster, canDeleteMaster, canViewBudget, canViewBudgetMenu,
+              canSetBudget, canViewAllDepts, now,
+              existingUser.id
+            ).run();
+          } catch (fullUpdateErr) {
+            console.error('[users API] Full update failed, attempting core column fallback:', fullUpdateErr);
+            await db.prepare(`
+              UPDATE users SET
+                username = CASE WHEN ? != '' THEN ? ELSE username END,
+                password = CASE WHEN ? != '' THEN ? ELSE password END,
+                pin = CASE WHEN ? != '' THEN ? ELSE pin END,
+                name = ?,
+                employeeName = ?,
+                position = ?,
+                department = ?,
+                primaryDepartment = ?,
+                allowedDepartments = ?,
+                roleId = ?,
+                level = ?,
+                status = ?,
+                signature = CASE WHEN ? IS NOT NULL AND ? != '' THEN ? ELSE signature END,
+                updatedAt = ?
+              WHERE id = ?
+            `).bind(
+              username, username,
+              rawPass, rawPass,
+              pin, pin,
+              name, empName,
+              position, dept, primaryDept, allowedDepts,
+              roleId, level, status,
+              sig, sig, sig,
+              now,
+              existingUser.id
+            ).run();
+          }
 
           const updatedUserRow = await db.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').bind(existingUser.id).first();
           return jsonResponse(formatSafeUser(updatedUserRow || { ...existingUser, ...u }));
         } else {
-          // 3. New user INSERT
+          // INSERT
           const newId = rawId || `USR-${Date.now()}`;
-          await db.prepare(`
-            INSERT INTO users (
-              id, employeeId, username, email, password, pin, name, employeeName, displayName,
-              position, department, primaryDepartment, allowedDepartments, roleId, canonicalRole,
-              positionKey, title, level, status, pictureUrl, description, signature,
+          const defaultPass = rawPass || 'password123';
+          try {
+            await db.prepare(`
+              INSERT INTO users (
+                id, employeeId, username, email, password, pin, name, employeeName, displayName,
+                position, department, primaryDepartment, allowedDepartments, roleId, canonicalRole,
+                positionKey, title, level, status, pictureUrl, description, signature,
+                canCreatePR, canSubmitPR, canDeleteOwnDraft, canReview, canFinalApprove, canOnlinePurchase,
+                canReceiveGoods, canCloseOwnPO, canManageMaster, canDeleteMaster, canViewBudget, canViewBudgetMenu,
+                canSetBudget, canViewAllDepts, createdAt, updatedAt
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+              newId, empId || `EMP-${Date.now().toString().slice(-4)}`, username, email, defaultPass, pin || defaultPass, name, empName, dispName,
+              position, dept, primaryDept, allowedDepts, roleId, canonicalRole,
+              posKey, title, level, status, pic, desc, sig,
               canCreatePR, canSubmitPR, canDeleteOwnDraft, canReview, canFinalApprove, canOnlinePurchase,
               canReceiveGoods, canCloseOwnPO, canManageMaster, canDeleteMaster, canViewBudget, canViewBudgetMenu,
-              canSetBudget, canViewAllDepts, updatedAt
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-          `).bind(
-            newId, empId, username, email, rawPass, pin, name, empName, dispName,
-            position, dept, primaryDept, allowedDepts, roleId, canonicalRole,
-            posKey, title, level, status, pic, desc, sig,
-            canCreatePR, canSubmitPR, canDeleteOwnDraft, canReview, canFinalApprove, canOnlinePurchase,
-            canReceiveGoods, canCloseOwnPO, canManageMaster, canDeleteMaster, canViewBudget, canViewBudgetMenu,
-            canSetBudget, canViewAllDepts, now
-          ).run();
+              canSetBudget, canViewAllDepts, now, now
+            ).run();
+          } catch (fullInsertErr) {
+            console.error('[users API] Full insert failed, attempting core column fallback:', fullInsertErr);
+            await db.prepare(`
+              INSERT INTO users (
+                id, employeeId, username, password, pin, name, employeeName,
+                position, department, primaryDepartment, allowedDepartments, roleId, level, status, signature, updatedAt
+              ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            `).bind(
+              newId, empId || `EMP-${Date.now().toString().slice(-4)}`, username, defaultPass, pin || defaultPass, name, empName,
+              position, dept, primaryDept, allowedDepts, roleId, level, status, sig, now
+            ).run();
+          }
 
           const savedUserRow = await db.prepare('SELECT * FROM users WHERE id = ? LIMIT 1').bind(newId).first();
           return jsonResponse(formatSafeUser(savedUserRow || u));
@@ -858,7 +1027,7 @@ export async function onRequest(context) {
       }
 
       if (method === 'DELETE' && subId) {
-        await db.prepare('UPDATE users SET status = "INACTIVE" WHERE id = ? OR username = ?').bind(subId, subId).run();
+        await db.prepare('UPDATE users SET status = "INACTIVE", updatedAt = CURRENT_TIMESTAMP WHERE id = ? OR username = ?').bind(subId, subId).run();
         return jsonResponse({ success: true, id: subId });
       }
     }

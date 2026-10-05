@@ -2032,13 +2032,17 @@ export const apiService = {
   },
 
   async saveUser(user, actor = null) {
-    const users = storageService.getUsers();
+    const users = storageService.getUsers() || [];
+    const targetUserId = user.id;
+    const targetUsername = user.username;
+    const targetEmpId = user.employeeId;
+
     const existingUser = users.find(u => 
-      (user.id && String(u.id).trim().toLowerCase() === String(user.id).trim().toLowerCase()) ||
-      (user.username && String(u.username).trim().toLowerCase() === String(user.username).trim().toLowerCase()) ||
-      (user.employeeId && String(u.employeeId).trim().toLowerCase() === String(user.employeeId).trim().toLowerCase())
+      (targetUserId && String(u.id).trim().toLowerCase() === String(targetUserId).trim().toLowerCase()) ||
+      (targetUsername && String(u.username).trim().toLowerCase() === String(targetUsername).trim().toLowerCase()) ||
+      (targetEmpId && String(u.employeeId).trim().toLowerCase() === String(targetEmpId).trim().toLowerCase())
     );
-    const isUpdate = Boolean(user.id || existingUser);
+    const isUpdate = Boolean(targetUserId || existingUser);
 
     // Check duplicate username if username is provided
     if (user.username) {
@@ -2046,8 +2050,9 @@ export const apiService = {
         const uName = String(u.username || '').trim().toLowerCase();
         const targetName = String(user.username || '').trim().toLowerCase();
         if (uName !== targetName) return false;
-        if (user.id && String(u.id).trim().toLowerCase() === String(user.id).trim().toLowerCase()) return false;
         if (existingUser && u === existingUser) return false;
+        if (targetUserId && u.id && String(u.id).trim().toLowerCase() === String(targetUserId).trim().toLowerCase()) return false;
+        if (existingUser?.id && u.id && String(u.id).trim().toLowerCase() === String(existingUser.id).trim().toLowerCase()) return false;
         return true;
       });
       if (isDuplicate) {
@@ -2105,8 +2110,8 @@ export const apiService = {
     }
 
     try {
-      const targetUserId = user.id || (existingUser ? existingUser.id : user.username);
-      const url = isUpdate && targetUserId ? `/api/users/${encodeURIComponent(targetUserId)}` : '/api/users';
+      const targetParam = userPayload.id || (existingUser ? existingUser.id : userPayload.username);
+      const url = isUpdate && targetParam ? `/api/users/${encodeURIComponent(targetParam)}` : '/api/users';
       const method = isUpdate ? 'PUT' : 'POST';
       const res = await fetch(url, {
         method,
@@ -2118,16 +2123,48 @@ export const apiService = {
         const saved = (resData && (resData.id || resData.username || resData.employeeId) && resData.name)
           ? { ...userPayload, ...resData }
           : userPayload;
-        const targetId = String(saved.id || user.id || '').trim().toLowerCase();
-        const targetUname = String(saved.username || user.username || '').trim().toLowerCase();
-        const updatedList = isUpdate 
-          ? users.map(u => {
-              const uId = String(u.id || '').trim().toLowerCase();
-              const uName = String(u.username || '').trim().toLowerCase();
-              return ((targetId && uId === targetId) || (targetUname && uName === targetUname)) ? saved : u;
-            }) 
-          : [...users, saved];
+
+        if (userPayload.password) {
+          saved.password = userPayload.password;
+        }
+
+        const oldId = String(existingUser?.id || user.id || '').trim().toLowerCase();
+        const oldUname = String(existingUser?.username || '').trim().toLowerCase();
+        const newId = String(saved.id || user.id || '').trim().toLowerCase();
+        const newUname = String(saved.username || user.username || '').trim().toLowerCase();
+
+        let matched = false;
+        const updatedList = users.map(u => {
+          const uId = String(u.id || '').trim().toLowerCase();
+          const uName = String(u.username || '').trim().toLowerCase();
+          const isMatch = (oldId && uId === oldId) ||
+                          (oldUname && uName === oldUname) ||
+                          (newId && uId === newId) ||
+                          (newUname && uName === newUname);
+          if (isMatch) {
+            matched = true;
+            return { ...u, ...saved };
+          }
+          return u;
+        });
+
+        if (!matched) {
+          updatedList.push(saved);
+        }
         storageService.saveUsers(updatedList);
+
+        // Update active auth session if it's the current user
+        try {
+          const sessionRaw = localStorage.getItem('prpo_auth_session');
+          if (sessionRaw) {
+            const sess = JSON.parse(sessionRaw);
+            const sId = String(sess.id || '').trim().toLowerCase();
+            const sUname = String(sess.username || '').trim().toLowerCase();
+            if ((oldId && sId === oldId) || (oldUname && sUname === oldUname) || (newId && sId === newId) || (newUname && sUname === newUname)) {
+              localStorage.setItem('prpo_auth_session', JSON.stringify({ ...sess, ...saved }));
+            }
+          }
+        } catch {}
 
         auditService.logAction({
           action: isUpdate ? 'USER_UPDATED' : 'USER_CREATED',
@@ -2139,23 +2176,28 @@ export const apiService = {
         });
 
         return saved;
+      } else {
+        const errJson = await res.json().catch(() => ({}));
+        throw new Error(errJson.error || `เซิร์ฟเวอร์ตอบกลับด้วยรหัส ${res.status}`);
       }
     } catch (e) {
-      console.warn('[apiService] saveUser API fallback:', e.message);
+      // If offline/local dev or specific fetch error where backend is unreachable, fallback to storageService
+      if (e.message && (e.message.includes('Failed to fetch') || e.message.includes('NetworkError'))) {
+        console.warn('[apiService] saveUser offline fallback to storageService:', e.message);
+        const saved = storageService.saveUser(userPayload);
+        auditService.logAction({
+          action: isUpdate ? 'USER_UPDATED' : 'USER_CREATED',
+          actor: actor || 'Admin',
+          department: saved.primaryDepartment || 'ALL',
+          docNo: saved.id,
+          docType: 'USER',
+          details: `${isUpdate ? 'แก้ไขข้อมูลผู้ใช้' : 'เพิ่มผู้ใช้ใหม่'} "${saved.name}" (${saved.position || saved.title || saved.roleId}) แผนก: ${saved.primaryDepartment} [${(saved.allowedDepartments || []).join(', ')}]`
+        });
+        return saved;
+      }
+      console.error('[apiService] saveUser API error:', e.message);
+      throw e;
     }
-
-    const saved = storageService.saveUser(userPayload);
-
-    auditService.logAction({
-      action: isUpdate ? 'USER_UPDATED' : 'USER_CREATED',
-      actor: actor || 'Admin',
-      department: saved.primaryDepartment || 'ALL',
-      docNo: saved.id,
-      docType: 'USER',
-      details: `${isUpdate ? 'แก้ไขข้อมูลผู้ใช้' : 'เพิ่มผู้ใช้ใหม่'} "${saved.name}" (${saved.position || saved.title || saved.roleId}) แผนก: ${saved.primaryDepartment} [${(saved.allowedDepartments || []).join(', ')}]`
-    });
-
-    return saved;
   },
 
   async deleteUser(userId, actor = null) {
