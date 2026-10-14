@@ -73,18 +73,19 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
     } else if (typeof selectedPR?.items === 'string') {
       try { const parsed = JSON.parse(selectedPR.items); if (Array.isArray(parsed)) parsedItems = parsed; } catch(e) {}
     }
-    const itemImageKeys = new Set(
-      parsedItems
-        .flatMap(it => {
-          let itImages = Array.isArray(it.images) ? it.images : [];
-          if (typeof it.images === 'string') { try { const p = JSON.parse(it.images); if(Array.isArray(p)) itImages = p; } catch(e){} }
-          let itAtt = Array.isArray(it.attachments) ? it.attachments : [];
-          if (typeof it.attachments === 'string') { try { const p = JSON.parse(it.attachments); if(Array.isArray(p)) itAtt = p; } catch(e){} }
-          return [...itImages, ...itAtt];
-        })
-        .map(img => (img?.name || img?.fileName || img?.url || img?.fileId || '').trim().toLowerCase())
-        .filter(Boolean)
-    );
+    const itemImageList = parsedItems.flatMap(it => {
+      let itImages = Array.isArray(it.images) ? it.images : [];
+      if (typeof it.images === 'string') { try { const p = JSON.parse(it.images); if(Array.isArray(p)) itImages = p; } catch(e){} }
+      let itAtt = Array.isArray(it.attachments) ? it.attachments : [];
+      if (typeof it.attachments === 'string') { try { const p = JSON.parse(it.attachments); if(Array.isArray(p)) itAtt = p; } catch(e){} }
+      return [...itImages, ...itAtt];
+    });
+    // a PR-level attachment is "the same file" as an item picture when it has the same stored file (fileId / url) ;
+    // the file name alone is used only for legacy entries without any id (a second upload with the same name is a different file)
+    const idKeyOf = (f) => String(f?.fileId || f?.url || f?.viewUrl || '').trim().toLowerCase();
+    const nameKeyOf = (f) => String(f?.name || f?.fileName || '').trim().toLowerCase();
+    const itemImageIds = new Set(itemImageList.map(idKeyOf).filter(Boolean));
+    const itemImageNames = new Set(itemImageList.filter(img => !idKeyOf(img)).map(nameKeyOf).filter(Boolean));
 
     // 2. ดึงเฉพาะเอกสารระดับ PR
     let prAttachments = Array.isArray(selectedPR?.attachments) ? selectedPR.attachments : [];
@@ -107,8 +108,10 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
       new Map(
         rawPrAttachments
           .filter(att => {
-            const key = (att?.name || att?.fileName || att?.url || att?.fileId || '').trim().toLowerCase();
-            return key && !itemImageKeys.has(key);
+            const idKey = idKeyOf(att);
+            if (idKey) return !itemImageIds.has(idKey);
+            const nameKey = nameKeyOf(att);
+            return nameKey && !itemImageNames.has(nameKey);
           })
           .map(att => [att.fileId || att.name || att.fileName || att.url, att])
       ).values()
