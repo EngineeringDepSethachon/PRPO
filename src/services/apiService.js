@@ -2212,9 +2212,13 @@ export const apiService = {
   },
 
   async saveDepartment(deptPayload, actor = null) {
-    const isUpdate = Boolean(deptPayload.id);
-
-    
+    // The create form pre-fills id = `DEPT-${code}`, so "has an id" does not mean "exists".
+    // Update only when that department is already known; otherwise POST (server PUT only updates an existing row).
+    const knownDepts = storageService.getDepartments() || [];
+    const payloadCode = String(deptPayload.code || '').trim().toUpperCase();
+    const isUpdate = Boolean(deptPayload.id) && knownDepts.some(d =>
+      d && (d.id === deptPayload.id || (payloadCode && String(d.code || '').trim().toUpperCase() === payloadCode))
+    );
 
     try {
       const url = isUpdate 
