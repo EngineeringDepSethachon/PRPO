@@ -351,11 +351,14 @@ function useMemoImages(rawImages, defaultTitle) {
       const candidateUrl = pickAttachmentUrl(item, ['localUrl', 'previewUrl', 'dataUrl', 'url', 'fileUrl']);
       const isLocal = typeof candidateUrl === 'string' && (candidateUrl.startsWith('blob:') || candidateUrl.startsWith('data:image/'));
 
-      // Extract Google Drive File ID if present
+      // Extract the stored file id : an R2 file (our /api/files/:id proxy path, cloudflare mode) or a Google Drive id
       let fileId = null;
+      const proxyPath = [item && typeof item === 'object' ? item.url : null, typeof rawInput === 'string' ? rawInput : null].find(isProxyFileUrl);
       if (!isLocal) {
         if (typeof item === 'object' && item !== null && item.fileId && typeof item.fileId === 'string' && !item.fileId.includes('BASE64') && !item.fileId.includes('STORED_IN_DRIVE')) {
           fileId = item.fileId;
+        } else if (proxyPath) {
+          fileId = proxyPath.replace(/^\/api\/files\//, '').replace(/\?.*$/, '');
         } else if (typeof rawInput === 'string') {
           const match = rawInput.match(/\/d\/([a-zA-Z0-9_-]{20,})/) || rawInput.match(/[?&]id=([a-zA-Z0-9_-]{20,})/);
           if (match) fileId = match[1];
@@ -377,7 +380,7 @@ function useMemoImages(rawImages, defaultTitle) {
 
       return {
         raw: item,
-        url: isLocal ? candidateUrl : (resolvedUrl || (typeof item === 'string' ? item : (item.url || item.previewUrl || ''))),
+        url: isLocal ? candidateUrl : (proxyUrl || resolvedUrl || (typeof item === 'string' ? item : (item.url || item.previewUrl || ''))),
         driveViewUrl,
         isProxyFile: Boolean(proxyUrl),
         fileId,

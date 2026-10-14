@@ -735,7 +735,9 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
                                             altText={`Item attachment ${imgIdx + 1}`}
                                             onClick={() => setSelectedPreviewImage({
                                               url: src,
+                                              // keep fileId / mimeType etc. : the lightbox needs them to read an R2 file through the proxy (cloudflare mode)
                                               images: photos.map((p, pIdx) => ({
+                                                ...(typeof p === 'object' && p ? p : {}),
                                                 url: typeof p === 'string' ? p : (p.url || p.previewUrl || p.dataUrl || p.directUrl || p.fileUrl || ''),
                                                 name: (typeof p === 'object' && p.name) ? p.name : `${item.name} (${pIdx + 1})`
                                               })),
