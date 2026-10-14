@@ -104,6 +104,8 @@ CREATE TABLE products (
     createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
     updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
 );
+-- NOTE: remark / remarkUpdatedAt / remarkUpdatedBy (and avgCost, leadTimeDays ...) are added by migrations/0017 (and 0004, 0006) ALTER TABLE on top of this
+-- baseline, so they are NOT repeated here (a duplicate column would make the ALTER fail).
 
 -- 6. Vendors / Suppliers Table
 DROP TABLE IF EXISTS vendors;

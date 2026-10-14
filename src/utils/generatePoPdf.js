@@ -662,13 +662,15 @@ export async function generatePoPdf(po) {
   }
 
   // Find users for 4 signer roles
-  const requesterUser = users.find(u => 
-    u.name === po?.requestedBy || 
-    u.displayName === po?.requestedBy || 
-    u.employeeName === po?.requestedBy ||
-    (po?.requestedBy && (po.requestedBy.includes(u.name) || po.requestedBy.includes(u.employeeName || ''))) ||
-    u.roleId === 'REQUESTER_PD'
-  ) || users.find(u => u.roleId?.includes('REQUESTER')) || users[0];
+  // ผู้ขอซื้อ = the real requester of the linked PR (decision 2026-10-14) : matched by id first, then by exact name ; never a
+  // "first user with the requester role" and never users[0] (that printed the admin's signature on other people's POs)
+  const requesterIdRef = String(prData?.requesterId || po?.requesterId || '').trim();
+  const requesterNameRefs = [prData?.requesterName, prData?.requestedBy, po?.requesterName, po?.requestedBy]
+    .map(v => String(v || '').trim()).filter(Boolean);
+  const sameName = (u, ref) => [u.name, u.employeeName, u.displayName, u.username].some(n => n && String(n).trim() === ref);
+  const requesterUser = (requesterIdRef && users.find(u => String(u.id || '') === requesterIdRef))
+    || users.find(u => requesterNameRefs.some(ref => sameName(u, ref)))
+    || null;
 
   const reviewerUser = users.find(u => 
     u.name === po?.reviewedBy || 
@@ -806,8 +808,8 @@ export async function generatePoPdf(po) {
 
   const stamps = [
     { 
-      role: 'ผู้ขอซื้อ', 
-      name: requesterUser?.employeeName || requesterUser?.name || po?.requestedBy || prData?.requestedBy || 'คุณวิชัย สุขใจ', 
+      role: 'ผู้ขอซื้อ',
+      name: requesterUser?.employeeName || requesterUser?.name || prData?.requesterName || po?.requestedBy || prData?.requestedBy || '( ............................................................ )',
       time: formatDocDateTime(requesterDate), 
       sigImg: reqSigImg,
       isSigned: true

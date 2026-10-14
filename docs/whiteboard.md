@@ -10,6 +10,8 @@
 
 ## ✅ ตัดสินใจแล้ว
 
+- [2026-10-14] **ผู้ใช้ตัดสิน (ผ่าน Claude):** (1) TC-001 ลายเซ็น "ผู้ขอซื้อ" ใน PDF PO ให้ใช้ลายเซ็นของ**ผู้ขอซื้อตัวจริงของ PR นั้น** (pr.requesterId/requesterName) ไม่ใช่เลือกตาม role/users[0] ; ถ้าผู้ขอซื้อยังไม่มีลายเซ็น ให้เว้นช่องว่างพร้อมชื่อ ไม่ fallback เป็นคนอื่น (2) ช่องโหว่กลางของกล้า: การเปลี่ยน PO ที่ค้างเคลมเป็น COMPLETED/CLOSED (และ short-close S4) ให้**จำกัดฝั่ง server** เหลือ Requester เจ้าของ PO/PR, Approver (level>=3) และ Admin เท่านั้น (`rbac.js canTransitionPO`) — Neo แตกงานให้ malee → QA → kla (แก้บั๊ก/ปิดช่องโหว่ ไม่ต้อง consult) ; deploy รอบล่าสุด 53b4af21 + migration 0017 แล้ว (commit eeb0902)
+
 - [2026-10-14] M9 ปิดครบ (ผ่าน QA+kla, npm test 2225/2225, build ผ่าน): TC-005 แจ้งเตือนจาก server (serverScoped) ไม่กรองซ้ำที่ client, badge = งานค้าง ตาม 1.0.1 (ผู้ใช้เลือก A), badge กับ To-Do ใช้ src/utils/claimState.js ร่วม ; TC-002 AttachmentViewerModal รู้จัก R2 (/api/files) ไม่ตีความ uuid เป็น Drive ; /api/products/batch ไม่เขียน currentStock แถวเดิม + ไม่ปลุกแถวที่ลบ ; ยอดตั้งต้นสินค้าใหม่ตรวจ ≥0 ≤1e7 + audit PRODUCT_CREATE + trim code ; ค้นแถวสินค้า ORDER BY (id=?) DESC ; isDriveUrl/getDriveFileViewUrl ตรวจ hostname ; ก่อน deploy apply ถึง 0017
 
 - [2026-10-14] TC-003/006/009 ปิด (ผ่าน QA, npm test 2145/2145): ปุ่ม 'จัดการเคสปัญหา' เปิดสำหรับ PARTIALLY_RECEIVED_IN_CLAIM/PENDING_CLAIM (isSelfClaimStatus) ; To-Do เคลมจัดซื้อเอง = Requester (L1) + Admin (Neo ตัดสินตามใบบั๊ก ; Reviewer ยังกดปุ่มได้ตาม server เดิม) ; resolveClaim ล้าง flag ค้าง (hasUnresolvedClaim/isInClaim/hasDispute) ; ROUND_2 = งาน Requester ; Hub สถานะปิดชนะ flag ค้าง (ยกเว้น storeClaims ยังไม่ resolve) ; client เท่านั้น
