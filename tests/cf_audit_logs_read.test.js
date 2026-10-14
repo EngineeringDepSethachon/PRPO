@@ -173,7 +173,7 @@ describe.skipIf(!DatabaseSync)('GET /api/audit-logs (onRequest + migrated sqlite
       { entityType: 'Po', docNo: 'PO-1', action: 'x' },
       { module: 'pr', action: 'x' },
       { docType: 'VENDOR', action: 'approve' },
-      { action: 'GOODS_RECEIVED_FULL' }, { action: ' po_settled ' }, { action: 'PASSWORD_CHANGE' }, { action: 'budget_adjust' }, { action: 'FILE_UPLOAD_ROLLBACK' }, { action: 'CANCEL' }
+      { action: 'GOODS_RECEIVED_FULL' }, { action: ' po_settled ' }, { action: 'PASSWORD_CHANGE' }, { action: 'budget_adjust' }, { action: 'FILE_UPLOAD_ROLLBACK' }, { action: 'CANCEL' }, { action: 'PR_COMPLETED_BY_PO' }, { action: ' pr_completed_by_po ' }
     ];
     for (const b of bad) expect((await call('L1', 'POST', '/api/audit-logs', b)).status, JSON.stringify(b)).toBe(400);
     expect((await call('L1', 'POST', '/api/audit-logs', [{ action: 'OK1' }, { docType: 'pr', action: 'OK2' }])).status).toBe(400); // one bad entry refuses the batch

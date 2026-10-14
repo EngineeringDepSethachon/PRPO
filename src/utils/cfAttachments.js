@@ -1,7 +1,7 @@
 /**
  * Cloudflare mode : files picked in FileUploader (PDF / big files) are uploaded to Google Drive through /api/upload
  * when the document is saved, and only {fileId, url, name, mimeType, size} is stored in the PR (never a full-file data URL).
- * Small compressed images (<= ~150 KB data URL) stay inline exactly as before. Other modes : returned untouched.
+ * Images too (S6) : the compressed data URL is uploaded and replaced by the file reference. Other modes : returned untouched.
  */
 import { useEffect, useState } from 'react';
 import { isCloudflareMode, backendFetch, getAuthToken, SESSION_INVALID_EVENT, SESSION_GONE_EVENT } from '../config/backendMode.js';
@@ -13,13 +13,18 @@ export const INLINE_IMAGE_MAX_CHARS = 250000; // > compressed 150 KB image (~205
 
 const isBlobLike = (v) => typeof Blob !== 'undefined' && v instanceof Blob;
 
-const needsDrive = (f) => {
-  if (!f || !isBlobLike(f.file) || f.fileId) return false;
-  const isImage = String(f.type || f.file.type || '').startsWith('image/');
-  const inline = typeof f.dataUrl === 'string' ? f.dataUrl : (typeof f.url === 'string' ? f.url : '');
-  if (isImage && inline.startsWith('data:image/') && inline.length <= INLINE_IMAGE_MAX_CHARS) return false;
-  return true;
-};
+// S6 (docs/requirements-file-storage.md) : in cloudflare mode every picked file, images included, goes to the file store (R2) ; no new data:image in a document
+const IMG_DATA_RE = /^data:(image\/(?:png|jpe?g|webp|gif));base64,([A-Za-z0-9+/=\s]+)$/i;
+const needsDrive = (f) => !!f && isBlobLike(f.file) && !f.fileId;
+
+/** { base64Data, mimeType } of the (compressed) inline image of an uploader item, or null (not an image / no usable data URL -> upload the File). */
+function imageDataOf(f) {
+  for (const v of [f && f.url, f && f.dataUrl, f && f.previewUrl]) {
+    const m = typeof v === 'string' ? v.match(IMG_DATA_RE) : null;
+    if (m) return { base64Data: m[2].replace(/\s/g, ''), mimeType: m[1].toLowerCase(), src: v };
+  }
+  return null;
+}
 
 /** Without a File : a lingering blob: URL is meaningless to the server, so drop it from the url fields. */
 const dropBlobs = (f) => {
@@ -192,6 +197,53 @@ export async function openProxiedFile(att, { download = false } = {}) {
 }
 
 /**
+ * Cloudflare mode : per-line product images ({url|previewUrl: data:image/...}, no File) are uploaded to the file store and replaced by
+ * {fileId, url: /api/files/:id}. images and attachments of a line hold the same pictures, so each one is uploaded once.
+ * Images that already have a fileId / a non-data URL (old PRs, uploaded earlier) are untouched ; unsupported data URLs (svg ...) are left as is.
+ * Other modes : the same items array is returned.
+ */
+export async function uploadItemImagesForCloudflare(items, { category = 'PR', docRef = '', department = '', docType = 'PR_ITEM_IMAGE' } = {}) {
+  if (!isCloudflareMode() || !Array.isArray(items)) return items;
+  const done = new Map(); // data URL -> uploaded reference (same picture in images + attachments / twice in the form)
+  const one = async (img) => {
+    if (!img || typeof img !== 'object' || img.fileId) return img;
+    const parsed = imageDataOf(img);
+    if (!parsed) return img;
+    const key = parsed.src || ''; // the exact data URL that is uploaded (url / dataUrl / previewUrl) ; empty -> no dedupe
+    if (key && done.has(key)) return done.get(key);
+    const res = await uploadFileToDrive({
+      base64Data: parsed.base64Data, mimeType: parsed.mimeType, fileName: img.name || img.fileName || 'image.jpg',
+      category, poNumber: docRef, docNo: docRef, docType, department
+    });
+    const ref = {
+      name: res.fileName || img.name || '',
+      fileId: res.fileId,
+      mimeType: res.mimeType || parsed.mimeType,
+      size: res.fileSize || img.size || 0,
+      url: res.fileUrl,
+      previewUrl: res.previewUrl || res.fileUrl,
+      driveUrl: '',
+      lh3Url: res.lh3Url || ''
+    };
+    if (key) done.set(key, ref);
+    return ref;
+  };
+  const out = [];
+  for (const item of items) {
+    if (!item || typeof item !== 'object') { out.push(item); continue; }
+    const next = { ...item };
+    for (const k of ['images', 'attachments']) {
+      if (!Array.isArray(item[k])) continue;
+      const list = [];
+      for (const img of item[k]) list.push(await one(img));
+      next[k] = list;
+    }
+    out.push(next);
+  }
+  return out;
+}
+
+/**
  * @param {Array} files FileUploader items ({file, name, type, size, url, previewUrl, dataUrl, ...})
  * @param {{category?: string, docRef?: string, department?: string, docType?: string}} opts
  * @returns {Promise<Array>} items where oversized / non-image files were replaced by Drive references
@@ -201,8 +253,10 @@ export async function uploadAttachmentsForCloudflare(files, { category = 'PR', d
   const out = [];
   for (const f of files) {
     if (!needsDrive(f)) { out.push(dropBlobs(f)); continue; }
+    // an image already compressed by the form (data URL) is uploaded from that data (small) ; otherwise the picked File itself
+    const img = imageDataOf(f);
     const res = await uploadFileToDrive({
-      file: f.file,
+      ...(img ? { base64Data: img.base64Data, mimeType: img.mimeType, fileName: f.name || f.fileName || 'image.jpg' } : { file: f.file }),
       category,
       poNumber: docRef,
       docNo: docRef,

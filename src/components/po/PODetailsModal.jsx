@@ -356,7 +356,8 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
             });
           }
           const prTarget = selectedPO.prNumber || selectedPO.prNo || selectedPO.prId;
-          if (prTarget && context?.updatePR) {
+          // Cloudflare : POST /receive already completed the PR in its own batch (server cascade) - a second PUT from here would only race it
+          if (prTarget && context?.updatePR && !isCloudflareMode()) {
             context.updatePR(prTarget, { status: 'completed' });
           }
         }

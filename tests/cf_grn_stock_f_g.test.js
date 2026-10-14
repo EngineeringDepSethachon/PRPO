@@ -47,6 +47,7 @@ d('GRN stock (G) and PO amounts / status (F)', () => {
   const prod = (id = 'P1') => ({ ...sdb.prepare('SELECT * FROM products WHERE id = ?').get(id) });
   const logs = (id = 'P1') => sdb.prepare("SELECT * FROM stock_logs WHERE productId = ? AND type = 'IN' ORDER BY rowid").all(id).map((r) => ({ ...r }));
   const po = () => ({ ...sdb.prepare('SELECT * FROM pos WHERE id = ?').get('PO-G1') });
+  const all = () => sdb.prepare('SELECT * FROM stock_logs ORDER BY rowid').all().map((r) => ({ ...r }));
   const LINE = { productId: 'P1', code: 'C1', name: 'Item', qty: 5, purchaseQty: 5, price: 100 };
   const seed = ({ stock = 10, avg = 0, std = 0, conv = 1, items, status = 'ORDERED' } = {}) => {
     sdb.prepare("INSERT INTO products (id, code, name, category, department, purchaseUnit, usageUnit, conversionRate, currentStock, avgCost, standardPrice, isDeleted) VALUES ('P1','C1','Item','PD','PD','box','pcs',?,?,?,?,0)").run(conv, stock, avg, std);
@@ -141,10 +142,148 @@ d('GRN stock (G) and PO amounts / status (F)', () => {
 
   it('G4 defective goods are not stocked (only goodQty)', async () => {
     seed();
-    await saveGrn([GR1], 3);
+    await saveGrn([GR1], 3, { ...LINE, damagedQty: 2 });
     await call('POST', '/api/pos/PO-G1/receive', { stockOnly: true, grNumber: GR1, receivingItems: [{ productId: 'P1', goodQty: 3, defectiveQty: 2 }] });
     expect(prod().currentStock).toBe(13);
-    expect(logs()[0].quantity).toBe(3);
+    expect(logs().find((x) => x.type === 'IN').quantity).toBe(3);
+  });
+
+  it('S8 stock log rows carry grnNumber (= GRN) ; defective goods add an IN_NG row (qty, no stock), once per GRN, bound by the damaged qty of the saved line', async () => {
+    seed();
+    await saveGrn([GR1], 3, { ...LINE, damagedQty: 2 });
+    const body = { stockOnly: true, grNumber: GR1, receivingItems: [{ productId: 'P1', goodQty: 3, defectiveQty: 2, defectReason: 'แตก' }] };
+    const r = await call('POST', '/api/pos/PO-G1/receive', body);
+    expect(r.status).toBe(200);
+    expect(r.json.stockLogs).toHaveLength(2);
+    const l = all();
+    const inRow = l.find((x) => x.type === 'IN');
+    const ng = l.find((x) => x.type === 'IN_NG');
+    expect(inRow).toMatchObject({ grnNumber: GR1, docNo: GR1, quantity: 3, balance: 13 });
+    expect(ng).toMatchObject({ grnNumber: GR1, docNo: GR1, docType: 'GRN', quantity: 2, balance: 13, poNo: 'PO-PD-2026-001' });
+    expect(prod().currentStock).toBe(13);
+    // retry : nothing again
+    expect((await call('POST', '/api/pos/PO-G1/receive', body)).status).toBe(200);
+    expect(all()).toHaveLength(2);
+    expect(prod().currentStock).toBe(13);
+    // more defective than the PO line holds : refused, nothing written
+    await saveGrn([GR1, GR2], 4, { ...LINE, damagedQty: 2 });
+    const over = await call('POST', '/api/pos/PO-G1/receive', { stockOnly: true, grNumber: GR2, receivingItems: [{ productId: 'P1', goodQty: 1, defectiveQty: 2 }] });
+    expect(over.status).toBe(409); // 5 ordered - 4 good = 1 not yet received good : 2 defective is too many
+    expect(all()).toHaveLength(2);
+    expect(prod().currentStock).toBe(13);
+  });
+
+  it('S8c an old GRN row with empty grnNumber is shown with docNo as grnNumber (stored row unchanged)', async () => {
+    seed();
+    sdb.prepare("INSERT INTO stock_logs (id, productId, type, docType, docNo, quantity, balance, department) VALUES ('OLD1','P1','IN','GRN',?,1,11,'PD')").run(GR1);
+    const r = await call('GET', '/api/stock-logs');
+    expect(r.json.find((x) => x.id === 'OLD1').grnNumber).toBe(GR1);
+    expect(all().find((x) => x.id === 'OLD1').grnNumber).toBeNull();
+  });
+
+  it('S8d stockOnly receipt that leaves the PO open : ONE GOODS_RECEIVED_PARTIAL audit + PO_CLAIM to Purchaser and Requester of the PO department ; a retry adds nothing', async () => {
+    seed();
+    await saveGrn([GR1], 2, LINE, { status: 'PARTIAL' });
+    const audits = () => sdb.prepare("SELECT * FROM audit_logs WHERE action LIKE 'GOODS_RECEIVED%'").all().map((r) => ({ ...r }));
+    const ntf = () => sdb.prepare("SELECT * FROM notifications WHERE type = 'PO_CLAIM' ORDER BY targetRole").all().map((r) => ({ ...r }));
+    expect((await stockReceive(GR1, 2)).status).toBe(200);
+    expect(audits()).toHaveLength(1);
+    expect(audits()[0]).toMatchObject({ action: 'GOODS_RECEIVED_PARTIAL', entityType: 'po', entityId: 'PO-G1', performedBy: 'U1' });
+    expect(JSON.parse(audits()[0].details).comment).toBe(`ตรวจรับสินค้า เลขที่ ${GR1} บางส่วน`);
+    expect(ntf().map((n) => [n.targetRole, n.targetDepartment, n.docRef])).toEqual([['Purchaser', 'PD', 'PO-PD-2026-001'], ['Requester', 'PD', 'PO-PD-2026-001']]);
+    expect((await stockReceive(GR1, 2)).status).toBe(200);
+    expect(audits()).toHaveLength(1);
+    expect(ntf()).toHaveLength(2);
+    // next round = its own GRN -> its own audit
+    await saveGrn([GR1, GR2], 3, LINE, { status: 'PARTIAL' });
+    expect((await stockReceive(GR2, 1)).status).toBe(200);
+    expect(audits()).toHaveLength(2);
+  });
+
+  it('S8e stockOnly receipt that finishes the PO (COMPLETED) writes no audit and no notification ; a refused receipt writes none either', async () => {
+    seed();
+    await saveGrn([GR1], 5, LINE, { status: 'COMPLETED' });
+    expect((await stockReceive(GR1, 5)).status).toBe(200);
+    expect(sdb.prepare("SELECT COUNT(*) AS n FROM audit_logs WHERE action LIKE 'GOODS_RECEIVED%'").get().n).toBe(0);
+    expect(sdb.prepare("SELECT COUNT(*) AS n FROM notifications WHERE type IN ('PO_CLAIM','GOODS_RECEIVED')").get().n).toBe(0);
+  });
+
+  it('S8f IN_NG ceiling is the server figure (ordered - stock logged - IN_NG logged), never the damagedQty a client PUT sets ; damagedQty is a number >= 0 clamped to the ordered qty and can go down / stay (claim flow)', async () => {
+    seed();
+    // a client inflating damagedQty : clamped to the ordered qty (5), and not used as the ceiling anyway
+    const put = await saveGrn([GR1], 4, { ...LINE, damagedQty: 99 });
+    expect(put.status).toBe(200);
+    expect(JSON.parse(po().itemsJson)[0].damagedQty).toBe(5);
+    // ordered 5 - good 4 = 1 left for IN_NG : 2 is refused, 1 passes
+    const bad = await call('POST', '/api/pos/PO-G1/receive', { stockOnly: true, grNumber: GR1, receivingItems: [{ productId: 'P1', goodQty: 4, defectiveQty: 2 }] });
+    expect(bad.status).toBe(409);
+    expect(all()).toHaveLength(0);
+    expect(prod().currentStock).toBe(10);
+    const ok = await call('POST', '/api/pos/PO-G1/receive', { stockOnly: true, grNumber: GR1, receivingItems: [{ productId: 'P1', goodQty: 4, defectiveQty: 1 }] });
+    expect(ok.status).toBe(200);
+    expect(all().map((x) => x.type).sort()).toEqual(['IN', 'IN_NG']);
+    // only 1 not received good is left : 2 defective is refused, absurd figures too (1e7 : 409, above the request cap : 400)
+    await saveGrn([GR1, GR2], 4, { ...LINE, damagedQty: 1 });
+    const ngReq = (n) => call('POST', '/api/pos/PO-G1/receive', { stockOnly: true, grNumber: GR2, receivingItems: [{ productId: 'P1', goodQty: 0, defectiveQty: n }] });
+    expect((await ngReq(2)).status).toBe(409);
+    expect((await ngReq(1e7)).status).toBe(409);
+    expect((await ngReq(1e9)).status).toBe(400);
+    // negative / non numeric damagedQty : 400 ; claim REFUND / WRITE_OFF reset to 0 and REPLACEMENT keeps it : both saves pass
+    expect((await call('PUT', '/api/pos/PO-G1', { items: [{ ...LINE, receivedQty: 4, goodQty: 4, damagedQty: -1 }] })).status).toBe(400);
+    expect((await call('PUT', '/api/pos/PO-G1', { items: [{ ...LINE, receivedQty: 4, goodQty: 4, damagedQty: 'x' }] })).status).toBe(400);
+    expect((await call('PUT', '/api/pos/PO-G1', { items: [{ ...LINE, receivedQty: 4, goodQty: 4, damagedQty: 1 }] })).status).toBe(200);
+    expect(JSON.parse(po().itemsJson)[0].damagedQty).toBe(1);
+    expect((await call('PUT', '/api/pos/PO-G1', { items: [{ ...LINE, receivedQty: 4, goodQty: 4, damagedQty: 0 }] })).status).toBe(200);
+    expect(JSON.parse(po().itemsJson)[0].damagedQty).toBe(0);
+  });
+
+  it('S8i claim REPLACEMENT round 2 : ordered 10, round 1 good 8 + defective 2, round 2 good 1 + defective 1 (the replacement is defective again) -> both IN_NG rows exist', async () => {
+    const line10 = { ...LINE, qty: 10, purchaseQty: 10 };
+    seed({ items: [line10] });
+    await saveGrn([GR1], 8, { ...line10, damagedQty: 2 });
+    expect((await call('POST', '/api/pos/PO-G1/receive', { stockOnly: true, grNumber: GR1, receivingItems: [{ productId: 'P1', goodQty: 8, defectiveQty: 2 }] })).status).toBe(200);
+    await saveGrn([GR1, GR2], 9, { ...line10, damagedQty: 3 });
+    const r2 = await call('POST', '/api/pos/PO-G1/receive', { stockOnly: true, grNumber: GR2, receivingItems: [{ productId: 'P1', goodQty: 1, defectiveQty: 1 }] });
+    expect(r2.status).toBe(200);
+    expect(all().filter((x) => x.type === 'IN_NG').map((x) => [x.docNo, x.quantity])).toEqual([[GR1, 2], [GR2, 1]]);
+    expect(prod().currentStock).toBe(19);
+  });
+
+  it('S8g stockOnly with nothing to book (no line / 0 good and 0 defective) is 400 and writes no audit / notification ; a PO row without department sends no notification', async () => {
+    seed({ status: 'PARTIAL' });
+    await saveGrn([GR1], 0, LINE, { status: 'PARTIAL' });
+    expect((await call('POST', '/api/pos/PO-G1/receive', { stockOnly: true, grNumber: GR1, receivingItems: [] })).status).toBe(400);
+    expect((await call('POST', '/api/pos/PO-G1/receive', { stockOnly: true, grNumber: GR1, receivingItems: [{ productId: 'P1', goodQty: 0, defectiveQty: 0 }] })).status).toBe(400);
+    expect(sdb.prepare("SELECT COUNT(*) AS n FROM audit_logs WHERE action LIKE 'GOODS_RECEIVED%'").get().n).toBe(0);
+    expect(sdb.prepare("SELECT COUNT(*) AS n FROM notifications WHERE type = 'PO_CLAIM'").get().n).toBe(0);
+    await saveGrn([GR1], 2, LINE, { status: 'PARTIAL' });
+    sdb.prepare("UPDATE pos SET department = '' WHERE id = 'PO-G1'").run();
+    await stockReceive(GR1, 2).catch(() => null);
+    expect(sdb.prepare("SELECT COUNT(*) AS n FROM notifications").get().n).toBe(0);
+  });
+
+  it('S8h long GRN numbers that share the first 60+ characters get different notification ids ; a retry reuses them', async () => {
+    seed();
+    const longGr = (n) => `GRN-${'A'.repeat(70)}-${n}`;
+    await saveGrn([longGr(1), longGr(2)], 2, LINE, { status: 'PARTIAL' });
+    expect((await stockReceive(longGr(1), 1)).status).toBe(200);
+    expect((await stockReceive(longGr(2), 1)).status).toBe(200);
+    expect((await stockReceive(longGr(2), 1)).status).toBe(200);
+    expect(sdb.prepare("SELECT COUNT(*) AS n FROM notifications WHERE type = 'PO_CLAIM'").get().n).toBe(4);
+  });
+
+  it('S8b defective-only line (good 0) writes just the IN_NG row ; full receive (not stockOnly) writes IN + IN_NG with grnNumber, the stock gets the good qty only', async () => {
+    seed();
+    await saveGrn([GR1], 0, { ...LINE, damagedQty: 1 });
+    expect((await call('POST', '/api/pos/PO-G1/receive', { stockOnly: true, grNumber: GR1, receivingItems: [{ productId: 'P1', goodQty: 0, defectiveQty: 1 }] })).status).toBe(200);
+    expect(all().map((x) => x.type)).toEqual(['IN_NG']);
+    expect(prod().currentStock).toBe(10);
+    const full = await call('POST', '/api/pos/PO-G1/receive', { grNumber: GR2, receivingItems: [{ productId: 'P1', goodQty: 2, defectiveQty: 1 }] });
+    expect(full.status).toBe(200);
+    const l = all().filter((x) => x.docNo === GR2);
+    expect(l.map((x) => x.type).sort()).toEqual(['IN', 'IN_NG']);
+    expect(l.every((x) => x.grnNumber === GR2)).toBe(true);
+    expect(prod().currentStock).toBe(12);
   });
 
   it('G5 conversion : 2 boxes x 12 pcs at 120 per box -> +24 pcs, cost 10 per pc ; conversion cannot be re-set by a save, nor be out of range', async () => {

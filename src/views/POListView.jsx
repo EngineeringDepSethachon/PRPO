@@ -106,6 +106,7 @@ const matchesPeriod = (doc, period) => {
 };
 
 import { getCompletedPOStatus } from '../utils/poCompletedStatus';
+import { PO_STATUS } from '../config/constants';
 
 const EMPTY_ARRAY = [];
 
@@ -135,6 +136,10 @@ export const getShortPOStatus = (status) => {
       return { label: 'แจ้งเคลม', color: 'bg-rose-50 text-rose-700 border-rose-200' };
     case 'CLAIM_IN_PROGRESS':
       return { label: 'กำลังเคลม', color: 'bg-amber-50 text-amber-700 border-amber-200' };
+    // the two claim-round statuses the list showed as raw ids : the label PO_STATUS already defines (COMPLETED_WITH_REFUND keeps its earlier, tested behaviour)
+    case 'WAITING_DELIVERY_ROUND_2':
+    case 'PARTIALLY_RECEIVED_IN_CLAIM':
+      return { label: PO_STATUS[status].label, color: PO_STATUS[status].color };
     default:
       return { label: status || 'ไม่ระบุ', color: 'bg-slate-100 text-slate-700 border-slate-200' };
   }

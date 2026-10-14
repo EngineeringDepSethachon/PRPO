@@ -8,9 +8,9 @@ import {
   Sparkles, CheckCircle2, ShoppingCart, 
   Building, Receipt, Loader2, Wallet, Link as LinkIcon, FileText
 } from 'lucide-react';
-import { MEMO_THRESHOLD, DEPARTMENTS } from '../config/constants';
+import { MEMO_THRESHOLD, DEPARTMENTS, PR_STATUS } from '../config/constants';
 import FileUploader from '../components/common/FileUploader';
-import { uploadAttachmentsForCloudflare } from '../utils/cfAttachments';
+import { uploadAttachmentsForCloudflare, uploadItemImagesForCloudflare } from '../utils/cfAttachments';
 import SearchableSelect from '../components/common/SearchableSelect';
 import { modalService } from '../services/modalService';
 import { budgetService } from '../services/budgetService';
@@ -123,8 +123,16 @@ export default function PRCreateView({
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [successModalInfo, setSuccessModalInfo] = useState({ title: '', message: '' });
 
+  // เคลียร์โหมดแก้ไข/สินค้าที่เลือกไว้ "หลัง" ผู้ใช้กดตกลงเท่านั้น (กันฟอร์มด้านหลัง modal เปลี่ยนเป็นโหมดสร้างใหม่/เลขใหม่)
+  const pendingClearRef = useRef(null);
+
   const handleCloseSuccessModal = () => {
     setShowSuccessModal(false);
+    if (typeof pendingClearRef.current === 'function') {
+      const fn = pendingClearRef.current;
+      pendingClearRef.current = null;
+      try { fn(); } catch (e) { console.warn('[PRCreateView] post-submit clear error:', e); }
+    }
     // สลับหน้าไปยังหน้ารายการทันที ห้ามมี await ขวาง
     if (typeof onNavigate === 'function') {
       onNavigate('pr-list');
@@ -189,10 +197,10 @@ export default function PRCreateView({
 
   // Keep nextPRNumber in sync when department changes or existingPRs update
   useEffect(() => {
-    if (!editingPR) {
+    if (!editingPR && !showSuccessModal) {
       setNextPRNumber(getNextPRNumber(existingPRs, department));
     }
-  }, [department, existingPRs, editingPR]);
+  }, [department, existingPRs, editingPR, showSuccessModal]);
 
   // Master Vendors integration (Directive 1)
   const allMasterVendors = useMemo(() => {
@@ -832,7 +840,7 @@ export default function PRCreateView({
 
   const handleCreateSubmit = async (e, isDraft) => {
     if (e && e.preventDefault) e.preventDefault();
-    if (isSubmitting) return;
+    if (isSubmitting || showSuccessModal) return;
 
     // Auto-detect Guard: Force ONLINE if any item has a shop link
     const hasAnyLink = prItems.some(item => !!(item.productUrl || item.onlineUrl || '').trim());
@@ -1111,6 +1119,8 @@ export default function PRCreateView({
       }));
 
       // Cloudflare mode only: PDFs / big files go to Google Drive (/api/upload) and only their reference is saved ; other modes unchanged
+      // (S6) per-line product images also go to the file store in Cloudflare mode ; only fileId + /api/files/:id URL stay in itemsJson
+      const processedItemsOut = await uploadItemImagesForCloudflare(processedItems, { category: 'PR', department, docType: 'PR_ITEM_IMAGE' });
       const quotationFilesOut = await uploadAttachmentsForCloudflare(quotationFiles, { category: 'PR', department, docType: 'QUOTATION' });
       const imageFilesOut = await uploadAttachmentsForCloudflare(processedImageFiles, { category: 'PR', department, docType: 'PR_ATTACHMENT' });
 
@@ -1161,7 +1171,7 @@ export default function PRCreateView({
           ...imageFilesOut.map(f => sanitizeAttachment(f, { category: 'GENERAL', type: f.mimeType || f.type || 'image/jpeg' }))
         ],
         note,
-        items: processedItems.map(item => ({
+        items: processedItemsOut.map(item => ({
           ...item,
           // Strip any File/Blob from images/attachments in items as well
           images: Array.isArray(item.images)
@@ -1191,7 +1201,7 @@ export default function PRCreateView({
         } else {
           newPR = await apiService.updatePR(editingPR.id, prPayload, currentRole, isDraft);
         }
-        if (clearEditingPR) clearEditingPR();
+        pendingClearRef.current = () => { if (clearEditingPR) clearEditingPR(); };
       } else {
         if (handleSavePR) {
           newPR = await handleSavePR(prPayload, isDraft);
@@ -1200,7 +1210,7 @@ export default function PRCreateView({
         } else {
           newPR = await apiService.createPR(prPayload, currentRole, isDraft);
         }
-        if (clearPreselectedProduct) clearPreselectedProduct();
+        pendingClearRef.current = () => { if (clearPreselectedProduct) clearPreselectedProduct(); };
       }
 
       // Optimistic Local Update
@@ -1276,7 +1286,7 @@ export default function PRCreateView({
               </h2>
               {editingPR?.status && (
                 <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
-                  {editingPR.status}
+                  {PR_STATUS[editingPR.status]?.label || editingPR.status}
                 </span>
               )}
             </div>

@@ -50,6 +50,7 @@ export function resolvePermissions(u) {
   return {
     level,
     isAdmin: n.isAdmin,
+    roleId: n.roleId, // gating-only (STOCK_ADJUST : the screen shows the stock buttons to roleId ASST_MANAGER)
     isOnline,
     // gating-only flag (not part of resolveUserPermissions): any online-purchaser formula used by the client or login response
     onlineish: Boolean(isOnline || n.isOnlineServer || n.positionKey === 'ONLINE_PURCHASER'),
@@ -192,7 +193,9 @@ const PERMS = {
   PO_WRITE: (p) => p.isAdmin || p.canCreatePR || p.canReview || p.canFinalApprove || p.canOnlinePurchase || p.canReceiveGoods,
   RECEIVE: (p) => p.isAdmin || p.canReceiveGoods,
   SETTLE: (p) => p.isAdmin || p.onlineish || p.canOnlinePurchase || p.canCloseOwnPO,
-  STOCK_WRITE: (p) => p.isAdmin || p.canManageMaster || p.canReceiveGoods
+  STOCK_WRITE: (p) => p.isAdmin || p.canManageMaster || p.canReceiveGoods,
+  // StockCardView shows "ปรับปรุงยอด" / "รับเข้าคลัง Manual" to: not an online purchaser AND (canReceiveGoods | ASST_MANAGER (level 2) | ADMIN)
+  STOCK_ADJUST: (p) => p.isAdmin || (!p.onlineish && (p.canReceiveGoods || p.roleId === 'ASST_MANAGER'))
 };
 
 const W = ['POST', 'PUT', 'PATCH', 'DELETE'];
@@ -226,6 +229,7 @@ export const ENDPOINT_RULES = [
   { id: 'pos-delete', methods: ['DELETE'], re: /^\/api\/(pos?)(\/.*)?$/, perm: 'ADMIN' },
   { id: 'pos-write', methods: ['POST', 'PUT', 'PATCH'], re: /^\/api\/(pos?)(\/.*)?$/, perm: 'PO_WRITE' },
   { id: 'stock-read', methods: ['GET'], re: /^\/api\/(stock-logs|stock|inventory)(\/.*)?$/, perm: 'AUTH' },
+  { id: 'stock-adjust', methods: ['POST'], re: /^\/api\/stock\/(adjust|manual-in)$/, perm: 'STOCK_ADJUST' },
   { id: 'stock-write', methods: ['POST', 'PUT', 'PATCH'], re: /^\/api\/(stock-logs|stock\/issue|inventory\/issue)$/, perm: 'STOCK_WRITE' },
   { id: 'audit-read', methods: ['GET'], re: /^\/api\/audit-logs(\/.*)?$/, perm: 'ADMIN' }, // UI route admin/audit-logs = SYSTEM_ADMIN
   { id: 'audit-write', methods: ['POST'], re: /^\/api\/audit-logs$/, perm: 'AUTH' },

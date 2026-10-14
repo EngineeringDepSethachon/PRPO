@@ -59,9 +59,12 @@ export const resolveRefundedQtyAndAmount = (item, po) => {
     refunded = Number(item?.damagedQty || item?.shortageQty || Math.max(0, ordered - accumulated));
   }
 
-  const remainingToReceive = item?.remainingQty !== undefined 
-    ? Number(item.remainingQty) 
-    : Math.max(0, ordered - accumulated - refunded);
+  // a stored remainingQty can only be stale on the high side (PO creation writes the full ordered qty and a goods receipt never lowered it) : it may
+  // lower the figure (refund / write-off close a line with 0) but never raise it above what ordered - received - refunded leaves
+  const computedRemaining = Math.max(0, ordered - accumulated - refunded);
+  const remainingToReceive = item?.remainingQty !== undefined
+    ? Math.min(Math.max(0, Number(item.remainingQty) || 0), computedRemaining)
+    : computedRemaining;
 
   const itemUnitPrice = Number(item?.actualPrice ?? item?.actUnitPrice ?? item?.unitPrice ?? item?.price ?? 0);
   let refundAmt = Number(item?.refundAmount || 0);
@@ -929,6 +932,8 @@ export default function ReceivingModal({
           accumulatedReceived: totalReceived,
           damagedQty: totalDamaged,
           shortageQty: shortage,
+          // what is still to be received (like workflowEngine.receiveGoods : ordered - received) - kept current so the next round starts from the true figure
+          remainingQty: poItem.claimResolution === 'WRITE_OFF' ? 0 : Math.max(0, ordered - totalReceived - refunded),
           refundedQty: refunded,
           refundAmount: refundAmount || poItem.refundAmount,
           isSettled: isItemRefunded ? true : (hasItemDispute ? false : poItem.isSettled),
@@ -1157,14 +1162,18 @@ export default function ReceivingModal({
         // Backend offline fallback
       }
 
-      if (stockItemsToReceive.length > 0 && isCloudflareMode()) {
+      // defective goods (damagedQty) go to the stock card as IN_NG rows (no stock added) like GAS ; they are bound by the damaged qty saved on the PO line
+      const cfStockLines = computedItems
+        .map((row, rowIdx) => ({ lineIndex: rowIdx, productId: row.productId || row.id, code: row.code, goodQty: Number(row.acceptedQty || 0), defectiveQty: Number(row.damagedQty || 0), defectReason: row.defectNote, locked: row.isRowLocked }))
+        .filter(l => !l.locked && (l.goodQty > 0 || l.defectiveQty > 0));
+      if (cfStockLines.length > 0 && isCloudflareMode()) {
         // One request adds currentStock, moves the moving average cost and writes ONE IN log per line for this GRN number (idempotent on the server).
         // It follows the PO save above. If it fails (network) the request is kept as pending and is replayed with the SAME GRN number the next
         // time this screen is used, so the receipt is never lost and never added twice.
         const stockResult = await apiService.receiveStock(
           targetPO.id,
           grnNumber,
-          stockItemsToReceive.map(it => ({ lineIndex: it.lineIndex, productId: it.productId, code: it.code, goodQty: it.goodQty, defectiveQty: 0 }))
+          cfStockLines.map(({ locked: _locked, ...l }) => l)
         );
         if (appContext?.setStockLogs && Array.isArray(stockResult?.stockLogs) && stockResult.stockLogs.length) {
           appContext.setStockLogs(prev => {

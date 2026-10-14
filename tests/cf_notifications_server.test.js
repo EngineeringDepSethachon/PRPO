@@ -180,13 +180,16 @@ d('server notifications (M7-2)', () => {
     expect(allNotifs()).toHaveLength(3);
   });
 
-  it('stockOnly receive sends no notification', async () => {
+  it('stockOnly receive (ReceivingModal flow) : PO left open -> PO_CLAIM to Purchaser + Requester once per GRN ; PO finished -> none', async () => {
     seedPo({ status: 'ORDERED' });
     await call('wh', 'PUT', '/api/pos/PO-G1', { grnHistory: [{ grnNumber: GR1, round: 1, items: [] }], items: [{ ...LINE, receivedQty: 5, goodQty: 5 }] });
     const before = allNotifs().length;
     const r = await call('wh', 'POST', '/api/pos/PO-G1/receive', { poId: 'PO-G1', stockOnly: true, grNumber: GR1, receivingItems: [{ productId: 'P1', code: 'C1', goodQty: 5, defectiveQty: 0 }] });
     expect(r.status).toBe(200);
-    expect(allNotifs().length).toBe(before);
+    expect(allNotifs().length).toBe(before + 2);
+    expect(notifs('PO_CLAIM').map((n) => n.targetRole).sort()).toEqual(['Purchaser', 'Requester']);
+    await call('wh', 'POST', '/api/pos/PO-G1/receive', { poId: 'PO-G1', stockOnly: true, grNumber: GR1, receivingItems: [{ productId: 'P1', code: 'C1', goodQty: 5, defectiveQty: 0 }] });
+    expect(allNotifs().length).toBe(before + 2);
   });
 
   it('read state is per user : one user reading does not mark it read for others ; mark-read of a notification that is not yours is 404 and writes nothing', async () => {

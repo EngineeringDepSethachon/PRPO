@@ -125,9 +125,9 @@ npx wrangler d1 create prpo-db-preview
 
 ---
 
-## ขั้น 3 : Backup แล้ว apply migrations 0001-0014
+## ขั้น 3 : Backup แล้ว apply migrations 0001-0015
 
-**ทำไม** : ต้องมี backup ก่อนแตะฐาน production ; migrations (`migrations/0001..0014`) สร้าง/ปรับตารางที่โค้ดใหม่ต้องใช้ (0010 `tokenVersion`, 0011 `file_refs`, 0012 ดัชนี login, 0013 `attachments.storage/objectKey/migratedFrom` สำหรับไฟล์ R2 -- แถวเดิมทั้งหมดเป็น `storage='drive'` ; 0014 ดัชนี `audit_logs.timestamp` + ตาราง `notification_reads` ; ไม่มี DROP ; **ต้อง apply 0013 ก่อน deploy โค้ดที่อัปโหลดลง R2**) ; `wrangler.toml` ตั้ง `migrations_dir = "migrations"` แล้ว จึงใช้ `d1 migrations apply` ได้ตรง ๆ ; **ห้ามใช้ `d1_schema.sql`**
+**ทำไม** : ต้องมี backup ก่อนแตะฐาน production ; migrations (`migrations/0001..0015`) สร้าง/ปรับตารางที่โค้ดใหม่ต้องใช้ (0015 ดัชนี `audit_logs(performedBy, action, createdAtMs)` สำหรับ rate limit ปรับยอด/รับเข้า Manual ; 0010 `tokenVersion`, 0011 `file_refs`, 0012 ดัชนี login, 0013 `attachments.storage/objectKey/migratedFrom` สำหรับไฟล์ R2 -- แถวเดิมทั้งหมดเป็น `storage='drive'` ; 0014 ดัชนี `audit_logs.timestamp` + ตาราง `notification_reads` ; ไม่มี DROP ; **ต้อง apply 0013 ก่อน deploy โค้ดที่อัปโหลดลง R2**) ; `wrangler.toml` ตั้ง `migrations_dir = "migrations"` แล้ว จึงใช้ `d1 migrations apply` ได้ตรง ๆ ; **ห้ามใช้ `d1_schema.sql`**
 
 ### 3.1 Backup (เก็บนอก repo)
 
@@ -150,7 +150,7 @@ npx wrangler d1 migrations apply prpo-db-preview --remote --env preview
 ```
 
 (ใช้ `--env preview` เพื่อให้ wrangler หาฐาน `prpo-db-preview` จากบล็อก `[env.preview]` ; ถ้า wrangler แจ้งว่าไม่พบฐานหรือไม่รู้จัก env ดูหัวข้อ "ถ้าพลาด")
-ตอบ `y` เมื่อมันแสดงรายการ 0001-0014
+ตอบ `y` เมื่อมันแสดงรายการ 0001-0015
 
 ```powershell
 npx wrangler d1 execute prpo-db-preview --remote --env preview --command "SELECT name FROM sqlite_master WHERE type='table' ORDER BY name"
@@ -165,7 +165,7 @@ npx wrangler d1 migrations apply prpo-db --remote
 npx wrangler d1 execute prpo-db --remote --command "SELECT name FROM d1_migrations ORDER BY id"
 ```
 
-**ตรวจว่าสำเร็จ** : รายการ migrations แสดง 0001 ถึง 0014 ครบ 14 แถว ; ตรวจตารางด้วยคำสั่ง `SELECT name FROM sqlite_master ...` แบบเดียวกับข้างบน (เปลี่ยนเป็น `prpo-db --remote` โดยไม่มี `--env`)
+**ตรวจว่าสำเร็จ** : รายการ migrations แสดง 0001 ถึง 0015 ครบ 15 แถว ; ตรวจตารางด้วยคำสั่ง `SELECT name FROM sqlite_master ...` แบบเดียวกับข้างบน (เปลี่ยนเป็น `prpo-db --remote` โดยไม่มี `--env`)
 
 **ถ้าพลาด** :
 - migration ใดล้ม wrangler ย้อน migration นั้นเอง migration ก่อนหน้ายังอยู่ -> อ่าน error แก้แล้วรัน apply ซ้ำได้ (ข้ามที่ผ่านแล้ว)

@@ -35,6 +35,7 @@ export const API_ROUTES = [
 
   { id: 'stock-logs', re: /^\/api\/stock-logs$/, methods: ['GET', 'POST'] },
   { id: 'stock-issue', re: /^\/api\/(stock\/issue|inventory\/issue)$/, methods: ['POST'] },
+  { id: 'stock-manual', re: /^\/api\/stock\/(adjust|manual-in)$/, methods: ['POST'] },
 
   { id: 'budgets', re: /^\/api\/budgets$/, methods: ['GET', 'POST'] },
   { id: 'budgets-adjust', re: /^\/api\/budgets\/adjust$/, methods: ['POST'] },

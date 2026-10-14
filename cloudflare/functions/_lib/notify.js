@@ -87,6 +87,19 @@ export function poSaveNotificationParams({ prev, status, body, dept, poNo }) {
   return out;
 }
 
+// cyrb53 : small non-crypto 53-bit string hash (ids only, nothing secret)
+function idHash(str) {
+  let h1 = 0xdeadbeef; let h2 = 0x41c6ce57;
+  for (let i = 0; i < str.length; i += 1) {
+    const ch = str.charCodeAt(i);
+    h1 = Math.imul(h1 ^ ch, 2654435761);
+    h2 = Math.imul(h2 ^ ch, 1597334677);
+  }
+  h1 = Math.imul(h1 ^ (h1 >>> 16), 2246822507) ^ Math.imul(h2 ^ (h2 >>> 13), 3266489909);
+  h2 = Math.imul(h2 ^ (h2 >>> 16), 2246822507) ^ Math.imul(h1 ^ (h1 >>> 13), 3266489909);
+  return (4294967296 * (2097151 & h2) + (h1 >>> 0)).toString(36);
+}
+
 export function poReceiveNotificationParams({ closed, dept, poNo }) {
   const d = dept || 'ALL';
   if (closed) {
@@ -98,5 +111,7 @@ export function poReceiveNotificationParams({ closed, dept, poNo }) {
 
 /** params list -> statements (ids derived from `idBase` when given, so a retried request hits the same ids). */
 export function notificationStmts(db, list, { idBase, whereSql, whereBinds } = {}) {
-  return (list || []).map((p, i) => notificationStmt(db, { ...p, whereSql, whereBinds }, idBase ? `NTF-${idBase}-${i}`.slice(0, 120) : undefined)).filter(Boolean);
+  // id = NTF-{first 60 chars of idBase}~{hash of the WHOLE idBase}-{i} : deterministic (a retry hits the same id) and two long idBase that share a prefix never collide
+  const idOf = (i) => `NTF-${String(idBase).slice(0, 60)}~${idHash(String(idBase))}-${i}`;
+  return (list || []).map((p, i) => notificationStmt(db, { ...p, whereSql, whereBinds }, idBase ? idOf(i) : undefined)).filter(Boolean);
 }

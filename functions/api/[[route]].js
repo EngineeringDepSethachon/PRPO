@@ -24,7 +24,11 @@ import { buildViewer, filterDocuments, filterStockLogs, filterBudgetRows, filter
 // D1 row is limited to 2 MB anyway ; everything else is small. /api/upload has its own, larger limit (upload.js).
 const DOC_WRITE_MAX_BYTES = 4 * 1024 * 1024;
 const JSON_WRITE_MAX_BYTES = 2 * 1024 * 1024;
-const DOC_WRITE_RE = /^\/api\/(prs?|pos?|products|receive-goods|receive|grn|inventory|stock-logs|budget-transactions)(\/|$)/;
+// stock log view : a GRN row written before grnNumber was filled (empty grnNumber, docNo = the GRN) shows docNo as grnNumber (GAS keeps grnNumber = documentNo) ; stored data is not changed
+function withGrnNumber(rows) {
+  return (rows || []).map((r) => (r && !r.grnNumber && /^GRN?-/i.test(String(r.docNo || '')) ? { ...r, grnNumber: r.docNo } : r));
+}
+const DOC_WRITE_RE =/^\/api\/(prs?|pos?|products|receive-goods|receive|grn|inventory|stock-logs|budget-transactions)(\/|$)/;
 
 const LOGIN_MAX_FAILS = 5;       // per user (per resolved userId)
 const LOGIN_MAX_FAILS_IP = 30;   // per IP (shared NAT / office networks)
@@ -654,6 +658,56 @@ function poAuditStmt(db, authUser, { id, action, poId, poNo, status, comment, wh
   return db.prepare(`INSERT OR IGNORE INTO audit_logs (id, action, entityType, entityId, performedBy, details, timestamp) SELECT ?, ?, ?, ?, ?, ${detailsExpr}, ? WHERE ${whereSql || '1'}`)
     .bind(id, action, 'po', String(poId || ''), authUser.userId, JSON.stringify(details), ...(statusFromPo ? [String(poId || '')] : []), new Date().toISOString(), ...(whereBinds || []));
 }
+// ── PR cascade when a PO is fully received / closed (GAS apiReceivePO step 10, Code.gs:2900-2947 ; parity.md "PO_ISSUED/IN_PROGRESS_ONLINE -> completed") ──
+// GAS : PO CLOSED / COMPLETED -> its PR gets status = poStatus = 'completed', poNumber, fullyReceivedAt and an activityLog line ; no audit row / notification for the PR
+// (the PO's own GOODS_RECEIVED_* audit + notification already exist). Server side, in the SAME batch as the PO write :
+//  - only a PR that is APPROVED / PO_ISSUED / IN_PROGRESS_ONLINE, of the PO's department, and only while it still has the status read here (optimistic, like every PR write)
+//  - only when the PO row really is CLOSED / COMPLETED after its own write in that batch. Exactly like GAS : the FIRST PO of the PR that closes completes it
+//    (owner's decision) - sibling POs are not looked at ; PR.poNumber is overwritten with the number of the PO that closed last (Code.gs:2922)
+const PR_CASCADE_FROM = new Set(['APPROVED', 'PO_ISSUED', 'IN_PROGRESS_ONLINE']);
+const PO_CLOSING_FOR_PR = new Set(['CLOSED', 'COMPLETED']);
+async function prCascadeFor(db, poRow) {
+  // the PO's prId names the PR exactly (id = prId only) ; prNumber is the fallback ONLY for a PO that has no prId (never both : another PR's number cannot match)
+  const prId = String((poRow && poRow.prId) || '').trim();
+  const prNo = String((poRow && poRow.prNumber) || '').trim();
+  if (!prId && !prNo) return null;
+  const prRow = await (prId
+    ? db.prepare('SELECT id, prNumber, status, department FROM prs WHERE id = ? LIMIT 1').bind(prId)
+    : db.prepare('SELECT id, prNumber, status, department FROM prs WHERE prNumber = ? LIMIT 1').bind(prNo)).first().catch(() => null);
+  if (!prRow || !PR_CASCADE_FROM.has(String(prRow.status || '').trim())) return null;
+  if (normalizeDeptCode(prRow.department) !== normalizeDeptCode(poRow.department)) return null;
+  return prRow;
+}
+function prCascadeStmt(db, authUser, { prRow, poRow, poNo, iso }) {
+  if (!db || !prRow) return [];
+  const actor = authUser.name || authUser.username || 'System';
+  const entry = {
+    action: 'ปิดเอกสาร (Closed)', user: actor, role: authUser.title || authUser.canonicalRole || authUser.role || '',
+    date: iso, timestamp: iso, note: `PO ${poNo} รับสินค้าครบแล้ว ปิดใบ PR อัตโนมัติ`
+  };
+  const tl = "COALESCE(NULLIF(timelineJson, ''), '[]')";
+  const update = db.prepare(`
+    UPDATE prs SET
+      status = 'completed',
+      poNumber = COALESCE(NULLIF(?, ''), poNumber),
+      timelineJson = CASE WHEN json_valid(${tl}) AND json_type(${tl}) = 'array' THEN json_insert(${tl}, '$[#]', json(?)) ELSE timelineJson END,
+      extraJson = json_patch(COALESCE(NULLIF(extraJson, ''), '{}'), ?),
+      updatedAt = CURRENT_TIMESTAMP
+    WHERE id = ? AND status IS ?
+      AND UPPER(TRIM(COALESCE((SELECT status FROM pos WHERE id = ?), ''))) IN ('CLOSED', 'COMPLETED')
+  `).bind(String(poNo || ''), JSON.stringify(entry), JSON.stringify({ poStatus: 'completed', fullyReceivedAt: iso }),
+    prRow.id, prRow.status, poRow.id);
+  // audit row of the cascade : the NEXT statement of the batch, written only when the UPDATE above really changed the PR (changes() = rows of the last statement) ;
+  // action PR_COMPLETED_BY_PO is not one of PR_AUDIT_ACTIONS, so it never joins the PR timeline ; listed by GET /api/audit-logs like the PO rows (module PURCHASE)
+  const text = `ปิดเอกสาร (Closed) จาก PO ${poNo}`;
+  const details = {
+    docNo: String(prRow.prNumber || prRow.id), poNumber: String(poNo || ''), comment: text, summary: text, status: 'completed',
+    actorName: actor, actorRole: authUser.title || authUser.canonicalRole || authUser.role || '', roleKey: authUser.roleKey, module: 'PURCHASE'
+  };
+  const audit = db.prepare('INSERT OR IGNORE INTO audit_logs (id, action, entityType, entityId, performedBy, details, timestamp) SELECT ?, ?, ?, ?, ?, ?, ? WHERE changes() > 0')
+    .bind(`AUD-PR-DONE:${prRow.id}:${poRow.id}`, 'PR_COMPLETED_BY_PO', 'pr', String(prRow.id), authUser.userId, JSON.stringify(details), iso);
+  return [update, audit];
+}
 // notifications of a PO save : only while the PO is still in the state this request read (status, orderStatus, claim resolvedAt) -> two identical saves = one row
 function poNotifyStmts(db, { poId, prev, status, body, dept, poNo }) {
   const prevExtra = (prev && prev.extra) || {};
@@ -1155,6 +1209,13 @@ function guardPoItems(stored, client, { admin = false, lockPrice = false, online
         if (Number.isFinite(sv) && out[k] < sv) out[k] = sv;
       }
     }
+    // damagedQty : a finite number >= 0, never above the ordered qty (clamped for a non-admin). It may go DOWN (claim REFUND / WRITE_OFF reset it to 0) and stay
+    // (REPLACEMENT) - the stock card never trusts it as a ceiling (IN_NG is bound by the ordered qty minus the stock logs of the PO line).
+    if (out.damagedQty !== undefined && out.damagedQty !== null && out.damagedQty !== '') {
+      const dn = Number(out.damagedQty);
+      if (!Number.isFinite(dn) || dn < 0) throw new HttpError(400, 'จำนวนที่รับไม่ถูกต้อง');
+      out.damagedQty = admin ? dn : Math.min(dn, orderedQtyOf(isPlain(s) ? s : out));
+    }
     if (lockPrice && !admin && isPlain(s)) {
       for (const k of LINE_PRICE_KEYS) { if (k in s) out[k] = s[k]; else delete out[k]; }
     }
@@ -1385,6 +1446,24 @@ function getDummyRecord() {
 }
 
 const FORBIDDEN_MSG = 'ไม่มีสิทธิ์ดำเนินการนี้';
+
+// stock quantity from a JSON body : a number or a plain decimal string only (no booleans / arrays / "5abc" / exponent forms). The screens' inputs are
+// step="any" and "issue all" sends the raw balance (0.30000000000000004), so extra decimals are ROUNDED to 4 dp (the precision the balance is kept in),
+// never refused. Then : > 0 and at most STOCK_QTY_MAX. Returns { qty } or { error } (Thai reason).
+const STOCK_QTY_MAX = 10000000;
+const STOCK_MANUAL_PER_MIN = 30; // adjust / manual-in per user per minute
+const round4 = (x) => Math.round((Number(x) + Number.EPSILON) * 10000) / 10000;
+function parseStockQty(raw) {
+  let s;
+  if (typeof raw === 'number') { if (!Number.isFinite(raw)) return { error: 'จำนวนต้องเป็นตัวเลข' }; s = String(raw); }
+  else if (typeof raw === 'string') s = raw.trim();
+  else return { error: 'จำนวนต้องเป็นตัวเลข' };
+  if (!/^\d+(\.\d+)?$/.test(s)) return { error: 'จำนวนต้องเป็นตัวเลขที่ไม่ติดลบและไม่ใช้รูปแบบยกกำลัง' };
+  const v = round4(Number(s));
+  if (!(v > 0)) return { error: 'จำนวนต้องมากกว่า 0 (ทศนิยมสูงสุด 4 ตำแหน่ง)' };
+  if (v > STOCK_QTY_MAX) return { error: `จำนวนมากเกินไป (ไม่เกิน ${STOCK_QTY_MAX.toLocaleString('en-US')})` };
+  return { qty: v };
+}
 
 // PR / PO writes (and the goods-receipt / settle routes that store evidence files in a PO) : the handlers record the ids they wrote in state.touched ;
 // those documents get their file_refs index rows rebuilt and a PR binds its saver's still unbound uploads to its number (functions/_lib/filerefs.js).
@@ -1942,7 +2021,7 @@ async function handleRequest(context, state) {
         usageUnits: unitsRes.results || [],
         departments: utcIsoRows(deptsRes.results || []),
         users,
-        stockLogs: filterStockLogs(scopeViewer, utcIsoRows(logsRes.results || [])),
+        stockLogs: filterStockLogs(scopeViewer, utcIsoRows(withGrnNumber(logsRes.results || []))),
         budgets: Object.keys(budgets).length > 0 ? budgets : undefined,
         budgetTransactions: filterLedger(scopeViewer, utcIsoRows(txsRes.results || []))
       });
@@ -2399,11 +2478,26 @@ async function handleRequest(context, state) {
       if (stockOnly) {
         // The ReceivingModal saves the PO first and then calls this : the GRN must already be in the PO's grnHistory (else any GRN number would add stock),
         // and per line the stock logged for this PO + line may not pass what the PO line holds as received (good) qty.
+        // nothing to book (no line, or every line 0 good and 0 defective) : refused, no audit / notification for an empty receipt
+        if (!receivePlan.some((p) => p.good > 0 || p.def > 0)) return errorResponse('ไม่มีรายการที่รับ', 400);
         const hist = parseExtra(poRow.extraJson).grnHistory;
         if (!Array.isArray(hist) || !hist.some((g) => g && (g.grnNumber === stockGr || g.grnNo === stockGr))) return errorResponse('ไม่พบเลขที่ GRN นี้ในใบสั่งซื้อ กรุณาบันทึกการตรวจรับก่อน', 409);
         for (const pl of receivePlan) {
           const line = poItemsPre[pl.idx];
           pl.ceiling = (Number(line.goodQty) || 0) * pl.conv; // good qty only : receivedQty also counts defective goods, which never enter stock
+          if (pl.def > 0) {
+            // defective goods (IN_NG, no stock) : bound by SERVER figures only - this request's defective qty may not pass what is still not received GOOD :
+            // ordered qty (stored line) minus the good stock already logged for this PO line (this request's good qty included). Earlier IN_NG are NOT deducted
+            // (replaced goods may come defective again, claim REPLACEMENT round 2) ; the client's damagedQty / defectiveQty on the line are never a ceiling.
+            pl.ngCeiling = orderedQtyOf(line) * pl.conv;
+            const haveNg = await db.prepare('SELECT 1 AS x FROM stock_logs WHERE id = ? LIMIT 1').bind(`LOGNG:${poRow.id}:${stockGr}:${pl.idx}`).first().catch(() => null);
+            if (!haveNg) {
+              const sumIn = await db.prepare("SELECT COALESCE(SUM(quantity), 0) AS s FROM stock_logs WHERE docType = 'GRN' AND type = 'IN' AND id LIKE ? ESCAPE '\\'").bind(`LOG:${esc(poRow.id)}:%:${pl.idx}`).first().catch(() => null);
+              const haveGood = pl.good > 0 ? await db.prepare('SELECT 1 AS x FROM stock_logs WHERE id = ? LIMIT 1').bind(planLogId(pl.idx)).first().catch(() => null) : null;
+              const used = (Number(sumIn && sumIn.s) || 0) + (pl.good > 0 && !haveGood ? pl.stockQty : 0);
+              if (used + Math.round(pl.def * pl.conv * 10000) / 10000 > pl.ngCeiling + 1e-4) return errorResponse('จำนวนของชำรุดเกินยอดสั่งซื้อของรายการใน PO', 409);
+            }
+          }
           if (!(pl.good > 0)) continue;
           const have = await db.prepare('SELECT 1 AS x FROM stock_logs WHERE id = ? LIMIT 1').bind(planLogId(pl.idx)).first().catch(() => null);
           if (have) continue;
@@ -2436,6 +2530,7 @@ async function handleRequest(context, state) {
       const recvStmts = [];
       const recvLogIds = [];
       const recvProdIds = new Set();
+      const ngPlan = [];
       for (const { rItem, idx, prod, prodKey, conv, stockQty, baseCost, ceiling, prCeil } of receivePlan) {
         const pId = prodKey; // the PO line's product, not the body's
         const goodQty = recvGoodOf(rItem);
@@ -2485,8 +2580,8 @@ async function handleRequest(context, state) {
           // balance is read inside the same batch, right after the stock update above
           recvStmts.push(db.prepare(`
             INSERT INTO stock_logs (id, productId, productCode, productName, type, docType, docNo, referenceNo, poNo, quantity, changeQty, balance, unit, department, location, issuedTo,
-              unitCost, unitPrice, totalCost, totalPrice, conversionRate, actorName, performedBy, createdAt)
-            SELECT ?, ?, ?, ?, 'IN', 'GRN', ?, ?, ?, ?, ?, COALESCE((SELECT currentStock FROM products WHERE id = ?), ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
+              unitCost, unitPrice, totalCost, totalPrice, conversionRate, actorName, performedBy, grnNumber, createdAt)
+            SELECT ?, ?, ?, ?, 'IN', 'GRN', ?, ?, ?, ?, ?, COALESCE((SELECT currentStock FROM products WHERE id = ?), ?), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
             WHERE ${cond}
             ON CONFLICT(id) DO NOTHING
           `).bind(
@@ -2512,12 +2607,71 @@ async function handleRequest(context, state) {
             conv,
             actorName,
             actorName,
+            grNumber,
             ...condBinds
           ));
         }
+        if (defectiveQty > 0) ngPlan.push({ pl: receivePlan.find((x) => x.idx === idx), def: defectiveQty, matchedItem });
+      }
+
+      // Defective goods : GAS keeps an IN_NG row in the stock card (qty only, grnNumber/docNo = the GRN, apiAppendStockMovements Code.gs:3236-3299 adds nothing to the
+      // balance for IN_NG) ; currentStock / moving average cost are NOT touched. id bound to PO + GRN + line, so a retry never repeats it ; the full receive
+      // writes it only when every good log of the receipt exists (same guard as the PO UPDATE below).
+      const ngLogIds = [];
+      for (const { pl, def, matchedItem } of ngPlan) {
+        const ngId = `LOGNG:${poRow.id}:${grNumber}:${pl.idx}`;
+        const ngQty = Math.round(def * pl.conv * 10000) / 10000;
+        const ngProdId = pl.prod?.id || pl.prodKey;
+        ngLogIds.push(ngId);
+        const ngGuard = stockOnly
+          ? `NOT EXISTS (SELECT 1 FROM stock_logs WHERE id = ?) AND ? <= ? - COALESCE((SELECT SUM(quantity) FROM stock_logs WHERE docType = 'GRN' AND type = 'IN' AND id LIKE ? ESCAPE '\\'), 0)`
+          : `NOT EXISTS (SELECT 1 FROM stock_logs WHERE id = ?) AND (SELECT COUNT(*) FROM stock_logs WHERE id IN (${recvLogIds.length ? recvLogIds.map(() => '?').join(',') : "''"})) = ?`;
+        const ngGuardBinds = stockOnly
+          ? [ngId, ngQty, Number(pl.ngCeiling) + 1e-4, `LOG:${esc(poRow.id)}:%:${pl.idx}`]
+          : [ngId, ...recvLogIds, recvLogIds.length];
+        recvStmts.push(db.prepare(`
+          INSERT INTO stock_logs (id, productId, productCode, productName, type, docType, docNo, referenceNo, poNo, quantity, changeQty, balance, unit, department, location, issuedTo,
+            actorName, performedBy, notes, grnNumber, createdAt)
+          SELECT ?, ?, ?, ?, 'IN_NG', 'GRN', ?, ?, ?, ?, ?, COALESCE((SELECT currentStock FROM products WHERE id = ?), 0), ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP
+          WHERE ${ngGuard}
+          ON CONFLICT(id) DO NOTHING
+        `).bind(
+          ngId, ngProdId, pl.prod?.code || matchedItem?.code || pl.prodKey, pl.prod?.name || matchedItem?.name || 'สินค้าตรวจรับ',
+          grNumber, cleanPoNo, cleanPoNo, ngQty, ngQty, pl.prod?.id || '',
+          pl.rItem.unit || pl.prod?.usageUnit || 'ชิ้น', poRow.department || 'PD', pl.rItem.storageLocation || 'DEFAULT', actorName,
+          actorName, actorName, `[สินค้าชำรุด/NG] ${String(pl.rItem.defectReason || pl.rItem.defectNote || '').slice(0, 300)}`.trim(), grNumber,
+          ...ngGuardBinds
+        ));
       }
 
       if (stockOnly) {
+        // GAS apiReceivePO (Code.gs:2949-2994) as the ReceivingModal flow reaches it : a receipt that leaves the PO NOT finished (PARTIAL / claim / round 2 ...)
+        // writes the GOODS_RECEIVED_PARTIAL audit + PO_CLAIM notifications (Purchaser + Requester) ; a finished PO (CLOSED / COMPLETED ...) writes none here
+        // (user decision, ask A). Same ids as the full receive (PO + GRN) -> once per GRN, a retry adds nothing ; same batch, guarded by the stock logs ;
+        // actor from the token, department from the PO row.
+        {
+          const stStatus = normalizePoStatus(poRow.status) || '';
+          const stDone = ['CLOSED', 'COMPLETED', 'COMPLETED_WITH_REFUND', 'RECEIVED'].includes(stStatus);
+          if (!stDone) {
+            const stIds = [...recvLogIds, ...ngLogIds]; // every row of this receipt (good + IN_NG) must exist
+            const stWhere = `(SELECT COUNT(*) FROM stock_logs WHERE id IN (${stIds.length ? stIds.map(() => '?').join(',') : "''"})) = ?`;
+            const stBinds = [...stIds, stIds.length];
+            const stAudit = poAuditStmt(db, authUser, {
+              id: `AUD-PO-GRN:${poRow.id}:${grNumber}`,
+              action: 'GOODS_RECEIVED_PARTIAL',
+              poId: poRow.id, poNo: cleanPoNo, status: poRow.status,
+              comment: 'ตรวจรับสินค้า ' + (grNumber ? ('เลขที่ ' + grNumber) : '') + ' บางส่วน',
+              whereSql: stWhere, whereBinds: stBinds
+            });
+            if (stAudit) recvStmts.push(stAudit);
+            // a PO row without a department : no notification (never broadcast to ALL from here)
+            if (String(poRow.department || '').trim()) {
+              recvStmts.push(...notificationStmts(db, poReceiveNotificationParams({ closed: false, dept: poRow.department, poNo: cleanPoNo }), {
+                idBase: `GRN:${poRow.id}:${grNumber}`, whereSql: stWhere, whereBinds: stBinds
+              }));
+            }
+          }
+        }
         try {
           await db.batch(recvStmts);
         } catch (e) {
@@ -2525,9 +2679,10 @@ async function handleRequest(context, state) {
           return errorResponse('ไม่สามารถบันทึกการตรวจรับสินค้าได้ กรุณาลองใหม่', 500);
         }
         const inList = (ids) => ids.map(() => '?').join(',');
-        const logRows = recvLogIds.length ? ((await db.prepare(`SELECT * FROM stock_logs WHERE id IN (${inList(recvLogIds)})`).bind(...recvLogIds).all().catch(() => ({ results: [] }))).results || []) : [];
+        const allLogIds = [...recvLogIds, ...ngLogIds];
+        const logRows = allLogIds.length ? ((await db.prepare(`SELECT * FROM stock_logs WHERE id IN (${inList(allLogIds)})`).bind(...allLogIds).all().catch(() => ({ results: [] }))).results || []) : [];
         // a line whose log is missing was refused by the in-batch ceiling (a concurrent receipt took the room) : tell the caller, nothing was added for it
-        if (logRows.length < recvLogIds.length) return errorResponse('จำนวนที่รับเกินจำนวนตรวจรับของรายการใน PO', 409);
+        if (logRows.length < allLogIds.length) return errorResponse('จำนวนที่รับเกินจำนวนตรวจรับของรายการใน PO', 409);
         const prodIds = [...recvProdIds];
         const prodRows = prodIds.length ? ((await db.prepare(`SELECT * FROM products WHERE id IN (${inList(prodIds)})`).bind(...prodIds).all().catch(() => ({ results: [] }))).results || []) : [];
         return jsonResponse({
@@ -2535,7 +2690,7 @@ async function handleRequest(context, state) {
           stockOnly: true,
           grNumber,
           products: await productViews(db, prodRows),
-          stockLogs: logRows,
+          stockLogs: withGrnNumber(logRows),
           ...(receiveSkipped.length ? { skipped: receiveSkipped } : {}),
           message: 'บันทึกสต็อกจากการตรวจรับสำเร็จ'
         });
@@ -2598,6 +2753,11 @@ async function handleRequest(context, state) {
           whereSql: `(SELECT COUNT(*) FROM stock_logs WHERE id IN (${recvLogIds.length ? recvLogIds.map(() => '?').join(',') : "''"})) = ?`,
           whereBinds: [...recvLogIds, recvLogIds.length]
         }));
+        // GAS apiReceivePO step 10 : every line received (PO CLOSED) -> the PR is completed in the same batch (after the PO UPDATE it depends on)
+        if (recvClosed) {
+          const prCasc = prCascadeStmt(db, authUser, { prRow: await prCascadeFor(db, poRow), poRow, poNo: cleanPoNo, iso: new Date().toISOString() });
+          recvStmts.push(...prCasc);
+        }
       }
       try {
         await db.batch(recvStmts);
@@ -3107,7 +3267,7 @@ async function handleRequest(context, state) {
         { const bad = await sanitizeWriteBody(db, p, authUser, { docKey: subId }); if (bad) return errorResponse(bad.message, bad.status); }
         { const bad = checkPoStatus(p, authUser); if (bad) return errorResponse(bad.message, bad.status); }
         // resolve ONE row (exact id first, then poNumber) ; the UPDATE below targets that id only
-        const curPo = await lookupStatus(db, 'SELECT id, poNumber, status, department, totalAmount, vatAmount, grandTotal, timelineJson, itemsJson, evidenceJson, purchaseChannel, extraJson FROM pos WHERE id = ? OR poNumber = ? ORDER BY (id = ?) DESC LIMIT 1', subId, subId, subId);
+        const curPo = await lookupStatus(db, 'SELECT id, poNumber, prId, prNumber, status, department, totalAmount, vatAmount, grandTotal, timelineJson, itemsJson, evidenceJson, purchaseChannel, extraJson FROM pos WHERE id = ? OR poNumber = ? ORDER BY (id = ?) DESC LIMIT 1', subId, subId, subId);
         if (curPo && !canAccessDepartment(authUser, curPo.department)) return errorResponse(FORBIDDEN_MSG, 403);
         if (curPo && poAmountsFrozenAndChanged(authUser, curPo, p)) return errorResponse(FORBIDDEN_MSG, 403);
         if (p.status && curPo && !canTransitionPO(authUser, curPo.status, p.status)) return errorResponse(FORBIDDEN_MSG, 403);
@@ -3170,12 +3330,18 @@ async function handleRequest(context, state) {
           putPoExtraJson,
           targetPoRowId
         );
+        // PO saved as CLOSED / COMPLETED (ReceivingModal / claim close / short-close : the client saves the final status itself) while it was not yet -> the PR of that
+        // PO is completed in the same batch (see prCascadeFor) ; a PO that was already closed never re-cascades
+        const putClosesPo = Boolean(curPo) && PO_CLOSING_FOR_PR.has(String(p.status || '').trim().toUpperCase()) && !PO_CLOSING_FOR_PR.has(String(curPo.status || '').trim().toUpperCase());
+        const putPrCascade = putClosesPo
+          ? prCascadeStmt(db, authUser, { prRow: await prCascadeFor(db, { ...curPo, prId: curPo.prId || putPoExtra.prId || putStoredExtra.prId, prNumber: curPo.prNumber || putPoExtra.prNumber || putStoredExtra.prNumber }), poRow: curPo, poNo: curPo.poNumber || targetPoRowId, iso: new Date().toISOString() })
+          : [];
         // GAS apiSavePO audit : UPDATE_PO, same batch as the write (only when the row exists)
         await runPoWithAudit(db, putPoStmt, poAuditStmt(db, authUser, {
           id: `AUD-${Date.now()}-${uid()}`, action: 'UPDATE_PO', poId: targetPoRowId, poNo: (curPo && curPo.poNumber) || targetPoRowId, status: (curPo && curPo.status) || null, statusFromPo: true,
           comment: poUpdateComment(p),
           whereSql: 'EXISTS (SELECT 1 FROM pos WHERE id = ?)', whereBinds: [targetPoRowId]
-        }), [], curPo ? poNotifyStmts(db, { poId: targetPoRowId, prev: { status: curPo.status, extra: putStoredExtra }, status: p.status || curPo.status, body: { orderStatus: p.orderStatus, claimResolution: putPoExtra.claimResolution }, dept: curPo.department, poNo: curPo.poNumber || targetPoRowId }) : []);
+        }), putPrCascade, curPo ? poNotifyStmts(db, { poId: targetPoRowId, prev: { status: curPo.status, extra: putStoredExtra }, status: p.status || curPo.status, body: { orderStatus: p.orderStatus, claimResolution: putPoExtra.claimResolution }, dept: curPo.department, poNo: curPo.poNumber || targetPoRowId }) : []);
         markTouched('pos', targetPoRowId);
         if (putItemNotes.length) await audit('PO_ADMIN_ITEM_CHANGE', 'po', targetPoRowId, { actorUserId: authUser.userId, changes: putItemNotes.slice(0, 30) });
 
@@ -3857,7 +4023,7 @@ async function handleRequest(context, state) {
       if (!db) return jsonResponse([]);
       if (method === 'GET') {
         const res = await db.prepare('SELECT * FROM stock_logs ORDER BY createdAt DESC LIMIT 500').all();
-        return jsonResponse(filterStockLogs(scopeViewer, utcIsoRows(res.results || [])));
+        return jsonResponse(filterStockLogs(scopeViewer, utcIsoRows(withGrnNumber(res.results || []))));
       }
 
       if (method === 'POST') {
@@ -3989,10 +4155,13 @@ async function handleRequest(context, state) {
         const productId = payload.productId || payload.id;
         const productCode = payload.productCode || payload.code || payload.sku;
         const rawQty = payload.quantity !== undefined ? payload.quantity : (payload.qty !== undefined ? payload.qty : payload.issueQty);
-        const quantity = Math.abs(Number(rawQty));
-        if (isNaN(quantity) || quantity <= 0) {
-          return errorResponse('จำนวนที่เบิกจ่ายไม่ถูกต้อง (ต้องมากกว่า 0)', 400);
+        // (the sign is ignored as before : a negative quantity is the same issue) ; same shape / ceiling / 4 dp rule as adjust
+        const rawAbs = typeof rawQty === 'number' ? Math.abs(rawQty) : (typeof rawQty === 'string' ? rawQty.trim().replace(/^-/, '') : rawQty);
+        const parsedIssue = parseStockQty(rawAbs);
+        if (parsedIssue.error) {
+          return errorResponse(`จำนวนที่เบิกจ่ายไม่ถูกต้อง: ${parsedIssue.error}`, 400);
         }
+        const quantity = parsedIssue.qty;
 
         // 1. ค้นหาสินค้าในตาราง products ด้วย id หรือ code
         let prod = null;
@@ -4013,7 +4182,8 @@ async function handleRequest(context, state) {
 
         const currentStock = Number(prod.currentStock || 0);
         const sUnit = prod.usageUnit || prod.purchaseUnit || 'ชิ้น';
-        if (currentStock < quantity) {
+        // both sides at 4 dp : "issue all" sends the raw balance (a float sum such as 0.30000000000000004 / 0.29999999999999993) and must always fit
+        if (round4(currentStock) < quantity) {
           return errorResponse(`จำนวนคงเหลือไม่พอเบิก (มี ${currentStock} ${sUnit}, ต้องการเบิก ${quantity} ${sUnit})`, 400);
         }
 
@@ -4036,9 +4206,9 @@ async function handleRequest(context, state) {
         // 2. ตัดยอดสต็อกแบบอะตอมมิก: ตัดได้เฉพาะเมื่อยอดพอ (race-safe) ; ไม่พอ -> ข้อความเดิม
         const deducted = await db.prepare(`
           UPDATE products SET
-            currentStock = currentStock - ?,
+            currentStock = MAX(0, ROUND(currentStock - ?, 4)),
             updatedAt = CURRENT_TIMESTAMP
-          WHERE id = ? AND currentStock >= ?
+          WHERE id = ? AND ROUND(currentStock, 4) >= ?
           RETURNING currentStock
         `).bind(quantity, prod.id, quantity).first();
         if (!deducted) {
@@ -4138,6 +4308,125 @@ async function handleRequest(context, state) {
           logEntry
         });
       }
+    }
+
+    // ── 9.2 Manual stock movements : Stock Adjustment (+/-) and Manual Stock-In (/api/stock/adjust, /api/stock/manual-in) ──
+    // The screens (StockAdjustmentModal / ManualStockInModal) only move the balance and write one log row (type IN / OUT, doc ADJ-IN-/ADJ-OUT-/MAN-IN-) ;
+    // they never touch the moving-average cost (no price on those forms). The server owns the arithmetic : balance, log, audit in ONE db.batch,
+    // never below zero (same message as the modal), actor from the token, department gate like /api/stock/issue, replay of the same requestId is a no-op.
+    if ((path === '/api/stock/adjust' || path === '/api/stock/manual-in') && method === 'POST') {
+      if (!db) return errorResponse('Database not available', 500);
+      const manualIn = path === '/api/stock/manual-in';
+      const payload = await request.json().catch(() => ({}));
+      const dir = manualIn ? 'IN' : String(payload.direction || payload.actionType || payload.type || '').trim().toUpperCase();
+      if (dir !== 'IN' && dir !== 'OUT') return errorResponse('ประเภทการปรับปรุงไม่ถูกต้อง', 400);
+      const parsedQty = parseStockQty(payload.quantity ?? payload.qty);
+      if (parsedQty.error) return errorResponse(parsedQty.error, 400);
+      const qty = parsedQty.qty;
+      // per user per minute (like the audit-log endpoint) : a stuck / hostile client cannot flood the ledger
+      const nowMs = Date.now();
+      const recentMoves = await db.prepare("SELECT COUNT(*) AS c FROM audit_logs WHERE performedBy = ? AND action IN ('STOCK_ADJUST', 'STOCK_MANUAL_IN') AND createdAtMs > ?").bind(authUser.userId, nowMs - 60000).first().catch(() => null);
+      // the limit could not be checked : refuse (never let the write through unchecked)
+      if (!recentMoves) return errorResponse('ระบบตรวจจำนวนครั้งการปรับปรุงสต็อกไม่ได้ชั่วคราว กรุณาลองใหม่', 503);
+      if (Number(recentMoves.c) >= STOCK_MANUAL_PER_MIN) return errorResponse('ปรับปรุงสต็อกถี่เกินไป กรุณารอสักครู่', 429);
+      const reasonText = String(payload.reason || '').trim().slice(0, 300);
+      if (!reasonText) return errorResponse('กรุณาระบุเหตุผล', 400);
+      const customNote = String(payload.customNote || payload.note || '').trim().slice(0, 500);
+      const pid = String(payload.productId || payload.id || '').trim();
+      const pcode = String(payload.productCode || payload.code || '').trim();
+      let prod = null;
+      if (pid) prod = await db.prepare('SELECT * FROM products WHERE id = ? LIMIT 1').bind(pid).first();
+      if (!prod && !pid && pcode) prod = await db.prepare('SELECT * FROM products WHERE code = ? AND COALESCE(isDeleted, 0) = 0 ORDER BY id LIMIT 1').bind(pcode).first();
+      if (!prod || Number(prod.isDeleted || 0) === 1) return errorResponse('ไม่พบสินค้าในระบบ', 404);
+      const prodDept = prod.department || prod.category || '';
+      if (prodDept ? !canAccessDepartment(authUser, normalizeDeptCode(prodDept)) : !normalizeUser(authUser).isAdmin) return errorResponse(FORBIDDEN_MSG, 403);
+
+      const sUnit = prod.usageUnit || prod.purchaseUnit || 'ชิ้น';
+      const delta = dir === 'IN' ? qty : -qty;
+      const currentStock = Number(prod.currentStock || 0);
+      const lackMsg = (have) => `ไม่สามารถปรับลด (${qty}) ได้มากกว่ายอดคงเหลือปัจจุบัน (${have})`;
+      if (dir === 'OUT' && qty > round4(currentStock)) return errorResponse(lackMsg(round4(currentStock)), 400);
+
+      // idempotency : the client sends one requestId per confirmed form ; the log id derives from (user, requestId) so a replay hits the primary key
+      const reqKey = String(payload.requestId || payload.idempotencyKey || '').trim().replace(/[^A-Za-z0-9_-]/g, '').slice(0, 64);
+      const dept = normalizeDeptCode(prodDept || 'PD');
+      // id = hash of (kind | product | user | requestId) : the same requestId on another product / direction / user is a NEW movement
+      const kind = manualIn ? 'MIN' : `ADJ${dir}`;
+      let logId = `LOG-${dept}-${Date.now()}-${uid()}`;
+      if (reqKey) {
+        const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([kind, String(prod.id), String(authUser.userId), reqKey])));
+        logId = `LOG-${kind}-${[...new Uint8Array(digest)].slice(0, 16).map((b) => b.toString(16).padStart(2, '0')).join('')}`;
+      }
+      const viewProduct = async () => {
+        const fresh = await db.prepare('SELECT * FROM products WHERE id = ? LIMIT 1').bind(prod.id).first().catch(() => null);
+        const f = fresh || prod;
+        const bal = Math.round(Number(f.currentStock || 0) * 10000) / 10000;
+        return { ...productView({ ...f, currentStock: bal }), currentStock: bal, stockBalance: bal };
+      };
+      if (reqKey) {
+        const known = await db.prepare('SELECT 1 AS x FROM stock_logs WHERE id = ? LIMIT 1').bind(logId).first().catch(() => null);
+        if (known) {
+          const up = await viewProduct();
+          return jsonResponse({ success: true, duplicate: true, message: 'รายการนี้ถูกบันทึกแล้ว', updatedProduct: up, product: up });
+        }
+      }
+
+      // (leading format kept : ADJ-IN- / ADJ-OUT- / MAN-IN- + 6 digits ; the tail of the log id keeps two movements in the same millisecond apart)
+      const suffix = `${Date.now().toString().slice(-6)}-${logId.slice(-4)}`;
+      const docNo = manualIn ? `MAN-IN-${suffix}` : `ADJ-${dir}-${suffix}`;
+      const noteText = `${manualIn ? '[รับเข้าด้วยตนเอง]' : `[ปรับปรุงสต็อก ${dir === 'IN' ? '+ เพิ่ม' : '- ลด'}]`} ${reasonText}${customNote ? ` — ${customNote}` : ''}`;
+      const actorName = authUser.name || authUser.username || 'System';
+      const nowIso = new Date().toISOString();
+      const unitCost = Number(prod.avgCost || prod.standardPrice || 0);
+      const totalCost = Math.round(qty * unitCost * 100) / 100;
+      // location : the product's storage point (name in `location`, id in `locationId`) so the movement shows where the stock sits
+      const locationId = prod.defaultLocationId || null;
+      const locRow = locationId ? await db.prepare('SELECT name FROM storage_locations WHERE id = ? LIMIT 1').bind(locationId).first().catch(() => null) : null;
+      const location = (locRow && locRow.name) || '';
+      try {
+        await db.batch([
+          // log first : the row exists only when the balance can take the change ; its `balance` is computed inside the same transaction
+          db.prepare(`
+            INSERT INTO stock_logs (
+              id, productId, productCode, productName, type, docType, docNo, referenceNo, poNo,
+              quantity, changeQty, balance, unit, department, location, issuedTo, issueUnit,
+              unitCost, totalCost, actorId, actorName, performedBy, notes, createdAt, locationId
+            )
+            SELECT ?, id, ?, ?, ?, 'ADJUST', ?, ?, '', ?, ?, ROUND(COALESCE(currentStock, 0) + ?, 4), ?, ?, ?, '', '', ?, ?, ?, ?, ?, ?, ?, ?
+            FROM products WHERE id = ? AND ROUND(COALESCE(currentStock, 0) + ?, 4) >= 0
+          `).bind(logId, prod.code, prod.name, dir, docNo, docNo, qty, delta, delta, sUnit, dept, location, unitCost, totalCost, authUser.roleKey, actorName, actorName, noteText, nowIso, locationId, prod.id, delta),
+          db.prepare(`
+            UPDATE products SET currentStock = ROUND(COALESCE(currentStock, 0) + ?, 4), updatedAt = CURRENT_TIMESTAMP
+            WHERE id = ? AND ROUND(COALESCE(currentStock, 0) + ?, 4) >= 0 AND EXISTS (SELECT 1 FROM stock_logs WHERE id = ?)
+          `).bind(delta, prod.id, delta, logId),
+          // audit only when the log row exists (same guard as the stock update : a movement refused inside the transaction leaves no audit)
+          db.prepare('INSERT INTO audit_logs (id, action, entityType, entityId, performedBy, details, timestamp, createdAtMs) SELECT ?, ?, ?, ?, ?, ?, ?, ? WHERE EXISTS (SELECT 1 FROM stock_logs WHERE id = ?)')
+            .bind(`AUD-${Date.now()}-${uid()}`, manualIn ? 'STOCK_MANUAL_IN' : 'STOCK_ADJUST', 'stock_log', logId, authUser.userId,
+              JSON.stringify({ roleKey: authUser.roleKey, productId: prod.id, direction: dir, quantity: qty, reason: reasonText, docNo }), nowIso, nowMs, logId)
+        ]);
+      } catch (e) {
+        // a replay racing the first request hits the primary key : the whole batch rolled back, nothing was added twice
+        const known = reqKey ? await db.prepare('SELECT 1 AS x FROM stock_logs WHERE id = ? LIMIT 1').bind(logId).first().catch(() => null) : null;
+        if (known) {
+          const up = await viewProduct();
+          return jsonResponse({ success: true, duplicate: true, message: 'รายการนี้ถูกบันทึกแล้ว', updatedProduct: up, product: up });
+        }
+        console.error('[stock-manual] batch failed:', e && e.message);
+        return errorResponse('ไม่สามารถบันทึกการปรับปรุงสต็อกได้ กรุณาลองใหม่', 500);
+      }
+      const logRow = await db.prepare('SELECT * FROM stock_logs WHERE id = ? LIMIT 1').bind(logId).first().catch(() => null);
+      if (!logRow) {
+        // refused inside the transaction : a concurrent movement took the stock between the check and the write
+        const fresh = await db.prepare('SELECT currentStock FROM products WHERE id = ? LIMIT 1').bind(prod.id).first().catch(() => null);
+        return errorResponse(lackMsg(Number(fresh && fresh.currentStock != null ? fresh.currentStock : currentStock)), 400);
+      }
+      const up = await viewProduct();
+      return jsonResponse({
+        success: true,
+        updatedProduct: up,
+        product: up,
+        logEntry: { ...logRow, timestamp: nowIso, date: nowIso, balanceAfter: logRow.balance, qty, reason: reasonText }
+      });
     }
 
     // ── 10. Budgets & Ledger (/api/budgets & /api/budget-transactions) ──

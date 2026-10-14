@@ -150,7 +150,7 @@ describe.skipIf(!DatabaseSync)('T3.2/T3.3/T3.5 functional (onRequest + migrated 
     products: '/api/products', 'products-mac': '/api/products/recalculate-mac', 'product-by-id': '/api/products/x',
     vendors: '/api/vendors', 'vendor-by-id': '/api/vendors/x', 'storage-locations': '/api/storage-locations', 'storage-location-by-id': '/api/storage-locations/x',
     'usage-units': '/api/usage-units', 'usage-unit-by-id': '/api/usage-units/x', departments: '/api/departments', 'department-by-id': '/api/departments/x',
-    users: '/api/users', 'user-by-id': '/api/users/x', 'stock-logs': '/api/stock-logs', 'stock-issue': '/api/stock/issue',
+    users: '/api/users', 'user-by-id': '/api/users/x', 'stock-logs': '/api/stock-logs', 'stock-issue': '/api/stock/issue', 'stock-manual': '/api/stock/adjust',
     budgets: '/api/budgets', 'budgets-adjust': '/api/budgets/adjust', 'budgets-allocate': '/api/budgets/allocate', 'budgets-reset': '/api/budgets/reset',
     'budget-by-dept': '/api/budgets/PD', 'budget-transactions': '/api/budget-transactions',
     notifications: '/api/notifications', 'notification-by-id': '/api/notifications/x', 'audit-logs': '/api/audit-logs',
@@ -291,7 +291,8 @@ describe.skipIf(!DatabaseSync)('T3.2/T3.3/T3.5 functional (onRequest + migrated 
     sdb.prepare("INSERT INTO pos (id, poNumber, department, status, itemsJson) VALUES ('RW','PO-RW','PD','ORDERED','[{\"productId\":\"P8\",\"qty\":10}]')").run();
     expect((await call('L1', 'POST', '/api/pos/RW/receive', { receivingItems: [{ productId: 'P8', goodQty: 0, defectiveQty: 2 }] })).status).toBe(200);
     expect((await call('L1', 'POST', '/api/pos/RW/receive', { receivingItems: [{ productId: 'P8', goodQty: 5 }] })).status).toBe(200);
-    expect(rows("SELECT docNo FROM stock_logs WHERE poNo = 'PO-RW'").map((x) => x.docNo)).toEqual(['GRN-PO-RW-02']);
+    // round 1 put no stock in (IN_NG row only, S8) ; round 2 is the IN row : both carry their GRN
+    expect(rows("SELECT docNo, type FROM stock_logs WHERE poNo = 'PO-RW' ORDER BY rowid").map((x) => `${x.type}:${x.docNo}`)).toEqual(['IN_NG:GRN-PO-RW-01', 'IN:GRN-PO-RW-02']);
   });
 
   // ───────── T3.5 ─────────

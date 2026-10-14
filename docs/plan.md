@@ -5,6 +5,7 @@
 1. `functions/_lib/storage/{index,r2,drive-adapter,common}.js` — interface put/head/open/trash/untrash/makePrivate/publicUrl ; getStorage(env) สำหรับเขียน, getStorageFor(row) สำหรับอ่าน/ลบ/กู้ ; drive.js ไม่แก้ logic ไม่ลบ
 2. migration `0013_attachments_storage.sql` (ADD COLUMN storage/objectKey/migratedFrom + index ; ไม่มี DROP)
    - migration `0014_m7_audit_notify.sql` (index `audit_logs.timestamp` + ตาราง `notification_reads` ; ไม่มี DROP)
+   - migration `0015_stock_rate_index.sql` (index `audit_logs(performedBy, action, createdAtMs)` สำหรับ rate limit ปรับยอด/รับเข้า Manual ; ไม่มี DROP)
 3. ต่อเข้า upload.js / files.js / orphans.js / unshare.js / [[route]].js (publicUrl) — API ฝั่ง client ไม่เปลี่ยน, สิทธิ์/IDOR/header เดิม
 4. config: wrangler.toml r2_buckets + FILE_STORAGE, playwright.cf.config.js (R2 local), .dev.vars.example, e2e อัปโหลดจริง 1 เคส
 5. `scripts/migrate-files.js` เฉพาะ --dry-run (ย้ายจริงรอบหน้า)

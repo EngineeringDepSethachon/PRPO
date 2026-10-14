@@ -30,7 +30,7 @@
 - `npx wrangler d1 create prpo-db-preview` (ยังไม่ทดสอบ) — ได้ `database_id` แล้วแทน `<PREVIEW_DATABASE_ID>` ในบล็อก `[[env.preview.d1_databases]]` ของ `wrangler.toml`
 - apply migrations ให้ฐาน preview: `npx wrangler d1 migrations apply prpo-db-preview --remote` (ยังไม่ทดสอบ) — ข้อมูลจริงห้ามใส่ฐาน preview
 
-**(3) Backup D1 production ก่อน แล้ว apply migrations 0001-0014 remote** (0013 = `attachments.storage/objectKey/migratedFrom` + ดัชนี `idx_attachments_storage` สำหรับไฟล์ R2/Drive ปนกัน ไม่มี DROP ; ต้อง apply ก่อน deploy โค้ดอัปโหลด ; 0012 = ดัชนี `login_attempts` ; 0010 = `tokenVersion` + ล้างคอลัมน์ pin ; ต้อง apply ก่อน deploy โค้ดที่เช็ค `tv` ; 0011 = ดัชนี `file_refs` + `attachments.docGone` ; 0014 = ดัชนี `audit_logs.timestamp` + ตาราง `notification_reads`)
+**(3) Backup D1 production ก่อน แล้ว apply migrations 0001-0015 remote** (0015 = ดัชนี `audit_logs(performedBy, action, createdAtMs)` สำหรับ rate limit ปรับยอด/รับเข้า Manual ไม่มี DROP ; 0013 = `attachments.storage/objectKey/migratedFrom` + ดัชนี `idx_attachments_storage` สำหรับไฟล์ R2/Drive ปนกัน ไม่มี DROP ; ต้อง apply ก่อน deploy โค้ดอัปโหลด ; 0012 = ดัชนี `login_attempts` ; 0010 = `tokenVersion` + ล้างคอลัมน์ pin ; ต้อง apply ก่อน deploy โค้ดที่เช็ค `tv` ; 0011 = ดัชนี `file_refs` + `attachments.docGone` ; 0014 = ดัชนี `audit_logs.timestamp` + ตาราง `notification_reads`)
 - Backup (ยังไม่ทดสอบ) — เก็บไฟล์**นอก repo** เช่น `<PATH_OUTSIDE_REPO>\backup-<วันที่>.sql` (ห้ามใช้ path สัมพัทธ์ เพราะจะเขียนลง repo):
   ```powershell
   npx wrangler d1 export prpo-db --remote --output=<PATH_OUTSIDE_REPO>\backup-<วันที่>.sql
@@ -40,7 +40,7 @@
   ```powershell
   npx wrangler d1 migrations apply prpo-db --remote
   ```
-- ต้องผ่าน local ครบ 0001-0014 ก่อน (ข้อ 1.2)
+- ต้องผ่าน local ครบ 0001-0015 ก่อน (ข้อ 1.2)
 
 **(4) ย้ายข้อมูลจาก Google Sheets (D1 ต้องว่าง)**
 - ทำตามหัวข้อ 5 (export CSV → `scripts/import-sheets-to-d1.js` → ทดสอบ local → remote) ; ทดสอบ local ก่อนเสมอ (ยังไม่ทดสอบ)
@@ -155,7 +155,7 @@ npx wrangler d1 create prpo-db
 npx wrangler d1 migrations apply prpo-db --remote
 ```
 
-- รันเฉพาะหลังตรวจแล้วว่า migrations 0001-0014 ผ่าน local (ข้อ 1.2)
+- รันเฉพาะหลังตรวจแล้วว่า migrations 0001-0015 ผ่าน local (ข้อ 1.2)
 - ห้ามรัน `d1_schema.sql` ใด ๆ (ดูหัวข้อ 4)
 
 ### 2.3 ตั้ง secret `AUTH_TOKEN_SECRET` (ยังไม่ทดสอบ)
@@ -303,7 +303,7 @@ npx wrangler pages deploy dist --project-name <YOUR_PAGES_PROJECT_NAME>
 - [ ] `npm test` ผ่าน (ข้อสังเกต: ณ วันที่ทีมตรวจ ยังมีเทสต์ 4 ข้อที่เกี่ยวกับความตรงกันของสำเนา `cloudflare/functions` กับ `functions/` ที่ยัง fail ต้องแก้ก่อนขึ้นจริง)
 - [ ] `npm run build:cf` ผ่าน — **build ขึ้น production ด้วย `npm run build:cf` เท่านั้น** (ไม่ใช่ `npm run build`): คำว่า "build cloudflare" มีนิยามเดียวทั้งโปรเจกต์ = `--mode cloudflare` หรือ `VITE_BACKEND_MODE=cloudflare` (ใช้ทั้ง `vite.config.js` → ปิด source map, และ `authService.IS_CLOUDFLARE_BUILD` → ตัดบัญชี demo/ทางลัดรหัสออกจาก bundle) ; ตรวจ `dist/assets` ว่าไม่มีไฟล์ `.map` และไม่มีบัญชี demo (ไม่มีชื่อผู้ใช้เช่น `wichai.pd` คู่กับ `password`) ก่อน deploy — สตริง `password123`/`admin123` ที่ยังเหลือ 2-3 จุดเป็นข้อความ/รายการ "รหัสที่ห้ามใช้" ในฟอร์ม ไม่ใช่รหัสของบัญชีใด
 - [ ] ผู้ใช้ใหม่: ไม่มีรหัสผ่านเริ่มต้นแล้ว — แอดมินต้องตั้งรหัสผ่านให้ผู้ใช้แต่ละคนเอง (อย่างน้อย 6 ตัว) ; server (`POST/PUT /api/users`) ปฏิเสธ `password123 / admin123 / 123456` (ไม่สนตัวพิมพ์) และรหัสสั้นกว่า 6 ตัวด้วย 400 "กรุณาตั้งรหัสผ่านใหม่ ห้ามใช้รหัสเริ่มต้น" ; ตอนแก้ไขผู้ใช้เว้นช่องรหัสว่างไว้ = ไม่เปลี่ยนรหัส
-- [ ] migrations ทั้งหมด (0001-0014) ผ่าน local และพร้อม remote (0013 = `attachments.storage/objectKey/migratedFrom` สำหรับ R2/Drive, 0007 = คอลัมน์ attachments สำหรับ `/api/upload`, 0009 = ตัวนับคำขออัปโหลด, 0011 = ดัชนี `file_refs`, 0012 = ดัชนี `login_attempts` สำหรับล้างแถวเก่ากว่า 24 ชม. ; 0014 = ดัชนี `audit_logs.timestamp` + ตาราง `notification_reads` ; ไม่มี DROP)
+- [ ] migrations ทั้งหมด (0001-0015) ผ่าน local และพร้อม remote (0013 = `attachments.storage/objectKey/migratedFrom` สำหรับ R2/Drive, 0007 = คอลัมน์ attachments สำหรับ `/api/upload`, 0009 = ตัวนับคำขออัปโหลด, 0011 = ดัชนี `file_refs`, 0012 = ดัชนี `login_attempts` สำหรับล้างแถวเก่ากว่า 24 ชม. ; 0014 = ดัชนี `audit_logs.timestamp` + ตาราง `notification_reads` ; 0015 = ดัชนี `audit_logs(performedBy, action, createdAtMs)` สำหรับ rate limit ปรับปรุงสต็อก ; ไม่มี DROP)
 - [x] **GitHub Pages job ปิดแล้ว (2026-10-13, ผู้ใช้ตัดสิน)** : job `build-and-deploy` ถูกเอาออกจาก `.github/workflows/deploy.yml` (เหลือ job `test` ที่รันทุก push) และ `GITHUB_PAGES_DEPLOYMENT.md` มีหมายเหตุเลิกใช้ด้านบน ; (ข้อเสนอ ไม่ได้ทำ: pin `actions/*` เป็น commit SHA — ไม่มีเน็ตยืนยัน SHA)
 - [ ] `AUTH_TOKEN_SECRET` ค่า `e2e-local-secret-...` ใน `playwright.cf.config.js` เป็นค่าสาธารณะ : `hasSecret` ปฏิเสธเมื่อไม่ได้ตั้ง `ENVIRONMENT=dev` (e2e ตั้ง binding นี้เอง) — ห้ามใช้ค่านี้ใน production
 - [ ] `public/_headers` (CSP ฯลฯ) อยู่ใน `dist/` หลัง `npm run build:cf` และเปิดแอปจริงบน Preview แล้วไม่มี CSP violation ใน Console (ดูหัวข้อ "Security headers" ด้านล่าง)
@@ -340,7 +340,7 @@ npx wrangler pages deploy dist --project-name <YOUR_PAGES_PROJECT_NAME>
 
 ## 5. ย้ายข้อมูลจาก Google Sheets (ตอนตัดระบบ)
 
-ขั้นตอนนี้ทำครั้งเดียวตอนตัดระบบเดิม และต้องทำกับ **D1 ที่ว่าง** (apply migrations ทั้งหมด 0001-0014 แล้ว ยังไม่มีข้อมูล ; ไฟล์ SQL เติมตาราง `file_refs` ด้วย จึงต้องมี 0011 — หรือสร้างด้วย `--no-file-refs`)
+ขั้นตอนนี้ทำครั้งเดียวตอนตัดระบบเดิม และต้องทำกับ **D1 ที่ว่าง** (apply migrations ทั้งหมด 0001-0015 แล้ว ยังไม่มีข้อมูล ; ไฟล์ SQL เติมตาราง `file_refs` ด้วย จึงต้องมี 0011 — หรือสร้างด้วย `--no-file-refs`)
 
 ### 5.1 Export ชีตเป็น CSV
 
@@ -376,7 +376,7 @@ npx wrangler d1 execute prpo-db --local --file=import/d1-import.import.sql
 npx wrangler d1 execute prpo-db --remote --file=import/d1-import.import.sql
 ```
 
-- รันได้เฉพาะเมื่อ D1 remote ว่างและ migrations 0001-0014 ผ่านแล้ว (ถ้ารันซ้ำ จะชน PRIMARY KEY และล้มเหลว ไม่ทับข้อมูล)
+- รันได้เฉพาะเมื่อ D1 remote ว่างและ migrations 0001-0015 ผ่านแล้ว (ถ้ารันซ้ำ จะชน PRIMARY KEY และล้มเหลว ไม่ทับข้อมูล)
 
 ### 5.5 รหัสผ่านของผู้ใช้
 

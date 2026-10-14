@@ -317,9 +317,12 @@ export const notificationService = {
       this.markNotificationAsReadForUser(userName, id);
     }
     const all = this.getAll();
+    const existing = all.find(n => n.id === id || n._id === id);
+    const alreadyRead = !!existing && (existing.isRead === true || existing.read === true || existing.status === 'read');
     const updated = all.map(n => (n.id === id || n._id === id) ? { ...n, isRead: true, read: true, status: 'read' } : n);
     this.saveAll(updated);
-    serverMarkRead([id]);
+    // Skip the server PUT if this item was already read locally (e.g. popover click triggers markAsRead twice)
+    if (!alreadyRead) serverMarkRead([id]);
 
     return updated;
   },

@@ -173,13 +173,17 @@ d('PO audit_logs (M7-3)', () => {
     expect(audits(['GOODS_RECEIVED_PARTIAL', 'GOODS_RECEIVED_FULL'])).toHaveLength(1);
   });
 
-  it('stockOnly receive writes no audit row (GAS parity)', async () => {
+  it('stockOnly receive (ReceivingModal flow) : PO left open -> ONE GOODS_RECEIVED_PARTIAL (once per GRN) ; PO finished (COMPLETED) -> none', async () => {
     seedPo();
     await call('wh', 'PUT', '/api/pos/PO-G1', { grnHistory: [{ grnNumber: GR1, round: 1, items: [] }], items: [{ ...LINE, receivedQty: 5, goodQty: 5 }] });
-    const before = audits(['GOODS_RECEIVED_PARTIAL', 'GOODS_RECEIVED_FULL']).length;
-    const r = await call('wh', 'POST', '/api/pos/PO-G1/receive', { poId: 'PO-G1', stockOnly: true, grNumber: GR1, receivingItems: [{ productId: 'P1', code: 'C1', goodQty: 5, defectiveQty: 0 }] });
-    expect(r.status).toBe(200);
-    expect(audits(['GOODS_RECEIVED_PARTIAL', 'GOODS_RECEIVED_FULL']).length).toBe(before);
+    const body = { poId: 'PO-G1', stockOnly: true, grNumber: GR1, receivingItems: [{ productId: 'P1', code: 'C1', goodQty: 5, defectiveQty: 0 }] };
+    expect((await call('wh', 'POST', '/api/pos/PO-G1/receive', body)).status).toBe(200);
+    expect((await call('wh', 'POST', '/api/pos/PO-G1/receive', body)).status).toBe(200);
+    expect(audits(['GOODS_RECEIVED_PARTIAL'])).toHaveLength(1);
+    expect(audits(['GOODS_RECEIVED_FULL'])).toHaveLength(0);
+    sdb.prepare("UPDATE pos SET status = 'COMPLETED' WHERE id = 'PO-G1'").run();
+    sdb.prepare("DELETE FROM audit_logs WHERE action LIKE 'GOODS_RECEIVED%'").run();
+    await call('wh', 'POST', '/api/pos/PO-G1/receive', body);
     expect(sdb.prepare("SELECT COUNT(*) AS n FROM audit_logs WHERE action LIKE 'GOODS_RECEIVED%'").get().n).toBe(0);
   });
 

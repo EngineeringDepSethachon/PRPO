@@ -1,7 +1,9 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { SlidersHorizontal, AlertCircle, X, Check, ArrowDownCircle, ArrowUpCircle, MapPin } from 'lucide-react';
 import { storageService } from '../../services/storageService';
+import { apiService } from '../../services/apiService';
+import { isCloudflareMode } from '../../config/backendMode';
 import SearchableSelect from '../common/SearchableSelect';
 import { safeStringCompare } from '../../utils/formatters';
 
@@ -13,6 +15,10 @@ export default function StockAdjustmentModal({ products = [], currentRole, onClo
   const [customNote, setCustomNote] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const newRequestId = () => `adj${Date.now().toString(36)}${Math.random().toString(36).slice(2, 10)}`;
+  const requestIdRef = useRef(newRequestId());
+  // a changed form is a different movement : fresh key (an untouched re-click after a lost reply keeps the key and replays safely)
+  useEffect(() => { requestIdRef.current = newRequestId(); }, [selectedProductId, actionType, qty, reason, customNote]);
 
   // Only show products matching this role's dept
   const availableProducts = useMemo(() => {
@@ -58,6 +64,20 @@ export default function StockAdjustmentModal({ products = [], currentRole, onClo
 
     setSaving(true);
     try {
+      if (isCloudflareMode()) {
+        // cloudflare : the server owns balance + log + audit (never localStorage) ; requestId makes a re-click after a lost reply a no-op
+        await apiService.adjustStock({
+          productId: selectedProductId,
+          direction: actionType,
+          quantity: qtyNum,
+          reason,
+          customNote,
+          requestId: requestIdRef.current
+        });
+        onClose();
+        onRefresh();
+        return;
+      }
       const allProducts = storageService.getProducts();
       const stockLogs = storageService.getStockLogs();
       const timestamp = new Date().toLocaleString('th-TH');

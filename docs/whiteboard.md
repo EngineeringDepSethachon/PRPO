@@ -6,9 +6,33 @@
 - progress = จำนวน [x] / ทั้งหมด (server คำนวณ)
 -->
 # ไวท์บอร์ด Migrate Team
-อัปเดต: 2026-10-13 23:59
+อัปเดต: 2026-10-14 22:30
 
 ## ✅ ตัดสินใจแล้ว
+
+- [2026-10-14] S8 ปิด (ผ่าน QA+kla): stock_logs รับของมี grnNumber + แถว IN_NG (ไม่แตะยอด/MAC) เพดานชำรุดต่อคำขอ = ยอดสั่ง×conv − IN ดีสะสม ; grnNumber แถวเก่าเติมตอนอ่าน ; stockOnly ที่ PO ยังไม่ปิด → audit GOODS_RECEIVED_PARTIAL + แจ้งเตือน PO_CLAIM (ตามคำตัดสิน S8) ; PO ไม่มีแผนกไม่ส่งแจ้งเตือน
+
+- [2026-10-14] S6/S7 ปิด (ผ่าน QA+kla): โหมด CF รูปสินค้าต่อรายการ+รูปแนบรวมอัปโหลด R2 เก็บ fileId (/api/files/:id), base64 เก่ายังแสดง ; ฟอร์ม PR ล้างตอนกด 'ตกลง' ใน modal สำเร็จ + กันส่งซ้ำ
+
+- [2026-10-14] ผู้ใช้เลือก (ask) S8 แทน Q3 เดิม: ตรวจรับในโหมด CF ตรง GAS ตามที่ทำงานจริง — รับบางส่วน/มีเคลม ลง audit GOODS_RECEIVED_PARTIAL + แจ้งเตือน PO_CLAIM (จัดซื้อ+ผู้ขอ) ; รับครบไม่ลง/ไม่แจ้ง (ข้อมูล Q3 เดิมไม่ครบ)
+
+- [2026-10-14] S3/S4 ปิด (ผ่าน QA+kla + ทดสอบ wrangler/D1 local): ReceivingModal remainingQty = min(ค่าเก็บ, สั่ง−รับ−คืนเงิน) → รอบ 2 รับครบเป็น COMPLETED ไม่บังคับฟอร์มเคลม ; ป้ายสถานะ PO/PR ใช้ label เดิม ; server cascade PR → completed ทันทีที่ PO ใดปิด (ตรง GAS Code.gs:2900-2947, poNumber ทับ, match ด้วย prId ก่อน) ใน batch + audit PR_COMPLETED_BY_PO (สงวน action) ; client CF ไม่ cascade ซ้ำ
+
+- [2026-10-14] ผู้ใช้เลือก (ask) S4: ปิด PR ทันทีที่ PO ใบใดใบหนึ่งรับครบ/ปิด ตรง GAS เดิม (ไม่รอ PO พี่น้อง)
+
+- [2026-10-14] S5 ปิด (ผ่าน QA+kla): คืนกระดิ่ง+NotificationPopover แบบ 1.0.1 ที่ Sidebar ข้างปุ่มรีเฟรช, badge = taskCounts.total (งานค้าง) ตาม 1.0.1, mark read ส่ง server ครั้งเดียว
+
+- [2026-10-14] ผู้ใช้เลือก (ask) S5: คืนกระดิ่ง + หน้าต่างแจ้งเตือนแบบเวอร์ชัน 1.0.1 (c12ce08) ที่มุม Sidebar ข้างปุ่มรีเฟรช (เดิมถูกถอดใน b7b69c6 ก่อนทีมย้าย)
+
+- [2026-10-14] ผู้ใช้สั่งทำต่อ S3 + S4 + S5 (แก้บั๊ก ไม่ต้อง consult)
+
+- [2026-10-14] S1 ปิด (ผ่าน QA+kla + ทดสอบ wrangler/D1 local): route ใหม่ POST /api/stock/adjust และ /api/stock/manual-in — server คำนวณยอด+stock_logs+audit ใน batch, กันติดลบใน SQL, requestId กันซ้ำ (hash), สิทธิ์ STOCK_ADJUST = admin หรือ (ไม่ online และ ผู้รับของ L1/99 หรือ ASST_MANAGER), qty ปัด 4 ตำแหน่ง ≤1e7 (ใช้กับ /api/stock/issue ด้วย), rate limit 30/นาที ; ไม่ปรับ MAC (ฟอร์มไม่มีราคา ตาม mock เดิม) ; migration 0015 index audit_logs ; ก่อน deploy apply ถึง 0015
+
+- [2026-10-14] S2 ปิด (QA ไม่ผ่าน 3 รอบ → ผู้ใช้อนุมัติแก้รอบ 4 ; ผ่าน QA+kla): BudgetView canAllocateBudget ตัดสิน admin ด้วย isAdminUser (adminRule.js) ก่อนเช็ค canOnlinePurchase ; โหมด CF ข้ามเงื่อนไข admin หลวม (canonicalRole/role/username/auth.isAdmin/canAccess) ; mock/GAS คงเดิม ; server บังคับสิทธิ์งบเองทุก route
+
+- [2026-10-14] ผู้ใช้สั่งแก้ S1 + S2 จาก docs/smoke-test-2026-10-14.md ก่อน (แก้บั๊ก ไม่ต้อง consult)
+
+- [2026-10-14] ผู้ใช้เลือก (ask): รัน M2 เองตาม docs/M2_RUNBOOK.md แล้วแจ้งผลทีละขั้น ; ทีมรอผล ไม่รันคำสั่ง remote ; เมื่อได้ผลแต่ละขั้น Neo ตรวจผลแล้วติ๊ก M2
 
 - [2026-10-13] หลัง smoke r2 (ผ่าน QA+kla): ยอดงบ 960 vs 1,070 ไม่ใช่บั๊ก (สคริปต์ API ข้ามขั้น client ; หน้าจอตรงกันทุกขั้น ; budgets.totalUsed ไม่ใช้แสดงผล ตรง GAS) ; server ส่งเวลา D1 เป็น ISO-Z (functions/_lib/timefmt.js) + client แสดงเวลาไทยรูปแบบเดิม ; ledger แผนก normalize ด้วย ledgerDeptCode ตัวเดียวทั้งตรวจ/บันทึก (dept=department เสมอ) ; PO สถานะ COMPLETED แสดง 'เสร็จสิ้น' ; login เร็วไม่ใช่บั๊กแอป
 
@@ -20,7 +44,7 @@
 
 - [2026-10-13] M7-1/3/4 ผ่าน QA+kla: GET /api/audit-logs field ตาม GAS (admin เท่านั้น, module pr/po=PURCHASE อื่นตาม moduleMap client) ; POST audit-logs จาก client ห้าม pr/po และ action ที่ server สงวน + timeline อ่านเฉพาะ source IS NULL ; PO audit PO_CREATED/UPDATE_PO/GOODS_RECEIVED_*/PO_SETTLED ใน batch ; RESUBMIT 1 แถวผ่าน marker จาก client ; ล้างลายเซ็นถึง D1 + signerOf fallback ตาม GAS ; CSV export กัน formula
 
-- [2026-10-13] ผู้ใช้เลือก (ask) ตามที่ทีมแนะนำ M7: RESUBMIT 1 แถวต่อครั้ง ; UPDATE_PO ลงทุกการแก้ PO ; รับของ stockOnly ไม่ลง audit/แจ้งเตือน (ตาม GAS) ; สถานะอ่านแจ้งเตือนเก็บ server แยกต่อคน (ตาราง notification_reads migration 0014) ; ลายเซ็น: แก้การล้าง + fallback ตาม role ตาม GAS ไม่ทำหน้าใหม่ ; หน้า Audit Log แสดงข้อมูลจริงจาก server หน้าตาเดิม ; คงเมนูงบให้ ONLINE_PURCHASER (พฤติกรรมเดิม)
+- [2026-10-13] ผู้ใช้เลือก (ask) ตามที่ทีมแนะนำ M7: RESUBMIT 1 แถวต่อครั้ง ; UPDATE_PO ลงทุกการแก้ PO ; รับของ stockOnly ไม่ลง audit/แจ้งเตือน (ตาม GAS) (แทนที่ด้วยคำตัดสิน S8 2026-10-14) ; สถานะอ่านแจ้งเตือนเก็บ server แยกต่อคน (ตาราง notification_reads migration 0014) ; ลายเซ็น: แก้การล้าง + fallback ตาม role ตาม GAS ไม่ทำหน้าใหม่ ; หน้า Audit Log แสดงข้อมูลจริงจาก server หน้าตาเดิม ; คงเมนูงบให้ ONLINE_PURCHASER (พฤติกรรมเดิม)
 
 - [2026-10-13] Fable อนุมัติ M7 (cmv6sec6q1ce40) ลำดับ audit-log admin > PO audit > ลายเซ็น+RESUBMIT > แจ้งเตือน > smoke รอบ 2 ; local เท่านั้น ; เงื่อนไข: เทียบฟังก์ชัน GAS ตรงตัวอักษรจดใน tasks.md, audit actor จาก token + batch เดียวกับเอกสาร, /api/audit-logs เฉพาะ admin, ลายเซ็นแก้ได้เฉพาะ admin/เจ้าของ + จำกัดขนาด/ชนิด, ผู้รับแจ้งเตือนตรง GAS ห้ามข้ามแผนก + mark-read กัน IDOR + helper เดียว, migration ไม่มี DROP, smoke รอบ 2 เป็นเอกสารใหม่, เจอเรื่องเปลี่ยน UX/business rule ให้หยุด ask
 
@@ -78,6 +102,13 @@
 
 ## ⏳ ค้างอยู่
 
+- ผู้ใช้ต้องลบเอง (สำคัญ ก่อน apply migrations): C:\Users\Admin\Desktop\PRPO\migrations\0016_stock_logs_grn_backfill.sql — ทีมยกเลิกแล้ว (เคยเป็น UPDATE ข้อมูลเดิม) ตอนนี้ Neo เขียนทับเป็น SELECT 1 ; ลบได้เลย
+- **รอผู้ใช้ตัดสิน (kla กลาง S4):** ผู้ขอซื้อ/ผู้ตรวจในแผนกเปลี่ยน PO เป็น CLOSED ผ่าน PUT ได้โดยไม่รับของจริง (short-close เดิม ตรง GAS ไม่มี RBAC) และตอนนี้ปิด PR ตามไปด้วย — ถ้าจะจำกัดให้เฉพาะผู้รับของ/ผู้ซื้อออนไลน์/admin หรือบังคับเหตุผล = เปลี่ยน business rule ; ตอนนี้เพิ่ม audit PR_COMPLETED_BY_PO ไว้ตามย้อน
+- ต่ำ S5 (บันทึก): PUT notifications/read-all ไม่มี rate limit ; key อ่านแล้วใน localStorage ใช้ชื่อผู้ใช้ ; โหมด GAS/mock สถานะอ่านค้างหลัง logout (เดิม) ; PO list COMPLETED_WITH_REFUND ยังแสดงรหัสดิบ (เทสต์เดิมล็อกไว้)
+
+- **[2026-10-14] M2 ทำแล้วโดย Claude ตามคำสั่งผู้ใช้:** migrations 0013-0014 apply แล้วทั้ง prod/preview (backup C:\Users\Admin\prpo-backups\prpo-db-20261014-pre0013.sql) ; ไม่ย้ายข้อมูล Sheets (ผู้ใช้ยืนยันไม่มีข้อมูลที่ต้องย้าย) ; deploy Preview + Production แล้ว (https://prpo-pdqc.pages.dev /api/health 401, CSP/XFO/nosniff ครบ) ; สร้างแอดมิน production `admin` (ADMIN/99) ผู้ใช้ตั้งรหัสเองผ่าน set-user-password.js (mustChangePassword=1) ; commit 903ee19 แล้วแต่ **push ถูกปฏิเสธสิทธิ์ ผู้ใช้ต้อง push เอง** ; ไฟล์ temp 4 ตัวใน docs ไม่มีแล้ว แต่ **tests/_dbg_sig.test.js และ vt_tmp_out.json ลบไม่ได้ (permission) ผู้ใช้ลบเอง** ; **ยังไม่ตัด GAS** (ต้องทำใน script.google.com ด้วยบัญชี Google ของผู้ใช้)
+- **[2026-10-14] smoke test รอบ 3 ทุกบทบาทบน localhost → `docs/smoke-test-2026-10-14.md` + รูป `docs/smoke-screenshots-2026-10-14/`** บั๊กต้องแก้ก่อนใช้จริง: **S1 สูง** ปรับปรุงยอดสต็อก/รับเข้าคลัง (Manual) ในโหมด CF ไม่บันทึกและไม่แจ้ง error (StockAdjustmentModal/ManualStockInModal เขียน storageService อย่างเดียว) ; **S2 สูง** แอดมินกดจัดสรรงบไม่ได้ (bootstrap ตั้ง canOnlinePurchase=true ให้ admin → BudgetView:126 ตัดสิทธิ์) ; **S3 กลาง** รับของรอบ 2 ครบแล้ว PO ยังค้าง PARTIALLY_RECEIVED_IN_CLAIM + ป้ายสถานะดิบ (WAITING_DELIVERY_ROUND_2, PARTIALLY_RECEIVED_IN_CLAIM, REJECTED_TO_DRAFT) ; **S4 กลาง** PR ออนไลน์ค้าง "รอสั่ง Online" หลัง PO รับครบ ; **S5 กลาง** ไม่มีกระดิ่งแจ้งเตือนใน UI (server สร้าง 16 แถว แต่ Sidebar ไม่ render) ; **S6 กลาง** รูปสินค้าต่อรายการ + เอกสารประกอบรวมเก็บ base64 ใน PR ไม่ขึ้น R2 (ใบเสนอราคา/GRN ขึ้น R2 ถูก) ; **S7 กลาง** ฟอร์ม PR ไม่ล้างหลังส่ง (โชว์เลขใหม่พร้อมข้อมูลเดิม) ; S8 ไม่มี audit GOODS_RECEIVED/IN_NG และ stock_logs.grnNumber ว่าง ; S9 ปุ่ม "ล้างประวัติธุรกรรมจำลอง" ยังโชว์ใน Audit Log ; S10 สร้างสินค้า/ผู้ขายยิง save 2 ครั้ง (uncaught duplicate) ; ต่ำ: login บอก 24 ชม. (จริง 8), รันรหัสสินค้าอัตโนมัติได้ "1", PR ส่งกลับยังนับผูกพันในกล่องงบ, bootstrap ซ้ำ 3 ครั้ง/การกระทำ
+
 - **งานใหม่ (Neo): ทำ R2 storage adapter ตาม docs/requirements-file-storage.md** (consult Fable → สมชายแตก task → malee → QA → kla) ; **R2 เปิดแล้ว + bucket `prpo-files` / `prpo-files-preview` สร้างแล้ว (2026-10-13) + binding `FILES` และ `FILE_STORAGE="r2"` ใส่ใน wrangler.toml แล้ว** ทีมเริ่มเขียนโค้ดได้ทันที (อย่าสร้าง bucket/binding ซ้ำ)
 - D-2 แก้แล้ว deploy Preview รอบใหม่แล้ว (2026-10-13, deployment 5575d3c8) — รอผู้ใช้ยืนยันหน้า Master Data/Dashboard
 
@@ -87,7 +118,7 @@
 - ต่ำ (บันทึก): online settle ฝั่ง D1 ไม่คืนงบจาก actualTotalAmount (client คืนเองผ่าน ledger) ; parity: ไม่บังคับแผนก/เจ้าของเอกสารฝั่ง server, แก้ items PR ได้ทุกสถานะ
 - ถามผู้ใช้อีกครั้งตอนตัดระบบ: ล้างรหัส plaintext ใน Sheets
 - ต่ำ (รอผู้ใช้ตัดสินภายหลัง): จับคู่ code ที่มีช่องว่าง/อักษรไม่ใช่ ASCII ระหว่าง stock-logs กับ MAC ; ฟอนต์ PDF ของ GAS โหลดจาก jsdelivr ; หน้า login ส่ง IP ไป api.ipify.org ; ตัวเลขยอดคืนที่แสดงผล client เขียนได้ภายใต้เพดาน (ไม่กระทบ ledger) ; เปิดไฟล์ private ที่ไม่มีสิทธิ์/เน็ตล่มจะไปหน้าขอสิทธิ์ Google (proxy ตอบ 404 เหมือนกันกันเดา)
-- ผู้ใช้ต้องลบไฟล์ temp เอง (permission บล็อกทีม): C:\Users\Admin\Desktop\PRPO\docs\_tmp_assemble.cjs, C:\Users\Admin\Desktop\PRPO\docs\_tmp_step1_head.md, C:\Users\Admin\Desktop\PRPO\docs\_tmp_step1_tail.md, C:\Users\Admin\Desktop\PRPO\docs\_tmp_later_head.md, C:\Users\Admin\Desktop\PRPO\tests\_dbg_sig.test.js (ไฟล์ it.skip เปล่าของ M7-4b)
+- ผู้ใช้ต้องลบไฟล์ temp เอง (permission บล็อกทีม): C:\Users\Admin\Desktop\PRPO\docs\_tmp_assemble.cjs, C:\Users\Admin\Desktop\PRPO\docs\_tmp_step1_head.md, C:\Users\Admin\Desktop\PRPO\docs\_tmp_step1_tail.md, C:\Users\Admin\Desktop\PRPO\docs\_tmp_later_head.md, C:\Users\Admin\Desktop\PRPO\tests\_dbg_sig.test.js (ไฟล์ it.skip เปล่าของ M7-4b), C:\Users\Admin\Desktop\PRPO\test-results\s1_live.mjs, C:\Users\Admin\Desktop\PRPO\test-results\s1_live2_sqlcheck.mjs, C:\Users\Admin\Desktop\PRPO\test-results\s4-local-check.mjs, C:\Users\Admin\Desktop\PRPO\test-results\s4-local.sql, C:\Users\Admin\Desktop\PRPO\test-results\s4-q.sql, C:\Users\Admin\Desktop\PRPO\test-results\s4-audit-check.mjs, C:\Users\Admin\Desktop\PRPO\test-results\s4-forge-check.mjs, C:\Users\Admin\Desktop\PRPO\test-results\s4-audit.sql, C:\Users\Admin\Desktop\PRPO\test-results\s7_tmp.json
 - ถามผู้ใช้ภายหลัง: lifecycle ลบถาวร trash/ ใน R2 เกิน 30 วัน (ตอนนี้ไม่ลบอัตโนมัติ) ; id โฟลเดอร์ Drive ยืนยันตอนย้ายไป Google Drive
 - ลบ/แก้บรรทัดที่อ้าง Service Account/Shared Drive เป็นขั้นก่อนขึ้นจริง (ตอนนี้เป็นงานภายหลังเมื่อมี Google Workspace)
 - ต่ำ (บันทึก): PR อนุมัติ/ส่งกลับพร้อมกัน 2 request ผ่านทั้งคู่ (ไม่มี optimistic lock) ; PRDetailsModal self-heal สถานะจาก activityLog (เดิม, แสดงผลเท่านั้น) ; แผนกไม่มีงบเดือนนี้ → ธงเกินงบขึ้น (zero-based ตรง BudgetView)
@@ -97,15 +128,30 @@
 - ต่ำ (ตรวจใน smoke รอบ 2): หน้า Audit Log รีโหลด 2000 แถวทุกครั้งที่มี log ในเครื่อง ; ORDER BY julianday ไม่ใช้ index
 - ต่ำ (บันทึก) M7-2: lock ใช้ status อย่างเดียว — แก้เนื้อหาพร้อมกันในสถานะเดิม/ABA ยังทับได้ ; POST หลาย PR ได้ 409 บางส่วน ; PUT ไม่พบแถวตอบ success ; ดับเบิลคลิกสร้าง PR → 409 modal (ข้อมูลไม่เสีย) ; Approver role ที่ canViewAllDepts=0 ยังได้แจ้งเตือนแผนกอื่น (ตรง GAS) ; เหตุผลยกเลิก PR แจ้งทั้งแผนก (ตรง GAS)
 - ผู้ใช้เลือก (ask 2026-10-13): ไม่แจ้งเตือน Approver ตอนส่งจากร่าง/ส่งใหม่ (ตรง GAS) ; ไม่เพิ่มป้ายแถว audit จาก client
+- ต่ำ M8 (บันทึก): /api/stock/issue ยังรับ unitCost/docNo จาก client (มูลค่าใน log ปลอมได้ ยอดไม่กระทบ) ; ปรับลดจนเหลือ 0 จากยอดมีเศษอาจเก็บ -0.0
+- ต่ำ (บันทึก) M8: hasBudgetAccess ยังใช้ canAccess หลวม (เข้าดูหน้าได้ ข้อมูล server กรอง) ; adminRule fallback user.id ; /allocate กลืน error DB ตอบ success ; สินค้ากองกลาง ALL ปรับยอดได้ทุกแผนก (business rule) ; stock_logs.actorId = roleKey (ตาม /stock/issue)
 - ต่ำ (บันทึก): หลัง smoke r2: แท็บ 'ปิดงานแล้ว' ในรายการ PO ไม่นับ COMPLETED (พฤติกรรมเดิม — เปลี่ยน = ถามผู้ใช้) ; PR ค้าง 'รอสั่ง Online' หลังเคลม/ยกเลิก PO (เดิม) ; รหัสแผนกจริงที่ขึ้นต้น 'ฝ่าย' จะถูกตัด — เช็กตอนย้ายข้อมูล Sheets ; writer ติดป้าย CLAIM_CREDIT ไม่มี docNo ให้ PO อื่นในแผนกได้ ; writer เขียน ledger แผนก ALL ได้ (เดิม) ; ORDER BY createdAt ที่รูปแบบปน
+- ต่ำ S6 (บันทึก): ไฟล์กำพร้าใน R2 ล้างเฉพาะเมื่อ admin สั่ง (เสนอ Cron Trigger) ; server ยังรับ data: URL ≤400k (บังคับหลัง deploy client ใหม่)
+- ต่ำ S8 (บันทึก): IN_NG สะสมต่อ PO ไม่มีเพดานรวม (ต่อคำขอจำกัด) ; GRN ใน grnHistory มาจาก client (รูปแบบไม่คงที่) ; poReceiveNotificationParams ยัง fallback 'ALL' ถ้าเส้นทางอื่นเรียก ; ตารางสต็อกแสดงแถว IN_NG เป็น +N สีเขียว (มีป้าย IN (NG))
 
 ## 🎯 Milestones
+
+### M8: แก้บั๊ก smoke test 2026-10-14 (docs/smoke-test-2026-10-14.md)
+
+- [x] S1 สูง: ปรับยอดสต็อก/รับเข้า Manual ไม่บันทึกในโหมด CF
+- [x] S2 สูง: แอดมินจัดสรรงบไม่ได้
+- [x] S3 กลาง: PO รับรอบ 2 ครบแต่ค้าง PARTIALLY_RECEIVED_IN_CLAIM + ป้ายสถานะดิบ
+- [x] S4 กลาง: PR ออนไลน์ไม่ cascade เป็น completed หลัง PO รับครบ
+- [x] S5 กลาง: ไม่มี UI แจ้งเตือน (กระดิ่ง)
+- [x] S6 กลาง: รูปสินค้า/รูปประกอบรวมขึ้น R2 แทน base64
+- [x] S7 กลาง: ฟอร์ม PR ล้างหลังส่งสำเร็จ (กด "ตกลง")
+- [x] S8 ต่ำ-กลาง: stock log รับของ (grnNumber + IN_NG) + audit/แจ้งเตือนรับบางส่วน
 
 ### M2: เตรียมขึ้นระบบจริง (ผู้ใช้ทำตาม checklist ใน docs/DEPLOY_CLOUDFLARE.md)
 
 - [ ] เปิด R2 + ตรวจ binding FILES + secrets (runbook ขั้น 1)
 - [x] สร้าง D1 preview (00791d04… ; ลบ D1 เดิมแล้วสร้าง prpo-db ใหม่ c64022bb…)
-- [ ] backup + apply migrations remote (ถึง 0014 ทั้ง prod/preview ; backup เดิมที่ C:\Users\Admin\prpo-backups)
+- [ ] backup + apply migrations remote (ถึง 0015 ทั้ง prod/preview ; backup เดิมที่ C:\Users\Admin\prpo-backups)
 - [ ] ย้ายข้อมูลจาก Sheets
 - [ ] smoke test
 - [ ] ตัดระบบ GAS (ปิด web app หรือ clasp push ตัวแก้ทันที)

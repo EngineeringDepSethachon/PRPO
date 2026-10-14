@@ -1354,7 +1354,10 @@ export const apiService = {
         (po.prNumber && (p.prNo === po.prNumber || p.id === po.prNumber || p.prNo === po.prNo))
       );
       if (relatedPR) {
-        await cfWrite('อัปเดตสถานะ PR ไม่สำเร็จ', `/api/prs/${relatedPR.id}`, jsonInit('PUT', relatedPR));
+        // the PO save above already completed the PR on the server (GAS parity : the PR closes as soon as ANY PO of it closes, siblings are not looked at) : the PR
+        // status belongs to the server, so it is not sent again (a stale local status would clash with it : 403 / 409) ; only the rest of the PR (activity log ...) is written
+        const { status: _prStatus, poStatus: _prPoStatus, ...prWithoutStatus } = relatedPR;
+        await cfWrite('อัปเดตสถานะ PR ไม่สำเร็จ', `/api/prs/${relatedPR.id}`, jsonInit('PUT', prWithoutStatus));
       }
     }
     return po;
@@ -1489,6 +1492,16 @@ export const apiService = {
       product: backendResult?.updatedProduct || gasResult?.updatedProduct || updatedProduct,
       logEntry: finalLog
     };
+  },
+
+  // --- Manual stock movements, cloudflare mode : the server owns balance + log + audit (POST /api/stock/adjust | /api/stock/manual-in) ---
+  async adjustStock(payload) {
+    const res = await cfWrite('ปรับปรุงสต็อกไม่สำเร็จ', '/api/stock/adjust', jsonInit('POST', payload));
+    return res.json().catch(() => ({}));
+  },
+  async manualStockIn(payload) {
+    const res = await cfWrite('รับสินค้าเข้าคลังไม่สำเร็จ', '/api/stock/manual-in', jsonInit('POST', payload));
+    return res.json().catch(() => ({}));
   },
 
   async quickIssueStock(productId, issueQty, user, note = '', issueUnit = '') {

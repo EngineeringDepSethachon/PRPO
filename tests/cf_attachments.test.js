@@ -4,7 +4,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 
 vi.mock('../src/services/modalService', () => ({ modalService: { alert: vi.fn(), error: vi.fn(), confirm: vi.fn() } }));
 
-import { uploadAttachmentsForCloudflare } from '../src/utils/cfAttachments.js';
+import { uploadAttachmentsForCloudflare, uploadItemImagesForCloudflare } from '../src/utils/cfAttachments.js';
 import { attachmentsForServer, pickAttachmentUrl, registerBlobUrl, isUsableUrl } from '../src/utils/attachmentUrls.js';
 import { hasOversizedDataUrl } from '../functions/_lib/upload.js';
 
@@ -55,14 +55,60 @@ describe('cloudflare mode : PR attachments', () => {
     expect(hasOversizedDataUrl(out)).toBe(false);
   });
 
-  it('small compressed images stay inline (no upload) ; a lingering blob preview is replaced by the data URL', async () => {
+  it('S6 : a small compressed image is uploaded too (from its compressed data URL) and no data:image stays in the saved reference', async () => {
     const img = new File([new Uint8Array(10)], 'p.jpg', { type: 'image/jpeg' });
     const data = 'data:image/jpeg;base64,' + 'A'.repeat(1000);
     const item = { file: img, id: 'i1', name: 'p.jpg', type: 'image/jpeg', isImage: true, previewUrl: 'blob:http://localhost/old', url: data, dataUrl: data };
-    const [out] = await uploadAttachmentsForCloudflare([item], { category: 'PR', department: 'PD' });
-    expect(fetchMock).not.toHaveBeenCalled();
-    expect(out.url).toBe(data);
-    expect(out.previewUrl).toBe(data);
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ ...SERVER, fileName: 'p.jpg', mimeType: 'image/jpeg', fileSize: 750 }), { status: 200 }));
+    const [out] = await uploadAttachmentsForCloudflare([item], { category: 'PR', department: 'PD', docType: 'PR_ATTACHMENT' });
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const sent = JSON.parse(fetchMock.mock.calls[0][1].body);
+    expect(sent).toMatchObject({ mimeType: 'image/jpeg', fileName: 'p.jpg', department: 'PD', docType: 'PR_ATTACHMENT' });
+    expect(sent.base64Data).toBe('A'.repeat(1000));
+    expect(out.fileId).toBe(SERVER.fileId);
+    expect(JSON.stringify(out)).not.toMatch(/data:|blob:/);
+  });
+
+  it('S6 : per-line product images (data URL, no File) are uploaded once per picture ; old fileId / non-image data untouched', async () => {
+    const d1 = 'data:image/png;base64,' + 'B'.repeat(400);
+    const d2 = 'data:image/jpeg;base64,' + 'C'.repeat(400);
+    const svg = 'data:image/svg+xml;base64,PHN2Zy8+';
+    const old = { name: 'old.jpg', fileId: 'OLDFILEID12345678', url: '/api/files/OLDFILEID12345678' };
+    const a = { name: 'a.png', url: d1, previewUrl: d1, size: 300 };
+    const b = { name: 'b.jpg', url: d2, previewUrl: d2 };
+    const items = [{ id: 'l1', name: 'x', images: [a, b, old], attachments: [a, b, old] }, { id: 'l2', images: [{ url: svg, previewUrl: svg }] }, { id: 'l3' }];
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify({ ...SERVER, fileId: 'NEWFILEID' + fetchMock.mock.calls.length + 'zzzzzzzz', fileUrl: '/api/files/x', directUrl: '/api/files/x', fileName: 'img.jpg', mimeType: 'image/jpeg', fileSize: 300 }), { status: 200 }));
+    const out = await uploadItemImagesForCloudflare(items, { category: 'PR', department: 'PD' });
+    expect(fetchMock).toHaveBeenCalledTimes(2); // a and b once each, although they sit in images AND attachments
+    const bodies = fetchMock.mock.calls.map(([, init]) => JSON.parse(init.body));
+    expect(bodies[0]).toMatchObject({ mimeType: 'image/png', docType: 'PR_ITEM_IMAGE', category: '01_PR_Attachments', department: 'PD' });
+    expect(bodies[1].mimeType).toBe('image/jpeg');
+    expect(out[0].images[0].fileId).toMatch(/^NEWFILEID/);
+    expect(out[0].images[0]).toEqual(out[0].attachments[0]);
+    expect(out[0].images[2]).toBe(old);
+    expect(out[1].images[0].url).toBe(svg); // unsupported type : left as before
+    expect(out[2]).toEqual({ id: 'l3' });
+    expect(JSON.stringify(out[0])).not.toMatch(/data:image/);
+    expect(items[0].images[0].url).toBe(d1); // input not mutated
+  });
+
+  it('S6 : two different pictures that only have dataUrl are uploaded as 2 files (no wrong dedupe)', async () => {
+    const d1 = 'data:image/png;base64,' + 'B'.repeat(400);
+    const d2 = 'data:image/png;base64,' + 'C'.repeat(400);
+    let n = 0;
+    fetchMock.mockImplementation(async () => new Response(JSON.stringify({ ...SERVER, fileId: 'FILEID_' + (++n) + '_zzzzzzzzzz', fileUrl: '/api/files/x' }), { status: 200 }));
+    const out = await uploadItemImagesForCloudflare([{ images: [{ dataUrl: d1 }, { dataUrl: d2 }] }], {});
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    expect(out[0].images[0].fileId).not.toBe(out[0].images[1].fileId);
+  });
+
+  it('S6 : upload failure of an item image propagates (nothing is silently saved as base64) ; other modes untouched', async () => {
+    const d = 'data:image/png;base64,' + 'B'.repeat(400);
+    fetchMock.mockResolvedValueOnce(new Response(JSON.stringify({ error: 'ระบบจัดเก็บไฟล์ยังไม่พร้อมใช้งาน' }), { status: 503 }));
+    await expect(uploadItemImagesForCloudflare([{ images: [{ url: d }] }], {})).rejects.toThrow();
+    vi.stubEnv('VITE_BACKEND_MODE', 'mock');
+    const items = [{ images: [{ url: d }] }];
+    expect(await uploadItemImagesForCloudflare(items, {})).toBe(items);
   });
 
   it('already uploaded items (fileId, no File) are untouched ; upload failure propagates', async () => {

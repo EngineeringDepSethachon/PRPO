@@ -17,6 +17,8 @@ import DepartmentAllocationModal from '../components/budget/DepartmentAllocation
 import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
+import { isAdminUser } from '../utils/adminRule';
+import { isCloudflareMode } from '../config/backendMode';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
   Tooltip as RechartsTooltip, Legend, ResponsiveContainer,
@@ -122,6 +124,13 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
     const username = String(u.username || '').toLowerCase();
     const level = Number(u.level || 0);
 
+    // Cloudflare mode: the only admin decision is isAdminUser (server rule); loose legacy admin checks below apply to mock/GAS only
+    const cf = isCloudflareMode();
+
+    // Admin (level 99 / ADMIN) always manages budget; bootstrap grants admin canOnlinePurchase=true, so check admin first
+    // Uses the displayed user (not auth.isAdmin, which follows originalUser while an admin impersonates a role)
+    if (isAdminUser(u, roleId === 'ADMIN' || level >= 99)) return true;
+
     // Online Purchaser has no budget management access
     if (roleId === 'ONLINE_PURCHASER' || u.canOnlinePurchase) return false;
 
@@ -135,22 +144,23 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
       positionKey === 'ASST_MANAGER' ||
       positionKey === 'REVIEWER' ||
       canonicalRole === 'ASST_MANAGER' ||
-      canonicalRole === 'ADMIN' ||
+      (!cf && canonicalRole === 'ADMIN') ||
       canonicalRole === 'APPROVER' ||
       canonicalRole === 'REVIEWER' ||
       roleStr === 'ASST_MANAGER' ||
-      roleStr === 'ADMIN' ||
+      (!cf && roleStr === 'ADMIN') ||
       roleStr === 'PLANT_MANAGER' ||
       roleStr === 'APPROVER' ||
       u.canFinalApprove ||
       u.canSetBudget === true ||
       u.canAllocateBudget === true ||
-      username === 'admin' ||
+      (!cf && username === 'admin') ||
       username.includes('kallayani') ||
       username.includes('somchai') ||
       level >= 2 ||
-      auth?.isAdmin ||
-      auth?.canAccess?.('BUDGET_MANAGE')
+      (!cf && auth?.isAdmin) ||
+      // canAccess is true for canonicalRole ADMIN (loose includes('ADMIN'/'SYS')); non-admin paths (APPROVER/REVIEWER/level>=2) are covered above
+      (!cf && auth?.canAccess?.('BUDGET_MANAGE'))
     ) {
       return true;
     }
