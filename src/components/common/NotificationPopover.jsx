@@ -66,6 +66,7 @@ export default function NotificationPopover(props) {
   // Helper ตรวจสอบ Role & Department Filter (Strict Role & Dept, No Email)
   const matchesRoleAndDept = (n) => {
     if (!user) return true;
+    if (n && n.serverScoped === true) return true; // the server already chose the recipients
 
     const roleStr = String(user.role || user.canonicalRole || user.roleId || user.positionKey || '').toUpperCase();
     const isAdmin = isAdminUser(user, user.isAdmin === true || roleStr.includes('ADMIN') || Number(user.level) >= 99 || user.username === 'admin');

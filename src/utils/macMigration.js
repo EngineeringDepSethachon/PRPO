@@ -1,5 +1,28 @@
 import { storageService, isGAS, callGAS } from '../services/storageService';
-import { cfBackground } from '../services/cfGuard';
+import { cfBackground, cfWrite } from '../services/cfGuard';
+import { isCloudflareMode } from '../config/backendMode.js';
+
+// cloudflare: the server is the only owner of the MAC (computed from its stock_logs, same rule as GAS apiRecalculateProductMAC).
+// Nothing is calculated here : a server error is thrown (the caller shows its real message) and an avgCost of 0 from the server stays 0.
+async function healMACViaServer(targetSkuOrName) {
+  const key = String(targetSkuOrName || '').trim();
+  if (!key) return null;
+  const low = key.toLowerCase();
+  const products = storageService.getProducts() || [];
+  const local = products.find(p => [p.id, p.code, p.sku, p.name].some(v => String(v || '').trim().toLowerCase() === low));
+  const res = await cfWrite('คำนวณต้นทุนเฉลี่ยใหม่ไม่สำเร็จ', '/api/products/recalculate-mac', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productId: local ? local.id : key, productCode: local ? local.code : undefined })
+  });
+  if (!res || !res.ok) throw new Error('คำนวณต้นทุนเฉลี่ยใหม่ไม่สำเร็จ');
+  const data = await res.json().catch(() => null);
+  const sp = data && data.product;
+  if (!sp) throw new Error('คำนวณต้นทุนเฉลี่ยใหม่ไม่สำเร็จ');
+  const i = products.findIndex(p => String(p.id) === String(sp.id));
+  if (i !== -1) { products[i] = { ...products[i], ...sp }; storageService.saveProducts(products); }
+  return { ...(local || {}), ...sp };
+}
 
 /**
  * Recalculates Moving Average Cost (MAC) for a product from historical IN logs
@@ -9,6 +32,7 @@ import { cfBackground } from '../services/cfGuard';
  * @returns {Promise<Object|null>} The updated product record or null
  */
 export const healMACForProduct = async (targetSkuOrName) => {
+  if (isCloudflareMode()) return healMACViaServer(targetSkuOrName);
   try {
     const logs = storageService.getStockLogs() || [];
     const products = storageService.getProducts() || [];

@@ -104,13 +104,25 @@ export const extractDriveFileId = (urlOrId = '') => {
  * @param {string} urlOrId
  * @returns {boolean}
  */
+const DRIVE_HOSTS = ['drive.google.com', 'docs.google.com', 'drive.usercontent.google.com'];
+// googleusercontent is limited to the Drive image hosts lh3..lh6 (not any *.googleusercontent.com : user-content / sites hosts serve arbitrary content)
+const isDriveHost = (host = '') =>
+  DRIVE_HOSTS.includes(host) || /^lh[3-6]\.googleusercontent\.com$/.test(host);
+
 export const isDriveUrl = (urlOrId = '') => {
   if (!urlOrId || typeof urlOrId !== 'string') return false;
-  return Boolean(
-    urlOrId.includes('drive.google.com') ||
-    urlOrId.includes('googleusercontent.com') ||
-    extractDriveFileId(urlOrId)
-  );
+  const str = urlOrId.trim();
+  // raw Drive file ID (no slash / colon / dot), nothing to parse
+  if (/^[a-zA-Z0-9_-]{25,50}$/.test(str)) return true;
+  try {
+    // URL without protocol (e.g. 'drive.google.com/file/d/..') is treated as https
+    const candidate = /^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(str) ? str : `https://${str}`;
+    const u = new URL(candidate);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+    return isDriveHost(u.hostname.toLowerCase());
+  } catch {
+    return false;
+  }
 };
 
 /**

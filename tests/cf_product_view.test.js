@@ -81,10 +81,10 @@ describe('products over the API', () => {
     const view = (await call('GET', '/api/products')).json[0];
     const r = await call('PUT', '/api/products/P1', { ...view, reorderPoint: 9, stockBalance: 33, price: 77, stockUnit: 'กก.', unit: 'กก.' });
     expect(r.status).toBe(200);
-    expect(row('P1')).toMatchObject({ minStock: 9, currentStock: 33, standardPrice: 77, usageUnit: 'กก.' });
+    expect(row('P1')).toMatchObject({ minStock: 9, currentStock: 10, standardPrice: 77, usageUnit: 'กก.' });
     const p = await call('POST', '/api/products', { ...view, reorderPoint: 5, stockBalance: 12, price: 80 });
     expect(p.status).toBe(200);
-    expect(row('P1')).toMatchObject({ minStock: 5, currentStock: 12, standardPrice: 80 });
+    expect(row('P1')).toMatchObject({ minStock: 5, currentStock: 10, standardPrice: 80 }); // the stock of an existing row is owned by the server : a body value never overwrites it
   });
 
   it('PUT : locationId null / "" clears the location, key absent keeps it', async () => {

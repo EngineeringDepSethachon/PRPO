@@ -10,6 +10,7 @@ import { classifyUnhandled } from '../_lib/routes.js';
 import { handleExtraRoutes } from '../_lib/extra.js';
 import { utcIsoRow, utcIsoRows } from '../_lib/timefmt.js';
 import { productView, productViews } from '../_lib/products.js';
+import { stockLogViews } from '../_lib/stocklogs.js';
 import { handleUpload, checkBodyShape } from '../_lib/upload.js';
 import { handleFileDownload } from '../_lib/files.js';
 import { handleCleanupOrphans, handleRestoreOrphan } from '../_lib/orphans.js';
@@ -27,6 +28,12 @@ const JSON_WRITE_MAX_BYTES = 2 * 1024 * 1024;
 // stock log view : a GRN row written before grnNumber was filled (empty grnNumber, docNo = the GRN) shows docNo as grnNumber (GAS keeps grnNumber = documentNo) ; stored data is not changed
 function withGrnNumber(rows) {
   return (rows || []).map((r) => (r && !r.grnNumber && /^GRN?-/i.test(String(r.docNo || '')) ? { ...r, grnNumber: r.docNo } : r));
+}
+// cost per stock unit used on an issue / adjustment log : avgCost (MAC) -> latest IN price fail-safe (what the screens show) -> standard price
+async function serverIssueUnitCost(db, prod) {
+  // the latest-IN fail-safe applies whatever the balance is (the screen does the same) : view the row as if it held stock
+  const v = (await productViews(db, [{ ...prod, currentStock: Math.max(Number(prod.currentStock) || 0, 1) }]).catch(() => []))[0];
+  return Number((v && v.avgCost) || prod.avgCost || prod.standardPrice || 0);
 }
 const DOC_WRITE_RE =/^\/api\/(prs?|pos?|products|receive-goods|receive|grn|inventory|stock-logs|budget-transactions)(\/|$)/;
 
@@ -218,8 +225,8 @@ const MASTER_TABLES = { products: { code: true }, vendors: { code: true }, stora
 // so the department check and the UPDATE / DELETE act on ONE row (WHERE id = row.id), never "check one row, change several".
 async function resolveMasterRow(db, table, { subId, id, code }) {
   const withCode = MASTER_TABLES[table].code;
-  const q = withCode ? `SELECT id, department FROM ${table} WHERE id = ? OR UPPER(code) = UPPER(?) LIMIT 1` : `SELECT id, department FROM ${table} WHERE id = ? LIMIT 1`;
-  const run = (a, b) => db.prepare(q).bind(...(withCode ? [a, b] : [a])).first().catch(() => null);
+  const q = withCode ? `SELECT id, department FROM ${table} WHERE id = ? OR UPPER(code) = UPPER(?) ORDER BY (id = ?) DESC, COALESCE(isDeleted,0) ASC, id LIMIT 1` : `SELECT id, department FROM ${table} WHERE id = ? LIMIT 1`;
+  const run = (a, b) => db.prepare(q).bind(...(withCode ? [a, b, a] : [a])).first().catch(() => null);
   let row = null;
   if (subId) row = await run(subId, subId);
   if (!row && (id || code)) row = await run(id || '', code || '');
@@ -268,7 +275,39 @@ async function masterWriteVerdict(db, authUser, table, items, subId, opts = {}) 
 // product list of EVERY department, so there the rows the user may not touch are skipped silently (never written, never an error ; their ids are
 // returned as `skipped`) and the rest is written. Every other products route stays all-or-nothing (403 / 400).
 // the product rows of a request body : an array, { products: [...] } or a single object (anything else becomes a row that fails validation -> 400)
-const productRows = (body) => (Array.isArray(body) ? body : (body && typeof body === 'object' && Array.isArray(body.products) ? body.products : [body]));
+// code / itemCode are trimmed here so the gate, the lookup of the existing row and the INSERT all see the same key ("ABC " must find "ABC")
+const trimCodes = (p) => {
+  if (!p || typeof p !== 'object' || Array.isArray(p)) return p;
+  const needs = (typeof p.code === 'string' && p.code !== p.code.trim()) || (typeof p.itemCode === 'string' && p.itemCode !== p.itemCode.trim());
+  if (!needs) return p;
+  const q = { ...p };
+  if (typeof q.code === 'string') q.code = q.code.trim();
+  if (typeof q.itemCode === 'string') q.itemCode = q.itemCode.trim();
+  return q;
+};
+const productRows = (body) => (Array.isArray(body) ? body : (body && typeof body === 'object' && Array.isArray(body.products) ? body.products : [body])).map(trimCodes);
+// Opening balance of a NEW product row (existing rows never take stock from the body). { value: null } = not sent, { value } = finite >= 0 rounded to 4 dp
+// and <= STOCK_QTY_MAX (same bounds as /api/stock/*), { error } = refused.
+function parseOpeningStock(p) {
+  const raw = p.stockBalance !== undefined && p.stockBalance !== null && p.stockBalance !== '' ? p.stockBalance : p.currentStock;
+  if (raw === undefined || raw === null || raw === '') return { value: null };
+  let n;
+  if (typeof raw === 'number') n = raw;
+  else if (typeof raw === 'string' && /^\s*\d+(\.\d+)?\s*$/.test(raw)) n = Number(raw);
+  else return { error: 'ยอดตั้งต้นต้องเป็นตัวเลข' };
+  if (!Number.isFinite(n) || n < 0) return { error: 'ยอดตั้งต้นต้องไม่ติดลบ' };
+  const v = round4(n);
+  if (v > STOCK_QTY_MAX) return { error: 'ยอดตั้งต้นมากเกินไป' };
+  return { value: v };
+}
+// INSERT of a new product + (opening > 0) its PRODUCT_CREATE audit row in ONE db.batch ; actor comes from the token
+async function insertProductWithAudit(db, authUser, insertStmt, id, code, opening) {
+  if (!(opening > 0)) { await insertStmt.run(); return; }
+  const aud = db.prepare('INSERT INTO audit_logs (id, action, entityType, entityId, performedBy, details, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(`AUD-${Date.now()}-${uid()}`, 'PRODUCT_CREATE', 'product', String(id), authUser.userId,
+      JSON.stringify({ roleKey: authUser.roleKey, actorName: authUser.name || authUser.username || 'System User', code, openingStock: opening }), new Date().toISOString());
+  if (typeof db.batch === 'function') await db.batch([insertStmt, aud]); else { await insertStmt.run(); await aud.run(); }
+}
 async function gateProducts(db, authUser, path, list, subId) {
   if (path !== '/api/products/batch') {
     const verdict = await masterWriteVerdict(db, authUser, 'products', list, subId);
@@ -292,6 +331,25 @@ async function savedProductView(db, sent, subId) {
   if (!row) return sent;
   const [view] = await productViews(db, [row]);
   return { ...sent, ...view };
+}
+// Product Remark (migration 0017) : one text per product + who / when. Written ONLY by the single-product POST / PUT (department gate already passed),
+// never by the bulk /batch sync (it re-sends every department with possibly stale copies). Author + time come from the token, never the body.
+const PRODUCT_REMARK_MAX = 2000;
+const productRemarkTooLong = (list) => list.some((p) => p && typeof p === 'object' && typeof p.remark === 'string' && p.remark.trim().length > PRODUCT_REMARK_MAX);
+// rowId = the id of the row the department gate checked and the main UPDATE / INSERT wrote (existing.id or the inserted id) - never looked up again by code
+async function applyProductRemark(db, authUser, path, p, rowId) {
+  if (path === '/api/products/batch' || !p || typeof p !== 'object' || !('remark' in p) || !rowId) return;
+  const next = p.remark == null ? '' : String(p.remark).trim().slice(0, PRODUCT_REMARK_MAX);
+  const row = await db.prepare('SELECT id, remark FROM products WHERE id = ?').bind(rowId).first();
+  if (!row || String(row.remark ?? '') === next) return; // unchanged -> keep the original author / time
+  const who = authUser.name || authUser.username || 'System User';
+  const title = authUser.title || authUser.department || '';
+  const upd = db.prepare('UPDATE products SET remark = ?, remarkUpdatedAt = ?, remarkUpdatedBy = ? WHERE id = ?')
+    .bind(next, new Date().toLocaleString('th-TH', { timeZone: 'Asia/Bangkok' }), title ? `${who} (${title})` : who, row.id);
+  const aud = db.prepare('INSERT INTO audit_logs (id, action, entityType, entityId, performedBy, details, timestamp) VALUES (?, ?, ?, ?, ?, ?, ?)')
+    .bind(`AUD-${Date.now()}-${uid()}`, 'PRODUCT_REMARK_SET', 'product', String(row.id), authUser.userId,
+      JSON.stringify({ roleKey: authUser.roleKey, actorName: who, from: String(row.remark ?? ''), to: next }), new Date().toISOString());
+  if (typeof db.batch === 'function') await db.batch([upd, aud]); else { await upd.run(); await aud.run(); }
 }
 // the master fields of a product row with the defaults the products POST / PUT handlers apply when they write it
 function productMasterFields(p) {
@@ -2021,7 +2079,7 @@ async function handleRequest(context, state) {
         usageUnits: unitsRes.results || [],
         departments: utcIsoRows(deptsRes.results || []),
         users,
-        stockLogs: filterStockLogs(scopeViewer, utcIsoRows(withGrnNumber(logsRes.results || []))),
+        stockLogs: stockLogViews(filterStockLogs(scopeViewer, utcIsoRows(withGrnNumber(logsRes.results || [])))),
         budgets: Object.keys(budgets).length > 0 ? budgets : undefined,
         budgetTransactions: filterLedger(scopeViewer, utcIsoRows(txsRes.results || []))
       });
@@ -3366,8 +3424,11 @@ async function handleRequest(context, state) {
         { const shape = checkBodyShape(body); if (shape) return errorResponse(shape.message, shape.status); }
         const gate = await gateProducts(db, authUser, path, productRows(body), null);
         if (gate.verdict) { const r = masterVerdictResponse(gate.verdict); return errorResponse(r.msg, r.status); }
+        if (productRemarkTooLong(gate.items)) return errorResponse(`หมายเหตุสินค้ายาวเกิน ${PRODUCT_REMARK_MAX} ตัวอักษร`, 400);
         const prods = gate.items;
         const skipped = gate.skipped;
+        const isBatch = path === '/api/products/batch';
+        let written = 0;
         for (const p of prods) {
           const id = p.id || `PROD-${Date.now()}-${uid()}`;
           const code = p.code || p.itemCode || id;
@@ -3378,13 +3439,20 @@ async function handleRequest(context, state) {
           const convRate = Number(p.conversionRate || 1);
           const minStock = Number(p.reorderPoint ?? p.minStock ?? 0) || 0;
           // not sent -> null : an existing row keeps its stock / price (COALESCE below), a new row gets 0 (D-2)
-          const curStock = (p.stockBalance ?? p.currentStock) != null && (p.stockBalance ?? p.currentStock) !== '' ? Number(p.stockBalance ?? p.currentStock) : null;
+          const opening = parseOpeningStock(p);
+          const curStock = opening.value;
           const price = (p.price ?? p.standardPrice) != null && (p.price ?? p.standardPrice) !== '' ? Number(p.price ?? p.standardPrice) : null;
           const locId = ('locationId' in p ? p.locationId : p.defaultLocationId) || '';
           const dept = p.department || cat;
 
           // Check if product already exists by id OR code (case-insensitive)
-          const existing = await db.prepare('SELECT * FROM products WHERE id = ? OR UPPER(code) = UPPER(?) LIMIT 1').bind(id, code).first();
+          const existing = await db.prepare('SELECT * FROM products WHERE id = ? OR UPPER(code) = UPPER(?) ORDER BY (id = ?) DESC, COALESCE(isDeleted,0) ASC, id LIMIT 1').bind(id, code, id).first();
+          // bulk sync : a deleted product is never revived by a (stale) list ; a NEW row with a refused opening balance is rejected like a row the user may not touch
+          if (isBatch && existing && Number(existing.isDeleted) === 1) continue;
+          if (isBatch && !existing && opening.error) { skipped.push(p.id || p.code || p.itemCode || null); continue; }
+          // single write : the opening balance only matters for a NEW row (an existing row ignores the body's stock) so only then is it validated
+          if (!isBatch && !existing && opening.error) return errorResponse(opening.error, 400);
+          written++;
           if (existing) {
             await db.prepare(`
               UPDATE products SET
@@ -3405,19 +3473,18 @@ async function handleRequest(context, state) {
                 isDeleted = 0,
                 updatedAt = CURRENT_TIMESTAMP
               WHERE id = ?
-            `).bind(name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock, price, locId, dept, optNum(p.leadTimeDays), p.locationName ?? null, activeFields(p).status, activeFields(p).isActive, existing.id).run();
-            // the master save may set the stock directly (same as the original system) : leave an audit row when it actually moves
-            if (curStock !== null && Number.isFinite(curStock) && Number(existing.currentStock || 0) !== curStock) {
-              await audit('PRODUCT_STOCK_SET', 'product', existing.id, { actorUserId: authUser.userId, from: Number(existing.currentStock || 0), to: curStock });
-            }
+            `).bind(name, cat, purchaseUnit, usageUnit, convRate, minStock, null, price, locId, dept, optNum(p.leadTimeDays), p.locationName ?? null, activeFields(p).status, activeFields(p).isActive, existing.id).run();
+            // the server owns the stock of an existing row (changes only via /stock/issue, /adjust, /manual-in, GRN receive) : a stale client copy (also in the bulk /batch sync) never overwrites it. A NEW row takes the opening balance below.
           } else {
-            await db.prepare(`
+            const ins = db.prepare(`
               INSERT INTO products (id, code, name, category, purchaseUnit, usageUnit, conversionRate, minStock, currentStock, standardPrice, defaultLocationId, department, isDeleted, updatedAt, leadTimeDays, locationName, status, isActive)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, ?, ?, COALESCE(?, 'ACTIVE'), COALESCE(?, 1))
-            `).bind(id, code, name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock ?? 0, price ?? 0, locId, dept, optNum(p.leadTimeDays), p.locationName ?? null, activeFields(p).status, activeFields(p).isActive).run();
+            `).bind(id, code, name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock ?? 0, price ?? 0, locId, dept, optNum(p.leadTimeDays), p.locationName ?? null, activeFields(p).status, activeFields(p).isActive);
+            await insertProductWithAudit(db, authUser, ins, id, code, curStock ?? 0);
           }
+          await applyProductRemark(db, authUser, path, p, existing ? existing.id : id);
         }
-        return jsonResponse(Array.isArray(body) || body.products ? { success: true, count: prods.length, ...(skipped.length ? { skipped } : {}) } : (prods[0] ? await savedProductView(db, prods[0], subId) : { success: true, count: 0, skipped }));
+        return jsonResponse(Array.isArray(body) || body.products ? { success: true, count: written, ...(skipped.length ? { skipped } : {}) } : (prods[0] ? await savedProductView(db, prods[0], subId) : { success: true, count: 0, skipped }));
       }
 
       if (method === 'PUT') {
@@ -3425,8 +3492,11 @@ async function handleRequest(context, state) {
         { const shape = checkBodyShape(body); if (shape) return errorResponse(shape.message, shape.status); }
         const gate = await gateProducts(db, authUser, path, productRows(body), subId);
         if (gate.verdict) { const r = masterVerdictResponse(gate.verdict); return errorResponse(r.msg, r.status); }
+        if (productRemarkTooLong(gate.items)) return errorResponse(`หมายเหตุสินค้ายาวเกิน ${PRODUCT_REMARK_MAX} ตัวอักษร`, 400);
         const prods = gate.items;
         const skipped = gate.skipped;
+        const isBatch = path === '/api/products/batch';
+        let written = 0;
         for (const p of prods) {
           const id = p.id || subId;
           const code = p.code || p.itemCode || id;
@@ -3436,20 +3506,27 @@ async function handleRequest(context, state) {
           const usageUnit = p.stockUnit || p.usageUnit || purchaseUnit; // UI name wins when both are sent (D-2)
           const convRate = Number(p.conversionRate || 1);
           const minStock = Number(p.reorderPoint ?? p.minStock ?? 0) || 0;
-          const curStock = p.stockBalance !== undefined ? Number(p.stockBalance) : (p.currentStock !== undefined ? Number(p.currentStock) : null);
+          const opening = parseOpeningStock(p);
+          const curStock = opening.value;
           const price = p.price !== undefined ? Number(p.price) : (p.standardPrice !== undefined ? Number(p.standardPrice) : null);
           const locId = ('locationId' in p) ? (p.locationId || '') : (p.defaultLocationId || null); // key sent as null / '' clears the location, key absent keeps it (D-2)
           const dept = p.department || cat;
 
           // Find existing product by subId, id, or code
           let existing = null;
+          let insertedId = null;
           if (subId) {
-            existing = await db.prepare('SELECT * FROM products WHERE id = ? OR UPPER(code) = UPPER(?) LIMIT 1').bind(subId, subId).first();
+            existing = await db.prepare('SELECT * FROM products WHERE id = ? OR UPPER(code) = UPPER(?) ORDER BY (id = ?) DESC, COALESCE(isDeleted,0) ASC, id LIMIT 1').bind(subId, subId, subId).first();
           }
           if (!existing && (id || code)) {
-            existing = await db.prepare('SELECT * FROM products WHERE id = ? OR UPPER(code) = UPPER(?) LIMIT 1').bind(id || '', code || '').first();
+            existing = await db.prepare('SELECT * FROM products WHERE id = ? OR UPPER(code) = UPPER(?) ORDER BY (id = ?) DESC, COALESCE(isDeleted,0) ASC, id LIMIT 1').bind(id || '', code || '', id || '').first();
           }
 
+          if (isBatch && existing && Number(existing.isDeleted) === 1) continue; // bulk sync never revives a deleted product
+          if (isBatch && !existing && opening.error) { skipped.push(p.id || p.code || p.itemCode || null); continue; }
+          // single write : the opening balance only matters for a NEW row (an existing row ignores the body's stock)
+          if (!isBatch && !existing && opening.error) return errorResponse(opening.error, 400);
+          written++;
           if (existing) {
             await db.prepare(`
               UPDATE products SET
@@ -3470,20 +3547,20 @@ async function handleRequest(context, state) {
                 isDeleted = 0,
                 updatedAt = CURRENT_TIMESTAMP
               WHERE id = ?
-            `).bind(name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock, price, locId, dept, optNum(p.leadTimeDays), p.locationName ?? null, activeFields(p).status, activeFields(p).isActive, existing.id).run();
-            // the master save may set the stock directly (same as the original system) : leave an audit row when it actually moves
-            if (curStock !== null && Number.isFinite(curStock) && Number(existing.currentStock || 0) !== curStock) {
-              await audit('PRODUCT_STOCK_SET', 'product', existing.id, { actorUserId: authUser.userId, from: Number(existing.currentStock || 0), to: curStock });
-            }
+            `).bind(name, cat, purchaseUnit, usageUnit, convRate, minStock, null, price, locId, dept, optNum(p.leadTimeDays), p.locationName ?? null, activeFields(p).status, activeFields(p).isActive, existing.id).run();
+            // the server owns the stock balance of an existing row (changes only via /stock/issue, /adjust, /manual-in, GRN receive) : a stale copy in the body (single PUT or bulk /batch) never overwrites it. A NEW row takes the opening balance below.
           } else {
-            await db.prepare(`
+            insertedId = id || `PROD-${Date.now()}-${uid()}`;
+            const ins = db.prepare(`
               INSERT INTO products (id, code, name, category, purchaseUnit, usageUnit, conversionRate, minStock, currentStock, standardPrice, defaultLocationId, department, isDeleted, updatedAt, leadTimeDays, locationName, status, isActive)
               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 0, CURRENT_TIMESTAMP, ?, ?, COALESCE(?, 'ACTIVE'), COALESCE(?, 1))
-            `).bind(id || `PROD-${Date.now()}-${uid()}`, code, name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock || 0, price || 0, locId, dept, optNum(p.leadTimeDays), p.locationName ?? null, activeFields(p).status, activeFields(p).isActive).run();
+            `).bind(insertedId, code, name, cat, purchaseUnit, usageUnit, convRate, minStock, curStock || 0, price || 0, locId, dept, optNum(p.leadTimeDays), p.locationName ?? null, activeFields(p).status, activeFields(p).isActive);
+            await insertProductWithAudit(db, authUser, ins, insertedId, code, curStock || 0);
           }
+          await applyProductRemark(db, authUser, path, p, existing ? existing.id : insertedId);
         }
 
-        return jsonResponse(Array.isArray(body) || body.products ? { success: true, count: prods.length, ...(skipped.length ? { skipped } : {}) } : (prods[0] ? await savedProductView(db, prods[0], subId) : { success: true, count: 0, skipped }));
+        return jsonResponse(Array.isArray(body) || body.products ? { success: true, count: written, ...(skipped.length ? { skipped } : {}) } : (prods[0] ? await savedProductView(db, prods[0], subId) : { success: true, count: 0, skipped }));
       }
 
       if (method === 'DELETE' && subId) {
@@ -4027,7 +4104,7 @@ async function handleRequest(context, state) {
       if (!db) return jsonResponse([]);
       if (method === 'GET') {
         const res = await db.prepare('SELECT * FROM stock_logs ORDER BY createdAt DESC LIMIT 500').all();
-        return jsonResponse(filterStockLogs(scopeViewer, utcIsoRows(withGrnNumber(res.results || []))));
+        return jsonResponse(stockLogViews(filterStockLogs(scopeViewer, utcIsoRows(withGrnNumber(res.results || [])))));
       }
 
       if (method === 'POST') {
@@ -4199,7 +4276,9 @@ async function handleRequest(context, state) {
         const reason = payload.reason || payload.note || payload.notes || 'เบิกจ่ายด่วน';
         const requesterId = authUser.roleKey;
         const requesterName = authUser.name || authUser.username || issuedTo || 'System';
-        const unitCost = Number(payload.unitCost ?? prod.standardPrice ?? 0);
+        // issue cost = the product's moving average cost (GAS apiAppendStockMovements OUT : avgCost || price), with the same fail-safe the screen shows
+        // (stock > 0 and no avgCost -> latest IN price) ; computed here, never taken from the client
+        const unitCost = await serverIssueUnitCost(db, prod);
         const totalCost = Math.round(quantity * unitCost * 100) / 100;
 
         // the log id is ALWAYS server-generated (a client id could overwrite/collide with an existing movement)
@@ -4381,7 +4460,7 @@ async function handleRequest(context, state) {
       const noteText = `${manualIn ? '[รับเข้าด้วยตนเอง]' : `[ปรับปรุงสต็อก ${dir === 'IN' ? '+ เพิ่ม' : '- ลด'}]`} ${reasonText}${customNote ? ` — ${customNote}` : ''}`;
       const actorName = authUser.name || authUser.username || 'System';
       const nowIso = new Date().toISOString();
-      const unitCost = Number(prod.avgCost || prod.standardPrice || 0);
+      const unitCost = await serverIssueUnitCost(db, prod);
       const totalCost = Math.round(qty * unitCost * 100) / 100;
       // location : the product's storage point (name in `location`, id in `locationId`) so the movement shows where the stock sits
       const locationId = prod.defaultLocationId || null;

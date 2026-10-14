@@ -72,6 +72,15 @@ export function hasUnresolvedClaim(po) {
 
   const isExplicitClaimStatus = s === 'claim_pending' || s === 'in_claim' || s === 'partially_received_in_claim' || Boolean(po.isInClaim) || po.claimStatus === 'PENDING_CLAIM' || po.claimStatus === 'IN_CLAIM' || Boolean(po.hasUnresolvedClaim);
 
+  // PO ที่ปิดงานแล้ว (COMPLETED / CLOSED / COMPLETED_WITH_REFUND / CANCELLED / RESOLVED) : สถานะปิดเป็นตัวตัดสิน
+  // flag ค้างจากตอนแจ้งเคลม (hasUnresolvedClaim / isInClaim / claimStatus IN_CLAIM) ต้องไม่ดึงการ์ดออกจากแท็บ "ปิดงานสำเร็จ" (TC-009)
+  // ยกเว้นยังมี storeClaims ร้านไหนที่ยังไม่เจรจา (isResolved === false)
+  const hasOpenStoreClaim = po.storeClaims && typeof po.storeClaims === 'object' &&
+    Object.values(po.storeClaims).some(c => c && c.isResolved === false);
+  if (!hasOpenStoreClaim && (statusUpper.startsWith('COMPLETED') || statusUpper.startsWith('CLOSED') || statusUpper === 'CANCELLED' || statusUpper === 'RESOLVED')) {
+    return false;
+  }
+
   // If PO is already closed/completed/cancelled/resolved, it must NEVER be in CLAIM unless explicitly in claim
   if (!isExplicitClaimStatus && (isOrderClosed(statusUpper) || po.claimStatus === 'RESOLVED' || po.claimStatus === 'REFUNDED')) {
     return false;

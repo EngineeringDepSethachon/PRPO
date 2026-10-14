@@ -8,6 +8,7 @@ import { budgetService } from './budgetService.js';
 import { hasDepartmentAccess } from '../utils/permissions.js';
 import { generateNextPRId, generateNextPOId } from '../utils/idGenerator.js';
 import { generateGRNNumber } from './warehouseService.js';
+import { isPoInOpenClaim, isRequesterUser, isPoDone, isOwnerByRequesterId } from '../utils/claimState.js';
 
 // ─── Fallback Mock Attachment Assets (Phase 2) ───
 const GLOVE_PACKAGE_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%"><rect width="400" height="400" fill="%23f8fafc"/><rect x="50" y="80" width="300" height="240" rx="16" fill="%230284c7" stroke="%230369a1" stroke-width="4"/><rect x="70" y="100" width="260" height="120" rx="10" fill="%2338bdf8" fill-opacity="0.3"/><path d="M120 160 Q150 130 180 160 T240 160 T280 150" fill="none" stroke="%23ffffff" stroke-width="5" stroke-linecap="round"/><circle cx="150" cy="150" r="12" fill="%23ffffff"/><circle cx="180" cy="140" r="14" fill="%23ffffff"/><circle cx="210" cy="145" r="13" fill="%23ffffff"/><circle cx="240" cy="160" r="11" fill="%23ffffff"/><rect x="80" y="235" width="240" height="65" rx="8" fill="%23075985"/><text x="200" y="260" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23ffffff" text-anchor="middle">NITRILE EXAMINATION GLOVES</text><text x="200" y="285" font-family="sans-serif" font-size="13" fill="%23bae6fd" text-anchor="middle">กล่องบรรจุ 100 ชิ้น (Package)</text></svg>`;
@@ -280,8 +281,10 @@ export const workflowEngine = {
 
     // 3. Process POs
     pos.forEach(po => {
-      const isClaim = ['CLAIM_REPORTED', 'CLAIM_IN_PROGRESS', 'CLAIM_PENDING', 'PARTIALLY_RECEIVED_IN_CLAIM'].includes(po.status) || po.hasUnresolvedClaim === true;
-      const isDone = po.status === 'CLOSED' || po.status === 'CANCELLED' || po.status === 'RECEIVED';
+      // WAITING_DELIVERY_ROUND_2 = เคลมเจรจาจบแล้ว (flag hasUnresolvedClaim ที่ค้างจากตอนแจ้งเคลมต้องไม่ทำให้ยังเป็นงานเคลม)
+      // same rule as the To-Do list (workspaceService.isTaskForMe) : status / claimStatus / unresolved storeClaims / flag
+      const isClaim = isPoInOpenClaim(po);
+      const isDone = isPoDone(po); // same done-list as the To-Do list (isTaskForMe)
       const canAction = !isDone && this.canAction(currentRole, po);
       const actedOnPO = hasDirectlyActedOn(po);
       const isOwnerOfPO = actedOnPO || isLinkedToOwnPR(po);
@@ -307,7 +310,9 @@ export const workflowEngine = {
           isClaimAction = true;
         } else if (!isOnlineProcurement) {
           const isDeptMember = hasDepartmentAccess(currentRole, po.department);
-          isClaimAction = (isOwnerOfPO || isDeptMember) && !isOnlinePurchaser;
+          // เคลมจัดซื้อเอง = งานของ Requester (level 1) ; ผู้ตรวจทาน/ผู้จัดการเป็นผู้ติดตาม ไม่นับเป็นงานของตน
+          // same as isTaskForMe : a Requester (level 1 / REQUESTER*) owns it even if the account also holds canFinalApprove
+          isClaimAction = (isOwnerOfPO || isOwnerByRequesterId(po, currentRole) || isDeptMember) && !isOnlinePurchaser && !currentRole?.canOnlinePurchase && isRequesterUser(currentRole);
         } else if (isOnlineProcurement && isOnlinePurchaser) {
           isClaimAction = true;
         } else if (isOnlineProcurement && !isOnlinePurchaser) {
@@ -3147,6 +3152,14 @@ export const workflowEngine = {
         po.status = (po.status && po.status !== 'COMPLETED' && po.status !== 'CLOSED') ? po.status : 'CLAIM_PENDING';
         po.claimStatus = 'IN_CLAIM';
       }
+    }
+
+    // เคลมเจรจาจบทุกร้านแล้ว → ล้าง flag ค้างที่ ReceivingModal ตั้งตอนแจ้งเคลม (hasUnresolvedClaim / isInClaim / hasDispute)
+    // ไม่งั้น To-Do ของ Requester (รอตรวจรับรอบ 2) และแท็บ "ปิดงานสำเร็จ" ของ Online Hub ยังมองว่า PO ติดเคลม (TC-006 / TC-009)
+    if ((!resolution.storeKey || resolution.allStoresResolved) && po.claimStatus !== 'IN_CLAIM' && po.claimStatus !== 'PENDING_CLAIM') {
+      po.hasUnresolvedClaim = false;
+      po.isInClaim = false;
+      po.hasDispute = false;
     }
 
     if (!Array.isArray(po.activityLog)) {

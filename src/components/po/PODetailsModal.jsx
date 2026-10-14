@@ -23,6 +23,7 @@ import { sanitizeExternalUrl, getProductUrl } from '../../utils/urlHelper';
 import ReceivingModal, { resolveRefundedQtyAndAmount } from '../../views/inventory/ReceivingModal';
 import { getValidConversionRate, toStockQuantity } from '../../utils/uomEngine.js';
 import ProxiedImg from '../common/ProxiedImg';
+import { isSelfClaimStatus } from '../../services/workspaceService';
 
 const getVendorDisplayName = (vendorData) => {
   if (!vendorData) return '';
@@ -97,7 +98,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
   const [isSubmittingClaim, setIsSubmittingClaim] = useState(false);
   const claimFileInputRef = useRef(null);
   // Self-buy Claim Resolution state
-  const [showSelfClaimResolution, setShowSelfClaimResolution] = useState(() => ['CLAIM_REPORTED', 'CLAIM_IN_PROGRESS'].includes(selectedPO?.status) && selectedPO?.purchaseChannel === 'SELF');
+  const [showSelfClaimResolution, setShowSelfClaimResolution] = useState(() => isSelfClaimStatus(selectedPO) && selectedPO?.purchaseChannel === 'SELF');
   const [selfClaimResolutionType, setSelfClaimResolutionType] = useState('RESEND');
   const [selfClaimNote, setSelfClaimNote] = useState('');
   const [selfClaimExpectedDate, setSelfClaimExpectedDate] = useState('');
@@ -522,7 +523,9 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
 
   // ─── Claim Permission Guard ───
   // Whether the current user can file a claim (report problem) on this PO
-  const isClaimStatus = ['CLAIM_REPORTED', 'CLAIM_IN_PROGRESS'].includes(selectedPO.status);
+  // ตรวจรับแล้วเลือก "บันทึกปัญหาไว้ก่อน" (ReceivingModal) เก็บ PO เป็น PARTIALLY_RECEIVED_IN_CLAIM / CLAIM_PENDING (claimStatus PENDING_CLAIM)
+  // สำหรับจัดซื้อเอง (SELF) สถานะเหล่านี้ต้องเปิดแผง "จัดการเคสปัญหา" ได้เหมือน CLAIM_REPORTED (TC-003)
+  const isClaimStatus = isSelfClaimStatus(selectedPO);
   const canFileClaim = !isOnlinePurchaser &&
     !['CLOSED', 'CANCELLED'].includes(selectedPO.status) &&
     !isClaimStatus &&

@@ -174,18 +174,18 @@ describe.skipIf(!DatabaseSync)('T5.3d master-data handlers act on the row they c
       expect(r.json.skipped).toEqual(['P-QC', 'P-PD']);
     }
     expect(rows('SELECT id, currentStock, department FROM products ORDER BY id')).toEqual([
-      { id: 'P-ALL', currentStock: 33, department: 'ALL' },
-      { id: 'P-PD', currentStock: 11, department: 'PD' }, // written by the first item, never moved to QC, not overwritten by the 4th
+      { id: 'P-ALL', currentStock: 1, department: 'ALL' }, // stock is server-owned : the batch never writes it for an existing row
+      { id: 'P-PD', currentStock: 5, department: 'PD' }, // written by the first item, never moved to QC, not overwritten by the 4th
       { id: 'P-QC', currentStock: 5, department: 'QC' }
     ]);
     // admin / online purchaser write every row
     const a = await call('ADMIN', 'PUT', '/api/products/batch', payload.slice(0, 3));
     expect(a.json.skipped).toBeUndefined();
-    expect(one("SELECT currentStock FROM products WHERE id = 'P-QC'").currentStock).toBe(22);
+    expect(one("SELECT currentStock FROM products WHERE id = 'P-QC'").currentStock).toBe(5);
     // POST on the batch route behaves the same
     const p = await call('L1', 'POST', '/api/products/batch', [{ ...full('P-QC', 'QC-A', 'QC', 99), standardPrice: 10 }, full('P-NEW', 'NEW-A', 'PD', 1)]); // master field (price) differs -> reported ; stock alone would be silent
     expect(p.json).toMatchObject({ count: 1, skipped: ['P-QC'] });
-    expect(one("SELECT currentStock FROM products WHERE id = 'P-QC'").currentStock).toBe(22);
+    expect(one("SELECT currentStock FROM products WHERE id = 'P-QC'").currentStock).toBe(5);
     // all rows forbidden -> still 200 with nothing written
     const none = await call('L1', 'PUT', '/api/products/batch', [{ ...full('P-QC', 'QC-A', 'QC', 7), standardPrice: 10 }]);
     expect(none.status).toBe(200);

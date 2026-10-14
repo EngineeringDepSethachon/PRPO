@@ -16,7 +16,10 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
   const fileName = title || file?.name || file?.fileName || 'เอกสารแนบ (Attachment)';
   
   // R2 file (cloudflare mode) : our own proxy path, never a Google Drive file (its fileId is a uuid, not a Drive id)
-  const isR2File = isProxyFileUrl(targetUrl);
+  // (a GRN photo just attached : url is a blob:, but the saved reference - fileUrl / url - is already the proxy path ; a uuid fileId must never be read as a Drive id)
+  const isLocalUrl = typeof targetUrl === 'string' && (targetUrl.startsWith('blob:') || targetUrl.startsWith('data:'));
+  const isR2File = isProxyFileUrl(targetUrl) || (file && typeof file === 'object'
+    && [file.url, file.fileUrl, file.previewUrl, file.viewUrl, file.downloadUrl].some((u) => isProxyFileUrl(u)));
   const driveId = isR2File ? null : (extractDriveFileId(targetUrl) || (file?.fileId ? extractDriveFileId(file.fileId) : null));
   const isDrive = !isR2File && (Boolean(driveId) || isDriveUrl(targetUrl));
 
@@ -36,6 +39,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
                   (file?.mimeType?.startsWith('image/')) ||
                   (typeof targetUrl === 'string' && targetUrl.match(/\.(jpeg|jpg|gif|png|webp|svg)($|\?)/i)) || 
                   (!isPdf && !isShoppingStore && (targetUrl.startsWith('blob:') || targetUrl.startsWith('data:image/'))) ||
+                  (isR2File && !isPdf && /\.(jpe?g|png|gif|webp)$/i.test(String(fileName))) ||
                   (isDrive && !isPdf);
 
   // only what this modal can draw (image / PDF) goes through the proxy ; other Drive files keep the Drive preview
@@ -46,13 +50,15 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
   const proxyOnlyFile = Boolean(proxied.fileId) && proxied.state === 'ready' && !useProxy;
 
   // Resolved URLs
-  const resolvedImageSrc = useProxy ? proxied.url : isDrive
+  const resolvedImageSrc = useProxy ? proxied.url : (isLocalUrl && isImage) ? targetUrl : isDrive
     ? getDriveDisplayUrl(driveId || targetUrl, { type: 'image', size: 'w1600' })
     : targetUrl;
 
-  const resolvedPdfSrc = useProxy ? proxied.url : isDrive
-    ? getDriveDisplayUrl(driveId || targetUrl, { type: 'pdf' })
-    : targetUrl;
+  // an iframe only ever gets the proxy URL or a Drive URL built from an extracted driveId - never a raw URL from the data
+  const canFramePdf = useProxy || Boolean(isDrive && driveId);
+  const resolvedPdfSrc = useProxy ? proxied.url : (isDrive && driveId)
+    ? getDriveDisplayUrl(driveId, { type: 'pdf' })
+    : '';
 
   const handleProxiedDownload = (e) => {
     if (!proxied.fileId) return;
@@ -95,7 +101,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
               </h3>
               <p className="text-xs text-slate-400 mt-0.5 font-medium flex items-center gap-2">
                 <span>
-                  {isDrive ? 'Google Drive Cloud Storage' : isImage ? 'รูปภาพแนบ (Image)' : isPdf ? 'เอกสาร PDF (Quotation/Doc)' : isShoppingStore ? 'ลิงก์ร้านค้าออนไลน์ (Online Store)' : 'เอกสารประกอบ'}
+                  {isDrive && !proxied.fileId ? 'Google Drive Cloud Storage' : isImage ? 'รูปภาพแนบ (Image)' : isPdf ? 'เอกสาร PDF (Quotation/Doc)' : isShoppingStore ? 'ลิงก์ร้านค้าออนไลน์ (Online Store)' : 'เอกสารประกอบ'}
                 </span>
                 {file?.size ? <span>• {(file.size / 1024).toFixed(1)} KB</span> : null}
               </p>
@@ -208,7 +214,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
             )
           ) : isPdf ? (
             <div className="w-full h-[64vh] flex flex-col bg-slate-900/90 rounded-lg border border-slate-700 overflow-hidden shadow-inner">
-              {isDrive || useProxy ? (
+              {canFramePdf ? (
                 <iframe
                   src={resolvedPdfSrc}
                   title={fileName}
@@ -283,7 +289,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
         <div className="px-6 py-3 bg-slate-800/80 border-t border-slate-700/80 flex items-center justify-between text-xs text-slate-400">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>ระบบรักษาความปลอดภัยเอกสารจัดซื้อ{isDrive ? ' • Google Drive Verified' : ''}</span>
+            <span>ระบบรักษาความปลอดภัยเอกสารจัดซื้อ{isDrive && !proxied.fileId ? ' • Google Drive Verified' : ''}</span>
           </div>
           <button
             type="button"

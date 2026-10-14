@@ -209,8 +209,15 @@ export const notificationService = {
   },
 
   // Helper to check if a notification is targeted for the current role and department (Strict Role & Dept, No Email)
+  // Rows returned by the Cloudflare server are already scoped to the signed-in user (isUserTargetOfNotification on the server) :
+  // tag them so the client does not filter them a second time with a (slightly different) role/department rule.
+  tagServerScoped(list) {
+    return Array.isArray(list) ? list.map(n => (n && typeof n === 'object' ? { ...n, serverScoped: true } : n)) : list;
+  },
+
   isNotificationTarget(n, currentRole) {
     if (!currentRole) return true;
+    if (n && n.serverScoped === true) return true;
     const roleId = String(currentRole.canonicalRole || currentRole.roleId || currentRole.id || currentRole.role || currentRole.positionKey || '').toUpperCase();
     const isAdmin = isAdminUser(currentRole, currentRole.isAdmin === true || roleId.includes('ADMIN') || Number(currentRole.level) >= 99 || currentRole.username === 'admin');
     if (isAdmin) return true;

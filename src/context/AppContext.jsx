@@ -312,7 +312,7 @@ export function AppProvider({ children }) {
               localReadMap.set(n.id || n._id, true);
             }
           });
-          const merged = notisData.map(n => {
+          const merged = (isCloudflareMode() ? notificationService.tagServerScoped(notisData) : notisData).map(n => {
             if (localReadMap.has(n.id || n._id)) {
               return { ...n, isRead: true, read: true, status: 'read' };
             }
@@ -464,7 +464,7 @@ export function AppProvider({ children }) {
         if (Array.isArray(payload.stockLogs)) setStockLogs(payload.stockLogs);
         if (Array.isArray(payload.budgetTransactions)) setBudgetTransactions(payload.budgetTransactions);
         if (Array.isArray(payload.notifications)) {
-          notificationService.saveAll(payload.notifications);
+          notificationService.saveAll(isCloudflareMode() ? notificationService.tagServerScoped(payload.notifications) : payload.notifications);
         }
         if (!isCloudflareMode()) {
           const bSummary = workflowEngine.calculateBudgetSummary();

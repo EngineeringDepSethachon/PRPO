@@ -122,12 +122,28 @@ export function getDriveLh3Url(input) {
  * @param {string|Object} input
  * @returns {string} Drive file view URL e.g. https://drive.google.com/file/d/{id}/view
  */
+// hostname check (not substring) : "https://evil.test/?u=drive.google.com" is not a Drive URL. Mirrors isDriveUrl of services/driveService.js (kept local : this file has no imports)
+const DRIVE_URL_HOSTS = ['drive.google.com', 'docs.google.com', 'drive.usercontent.google.com'];
+function isDriveHostUrl(value) {
+  if (!value || typeof value !== 'string') return false;
+  const str = value.trim();
+  try {
+    const u = new URL(/^[a-zA-Z][a-zA-Z0-9+.-]*:\/\//.test(str) ? str : `https://${str}`);
+    if (u.protocol !== 'https:' && u.protocol !== 'http:') return false;
+    const host = u.hostname.toLowerCase();
+    return DRIVE_URL_HOSTS.includes(host) || /^lh[3-6]\.googleusercontent\.com$/.test(host);
+  } catch {
+    return false;
+  }
+}
+
 export function getDriveFileViewUrl(input) {
   if (!input) return '';
 
   if (typeof input !== 'string') {
-    if (input.viewUrl && !input.viewUrl.includes('BASE64_')) return input.viewUrl;
-    if (input.driveUrl && !input.driveUrl.includes('BASE64_')) return input.driveUrl;
+    // a stored viewUrl / driveUrl is returned only when it really points at Drive ; otherwise fall through to the fileId (or '')
+    if (typeof input.viewUrl === 'string' && input.viewUrl && !input.viewUrl.includes('BASE64_') && isDriveHostUrl(input.viewUrl)) return input.viewUrl;
+    if (typeof input.driveUrl === 'string' && input.driveUrl && !input.driveUrl.includes('BASE64_') && isDriveHostUrl(input.driveUrl)) return input.driveUrl;
     if (input.fileId) {
       if (typeof input.fileId === 'string' && (input.fileId.includes('BASE64_') || input.fileId.includes('STORED_IN_DRIVE'))) {
         return '';
@@ -147,12 +163,13 @@ export function getDriveFileViewUrl(input) {
   if (str.includes('BASE64_') || str.includes('STORED_IN_DRIVE')) return '';
 
   // If already a standard Drive view URL
-  if (str.startsWith('http') && str.includes('drive.google.com/file/d/') && str.includes('/view')) {
+  if (str.startsWith('http') && isDriveHostUrl(str) && new URL(str).hostname.toLowerCase() === 'drive.google.com'
+    && /^\/file\/d\/[^/]+\/view/.test(new URL(str).pathname)) {
     return str;
   }
 
-  const isDriveUrl = str.includes('drive.google.com') || str.includes('googleusercontent.com') || str.includes('docs.google.com');
-  const isRawId = !str.startsWith('http://') && !str.startsWith('https://') && str.length >= 20;
+  const isDriveUrl = isDriveHostUrl(str) && (str.startsWith('http://') || str.startsWith('https://') || /^[a-z0-9.-]+\//i.test(str));
+  const isRawId = !str.startsWith('http://') && !str.startsWith('https://') && !/[/.:?]/.test(str) && str.length >= 20;
 
   if (!isDriveUrl && !isRawId) {
     return '';

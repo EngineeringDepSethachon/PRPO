@@ -1,5 +1,6 @@
 import { workflowEngine } from './workflowEngine';
 import { hasDepartmentAccess } from '../utils/permissions';
+import { isPoInOpenClaim, isPoDone, isOwnerByRequesterId } from '../utils/claimState';
 
 // WorkspaceView's own user matching (email / name / username only ; NOT the id) - kept exactly as the view had it
 const isWorkspaceUserMatched = (targetValue, currentUser) => {
@@ -170,6 +171,20 @@ export const isUserStakeholder = (doc, user, allPRs = []) => {
  * 1. บล็อก Requester จากการเห็น CLAIM_PENDING ใน To Do โดยเด็ดขาด
  * 2. เงื่อนไขเดียวที่ Requester จะได้ตรวจรับรอบ 2 คือสถานะ WAITING_DELIVERY_ROUND_2
  */
+// shared with workflowEngine.getUserTasks (sidebar badge) so badge and To-Do count claims the same way
+export { isPoInOpenClaim };
+
+/**
+ * PO จัดซื้อเองอยู่ในขั้นตอนเคลมที่ผู้ขอซื้อต้องเลือกแนวทางต่อ (ส่งเพิ่ม / คืนเงิน / ยอมรับสภาพ) ที่ PODetailsModal ไหม
+ * CLAIM_REPORTED / CLAIM_IN_PROGRESS = ผ่าน fileClaim ; PARTIALLY_RECEIVED_IN_CLAIM / CLAIM_PENDING = ตรวจรับแล้วเลือก "บันทึกปัญหาไว้ก่อน" (TC-003)
+ * PO ออนไลน์ใช้แผงของ Online Hub จึงไม่นับ (คงพฤติกรรมเดิมของ PODetailsModal)
+ */
+export const isSelfClaimStatus = (po) => {
+  if (!po) return false;
+  if (['CLAIM_REPORTED', 'CLAIM_IN_PROGRESS'].includes(po.status)) return true;
+  return po.purchaseChannel === 'SELF' && ['PARTIALLY_RECEIVED_IN_CLAIM', 'CLAIM_PENDING'].includes(po.status);
+};
+
 export const isTaskForMe = (task, user) => {
   if (!user) return false;
   if (task.docType === 'PR') {
@@ -178,28 +193,27 @@ export const isTaskForMe = (task, user) => {
     return workflowEngine.canAction(user, task);
   }
   if (task.docType === 'PO') {
-    const isDone = ['CLOSED', 'CANCELLED', 'RECEIVED', 'COMPLETED', 'COMPLETED_WITH_REFUND'].includes(task.status);
-    if (isDone) return false;
+    if (isPoDone(task)) return false;
 
     // 1. บล็อกงานที่อยู่ระหว่างการเคลมทุกชนิด
-    const isClaiming =
-      ['CLAIM_PENDING', 'CLAIM_REPORTED', 'CLAIM_IN_PROGRESS', 'PARTIALLY_RECEIVED_IN_CLAIM'].includes(task.status) ||
-      Boolean(task.hasUnresolvedClaim) ||
-      Boolean(task.claimPending) ||
-      task.claimStatus === 'PENDING_CLAIM' ||
-      task.claimStatus === 'IN_CLAIM';
+    const isClaiming = isPoInOpenClaim(task);
 
     if (isClaiming) {
-      // For self-procurement (Offline/Internal), Requester MUST handle the claim
+      const uRole = String(user?.roleId || user?.role || user?.canonicalRole || '').toUpperCase();
+
+      // For self-procurement (Offline/Internal), Requester MUST handle the claim (เลือกส่งเพิ่ม / คืนเงิน / ยอมรับสภาพ ใน PODetailsModal)
+      // ผู้ตรวจทาน/ผู้จัดการ (level >= 2) ไม่ใช่เจ้าของงาน → ไปอยู่ "รอผู้อื่นดำเนินการ" (TC-003)
       const isOnlinePurchase = task.isOnlinePurchase === true || task.purchaseChannel === 'ONLINE';
       if (!isOnlinePurchase) {
-        return workflowEngine.canAction(user, task) || 
-               // Also allow owner/dept member if status is CLAIM_PENDING
-               (isUserMatched(task.requestedBy, user) || isDepartmentMatch(task.department, user.department));
+        if (user?.id === 'ADMIN' || uRole === 'ADMIN' || Number(user?.level || 1) >= 99) return true;
+        if (!isRequester(user) || uRole === 'ONLINE_PURCHASER' || Boolean(user?.canOnlinePurchase)) return false;
+        return isUserMatched(task.requestedBy, user) ||
+               isOwnerByRequesterId(task, user) ||
+               isDepartmentMatch(task.department, user.department) ||
+               hasDepartmentAccess(user, task.department);
       }
 
       // ส่งไปให้เฉพาะ Purchaser / Admin ทำ Action เท่านั้น (Requester ห้ามเห็นใน To Do สำหรับจัดซื้อออนไลน์)
-      const uRole = String(user?.roleId || user?.role || user?.canonicalRole || '').toUpperCase();
       const isPurchaserOrAdmin =
         ['ONLINE_PURCHASER', 'PURCHASER', 'ADMIN'].includes(uRole) ||
         user?.id === 'ADMIN' ||
@@ -289,7 +303,7 @@ export const isUserParticipant = (doc, currentUser) => isUserStakeholder(doc, cu
 export const getTaskBadgeLabel = (task, user) => {
   if (!task) return '';
   if (task.docType === 'PO') {
-    if (['CLAIM_PENDING', 'CLAIM_REPORTED', 'CLAIM_IN_PROGRESS', 'PARTIALLY_RECEIVED_IN_CLAIM'].includes(task.status) || task.hasUnresolvedClaim || task.claimStatus === 'PENDING_CLAIM' || task.claimStatus === 'IN_CLAIM') {
+    if (isPoInOpenClaim(task)) {
       const isPurchaser = user?.roleId === 'ONLINE_PURCHASER' || user?.canOnlinePurchase || user?.roleId === 'ADMIN' || Number(user?.level || 1) >= 99;
       return isPurchaser ? '🔴 รอเจรจาเคลมร้านค้า' : '⏳ รอฝ่ายจัดซื้อเจรจาเคลมร้านค้า';
     }
@@ -306,6 +320,8 @@ export const workspaceService = {
   isDepartmentMatch,
   isUserStakeholder,
   isTaskForMe,
+  isPoInOpenClaim,
+  isSelfClaimStatus,
   isToDoTask,
   isInProgressTask,
   isCompletedTask,

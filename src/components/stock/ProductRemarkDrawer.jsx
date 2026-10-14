@@ -11,15 +11,19 @@ export default function ProductRemarkDrawer({ isOpen, product, currentRole, onCl
   const [remarkText, setRemarkText] = useState('');
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [saved, setSaved] = useState(null); // remark just saved (parent list refreshes later) so the drawer shows it at once
 
   useEffect(() => {
     if (product) {
       setRemarkText(product.remark || '');
       setIsEditing(false);
+      setSaved(null);
     }
   }, [product]);
 
   if (!isOpen || !product) return null;
+
+  const view = saved ? { ...product, ...saved } : product;
 
   const isOnlinePurchaser = currentRole?.roleId === 'ONLINE_PURCHASER' || currentRole?.id === 'ONLINE_PURCHASER';
 
@@ -42,6 +46,7 @@ export default function ProductRemarkDrawer({ isOpen, product, currentRole, onCl
       };
 
       await apiService.saveProduct(updatedProduct, currentRole);
+      setSaved({ remark: updatedProduct.remark, remarkUpdatedAt: updatedProduct.remarkUpdatedAt, remarkUpdatedBy: updatedProduct.remarkUpdatedBy });
       modalService.success('บันทึกหมายเหตุเรียบร้อย', `อัปเดตหมายเหตุสินค้า "${product.name}" สำเร็จ`);
       setIsEditing(false);
       if (onRefresh) onRefresh();
@@ -71,7 +76,7 @@ export default function ProductRemarkDrawer({ isOpen, product, currentRole, onCl
         <div className="p-5 border-b border-slate-100 bg-white sticky top-0 z-20 flex items-center justify-between gap-3 shrink-0">
           <div className="flex items-center gap-3 min-w-0">
             <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shrink-0 shadow-2xs border ${
-              product.remark 
+              view.remark
                 ? 'bg-amber-50 text-amber-600 border-amber-200/80' 
                 : 'bg-indigo-50 text-indigo-600 border-indigo-200/80'
             }`}>
@@ -157,7 +162,7 @@ export default function ProductRemarkDrawer({ isOpen, product, currentRole, onCl
                   <button
                     type="button"
                     onClick={() => {
-                      setRemarkText(product.remark || '');
+                      setRemarkText(view.remark || '');
                       setIsEditing(false);
                     }}
                     className="px-3 py-1.5 rounded-lg border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-50 transition-all cursor-pointer"
@@ -177,9 +182,9 @@ export default function ProductRemarkDrawer({ isOpen, product, currentRole, onCl
               </div>
             ) : (
               <div>
-                {product.remark ? (
+                {view.remark ? (
                   <div className="p-3.5 bg-amber-50/40 border border-amber-200/60 rounded-xl text-xs sm:text-sm text-slate-800 whitespace-pre-wrap leading-relaxed">
-                    {product.remark}
+                    {view.remark}
                   </div>
                 ) : (
                   <div className="p-6 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-xs space-y-1">
@@ -195,18 +200,18 @@ export default function ProductRemarkDrawer({ isOpen, product, currentRole, onCl
             )}
 
             {/* Timestamp & Author Meta */}
-            {(product.remarkUpdatedAt || product.remarkUpdatedBy) && (
+            {(view.remarkUpdatedAt || view.remarkUpdatedBy) && (
               <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 space-y-1">
-                {product.remarkUpdatedAt && (
+                {view.remarkUpdatedAt && (
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3 h-3 text-slate-400" />
-                    <span>อัปเดตล่าสุด: <span className="font-mono text-slate-700">{product.remarkUpdatedAt}</span></span>
+                    <span>อัปเดตล่าสุด: <span className="font-mono text-slate-700">{view.remarkUpdatedAt}</span></span>
                   </div>
                 )}
-                {product.remarkUpdatedBy && (
+                {view.remarkUpdatedBy && (
                   <div className="flex items-center gap-1.5">
                     <User className="w-3 h-3 text-slate-400" />
-                    <span>ผู้บันทึก: <span className="font-medium text-slate-700">{product.remarkUpdatedBy}</span></span>
+                    <span>ผู้บันทึก: <span className="font-medium text-slate-700">{view.remarkUpdatedBy}</span></span>
                   </div>
                 )}
               </div>

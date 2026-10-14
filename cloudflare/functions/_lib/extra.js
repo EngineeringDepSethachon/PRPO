@@ -4,7 +4,7 @@
 //   usage-units CRUD, notifications (GET filtered per user / POST / PUT mark-read), audit-logs (POST any user, GET admin),
 //   signatures (GET / POST|PUT admin), PUT /api/storage-locations/:id, POST /api/products/recalculate-mac
 
-import { normalizeDeptCode, canAccessDepartment, isWildcardDept, resolvePermissions } from './rbac.js';
+import { normalizeDeptCode, canAccessDepartment, isWildcardDept, resolvePermissions, normalizeUser } from './rbac.js';
 import { sqliteUtcToIso } from './timefmt.js';
 import { checkUserSignature } from './sanitize.js';
 import { productView } from './products.js';
@@ -104,7 +104,7 @@ export function auditModuleOf(entityType, fromClient = false) {
 const AUDIT_SERVER_ACTIONS = new Set([
   'CREATE', 'PR_DRAFTED', 'RESUBMIT', 'REVIEW_FORWARD', 'APPROVE', 'SEND_BACK', 'CANCEL', 'PR_UPSERT',
   'PO_CREATED', 'UPDATE_PO', 'GOODS_RECEIVED_FULL', 'GOODS_RECEIVED_PARTIAL', 'PO_SETTLED', 'PO_SETTLEMENT_EDITED', 'PO_ADMIN_ITEM_CHANGE', 'PR_COMPLETED_BY_PO',
-  'PRODUCT_STOCK_SET', 'PRODUCT_MAC_RECALC', 'STOCK_LOG', 'STOCK_ISSUE', 'USAGE_UNIT_CREATE', 'USAGE_UNIT_DELETE', 'SIGNATURE_SAVE'
+  'PRODUCT_STOCK_SET', 'PRODUCT_CREATE', 'PRODUCT_MAC_RECALC', 'STOCK_LOG', 'STOCK_ISSUE', 'USAGE_UNIT_CREATE', 'USAGE_UNIT_DELETE', 'SIGNATURE_SAVE'
 ]);
 const AUDIT_SERVER_PREFIXES = ['PASSWORD_', 'BUDGET_', 'ORPHAN_', 'FILE_UPLOAD', 'UNSHARE_PUBLIC'];
 export function isReservedAuditEntry(a) {
@@ -465,7 +465,9 @@ export async function handleExtraRoutes(ctx) {
       'SELECT * FROM products WHERE isDeleted = 0 AND (LOWER(id) = LOWER(?) OR LOWER(code) = LOWER(?) OR LOWER(name) = LOWER(?)) ORDER BY (LOWER(id) = LOWER(?)) DESC LIMIT 1'
     ).bind(key, key, key, key).first();
     if (!prod) return errorResponse(`NOT_FOUND: ไม่พบสินค้า "${key}" ในระบบ`, 404);
-    if (!canAccessDepartment(authUser, prod.department || prod.category || 'ALL')) return errorResponse('ไม่มีสิทธิ์ดำเนินการนี้', 403);
+    // same rule as /stock/issue : a product without a department is for admin only
+    const prodDeptRaw = prod.department || prod.category || '';
+    if (prodDeptRaw ? !canAccessDepartment(authUser, normalizeDeptCode(prodDeptRaw)) : !normalizeUser(authUser).isAdmin) return errorResponse('ไม่มีสิทธิ์ดำเนินการนี้', 403);
     // a log belongs to the product by its productId ; a legacy log with NO productId is matched by code / name AND the product's own department
     // (never a same-code / same-name product of another department - its price must not move this product's MAC)
     // Match rule = GAS apiRecalculateProductMAC (productId == id, code == code / productId == code, name == name) narrowed so another department cannot move this MAC :
@@ -492,7 +494,7 @@ export async function handleExtraRoutes(ctx) {
       return !ld || isWildcardDept(ld) || !prodDept || ld === prodDept || !knownDepts.has(ld);
     });
     let avg = computeMovingAverage(mine);
-    if (avg === 0 && Number(b.averageCost) > 0) avg = Number(b.averageCost); // GAS :858 - caller supplied figure when there is no IN history
+    // no IN history -> avgCost stays as it is (a figure supplied by the client is never trusted)
     if (avg > 0) {
       const totalValue = Math.round(Number(prod.currentStock || 0) * avg * 100) / 100;
       await db.prepare('UPDATE products SET avgCost = ?, totalValue = ?, updatedAt = CURRENT_TIMESTAMP WHERE id = ?').bind(avg, totalValue, prod.id).run();

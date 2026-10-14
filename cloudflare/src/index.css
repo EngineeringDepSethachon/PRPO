@@ -1,0 +1,41 @@
+/* Global CSS Reset & Root Styles */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html, body, #root {
+  margin: 0 !important;
+  padding: 0 !important;
+  width: 100%;
+  min-height: 100vh;
+}
+
+body {
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow-x: hidden;
+  font-family: "IBM Plex Sans Thai", "Inter", -apple-system, BlinkMacSystemFont, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: #1e293b; /* text-slate-800 */
+}
+
+:root {
+  color-scheme: light;
+}
+
+@media print {
+  html, body, #root {
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+  body {
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+  }
+}
+

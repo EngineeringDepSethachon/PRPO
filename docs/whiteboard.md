@@ -6,9 +6,17 @@
 - progress = จำนวน [x] / ทั้งหมด (server คำนวณ)
 -->
 # ไวท์บอร์ด Migrate Team
-อัปเดต: 2026-10-14 22:30
+อัปเดต: 2026-10-14 21:30
 
 ## ✅ ตัดสินใจแล้ว
+
+- [2026-10-14] M9 ปิดครบ (ผ่าน QA+kla, npm test 2225/2225, build ผ่าน): TC-005 แจ้งเตือนจาก server (serverScoped) ไม่กรองซ้ำที่ client, badge = งานค้าง ตาม 1.0.1 (ผู้ใช้เลือก A), badge กับ To-Do ใช้ src/utils/claimState.js ร่วม ; TC-002 AttachmentViewerModal รู้จัก R2 (/api/files) ไม่ตีความ uuid เป็น Drive ; /api/products/batch ไม่เขียน currentStock แถวเดิม + ไม่ปลุกแถวที่ลบ ; ยอดตั้งต้นสินค้าใหม่ตรวจ ≥0 ≤1e7 + audit PRODUCT_CREATE + trim code ; ค้นแถวสินค้า ORDER BY (id=?) DESC ; isDriveUrl/getDriveFileViewUrl ตรวจ hostname ; ก่อน deploy apply ถึง 0017
+
+- [2026-10-14] TC-003/006/009 ปิด (ผ่าน QA, npm test 2145/2145): ปุ่ม 'จัดการเคสปัญหา' เปิดสำหรับ PARTIALLY_RECEIVED_IN_CLAIM/PENDING_CLAIM (isSelfClaimStatus) ; To-Do เคลมจัดซื้อเอง = Requester (L1) + Admin (Neo ตัดสินตามใบบั๊ก ; Reviewer ยังกดปุ่มได้ตาม server เดิม) ; resolveClaim ล้าง flag ค้าง (hasUnresolvedClaim/isInClaim/hasDispute) ; ROUND_2 = งาน Requester ; Hub สถานะปิดชนะ flag ค้าง (ยกเว้น storeClaims ยังไม่ resolve) ; client เท่านั้น
+
+- [2026-10-14] TC-008/007/004 ปิด (ผ่าน QA+kla, npm test 2128/2128, build ผ่าน): ราคาเบิก/ปรับยอดคำนวณที่ server (avgCost > ราคา IN ล่าสุด > standardPrice ไม่หาร conversion ตาม GAS) เมิน unitCost จาก client ; หน้าจอโหมด CF ใช้เกณฑ์เดียวกัน (จับ log id/code) ; ปุ่มคำนวณ MAC ใหม่โหมด CF เรียก /api/products/recalculate-mac (ไม่รับ averageCost จาก client) ; stock_logs ส่ง alias timestamp/date/qty/note (functions/_lib/stocklogs.js) ; หมายเหตุสินค้าเก็บ D1 (migration 0017 remark) + audit PRODUCT_REMARK_SET ; PUT/POST สินค้าแถวเดิมไม่เขียน currentStock (server เป็นเจ้าของยอด) ; ก่อน deploy apply ถึง 0017
+
+- [2026-10-14] ผู้ใช้สั่งแก้ docs/bug-log-tester-2026-10-14.md ลำดับ TC-008 > TC-007 > TC-004 > สายเคลม (TC-003/006/009) > TC-005 > TC-002 ; TC-001 รอผู้ใช้ตัดสิน (แก้บั๊ก ไม่ต้อง consult)
 
 - [2026-10-14] S8 ปิด (ผ่าน QA+kla): stock_logs รับของมี grnNumber + แถว IN_NG (ไม่แตะยอด/MAC) เพดานชำรุดต่อคำขอ = ยอดสั่ง×conv − IN ดีสะสม ; grnNumber แถวเก่าเติมตอนอ่าน ; stockOnly ที่ PO ยังไม่ปิด → audit GOODS_RECEIVED_PARTIAL + แจ้งเตือน PO_CLAIM (ตามคำตัดสิน S8) ; PO ไม่มีแผนกไม่ส่งแจ้งเตือน
 
@@ -102,6 +110,10 @@
 
 ## ⏳ ค้างอยู่
 
+- **รอผู้ใช้ตัดสิน (M9):** TC-001 ลายเซ็น 'ผู้ขอซื้อ' ใน PDF PO เลือกตาม role (users[0]=admin) — ใช้ลายเซ็นผู้ขอซื้อตัวจริงหรือคงตาม role ; kla กลาง: ผู้ใช้ทั่วไปในแผนกเปลี่ยน PO ที่ค้างเคลมเป็น COMPLETED/CLOSED ได้โดยไม่มี canCloseClaim (rbac.js:383 canTransitionPO ปล่อยผ่าน) — เรื่องเดียวกับ short-close S4 ที่รอตัดสิน
+- ต่ำ M9 (บันทึก): footer/หัวโมดัล error สร้างสินค้า 'รหัสสินค้านี้ถูกใช้งานแล้ว' ไม่ตรงสาเหตุ 400 ยอดตั้งต้น ; modal skipped ของ batch บอก 'รายการของแผนกอื่น' ไม่ตรงสาเหตุ ; POST/PUT เดี่ยวแบบ array เขียนบางส่วนก่อน 400 (client ไม่ส่ง array) ; ลบสินค้าแล้วสร้างรหัสเดิมได้ยอดเก่า (server เป็นเจ้าของยอด) ; receiveToStock/submitGRN ไม่มี UI เรียก ถ้าใช้ในโหมด CF ยอดไม่บวก ; PO เก่าที่ flag เคลมค้างใน D1 ล้างเมื่อ resolve ครั้งถัดไป
+- **[2026-10-14 บ่าย-เย็น] Claude แก้+deploy ตรงบน production 4 เรื่องจากคนเทส (commit 09b6eb9, 099d557, 9e106e2, a25472d, d212665 — ผู้ใช้ push ด้วย `git push origin uat:main`)**: สร้างแผนกส่ง PUT แทน POST ไม่บันทึก ; แก้รหัสย่อแผนกไม่อัปเดต (server UPDATE ไม่มีคอลัมน์ code) ; ป้าย/ลิงก์ "เปิดดูใน Google Drive" สำหรับไฟล์ R2 ; ไฟล์แนบรวมชื่อซ้ำรูปสินค้าถูกซ่อน (dedupe ด้วย fileId แทนชื่อ) ; รูปสเปกใน lightbox ยิง /api/files ตรงไม่มี token (ส่ง fileId ให้ lightbox + รู้จัก proxy path) ; **ทีมควรเพิ่มเทสต์ครอบทั้ง 5 เคส**
+
 - **[2026-10-14 บ่าย] Claude deploy แก้บั๊ก S1-S8 ขึ้นจริงแล้ว (ผู้ใช้สั่ง "เอาขึ้นเลย")**: migrations 0015-0016 apply prod+preview ; npm test 2109/2109 ; deploy Production cd9b5482 + Preview 925516c9 ; /api/health 401 ทั้งคู่ ; commit `f2abd9a` (รวม docs/ADMIN_SETUP_GUIDE.md, reset-admin-password.bat, docs/smoke-test-2026-10-14.md) **ผู้ใช้ต้อง push เอง** ; **แก้แล้ว 2026-10-14 บ่าย: สร้างแผนกไม่บันทึก** สาเหตุ apiService.saveDepartment ตัดสิน isUpdate จาก payload.id ซึ่งฟอร์มสร้างใหม่ใส่ `DEPT-<code>` ล่วงหน้า → ส่ง PUT แทน POST → server UPDATE แถวที่ไม่มี ตอบ 200 → หน้าจอว่าสำเร็จแต่ไม่มีแถว (ผู้ใช้จึงสร้างต่อไม่ได้เพราะไม่มีแผนกให้เลือก) ; แก้ให้เช็คว่ามีแผนกนั้นอยู่แล้วจริงก่อนใช้ PUT ; ทดสอบ local ผ่าน (POST + แถวขึ้น) ; deploy แล้ว ; commit ต่อจาก f2abd9a (ผู้ใช้ push ด้วย `git push origin uat:main`) ; **ทีมควรเพิ่มเทสต์ + พิจารณาให้ server PUT /api/departments upsert ด้วย** ; บั๊กนี้มีในโค้ดเดิมก่อนย้าย (ตรรกะ isUpdate เดิม) แต่โหมด mock ไม่สังเกตเพราะ localStorage เก็บให้
 
 - ผู้ใช้ต้องลบเอง (สำคัญ ก่อน apply migrations): C:\Users\Admin\Desktop\PRPO\migrations\0016_stock_logs_grn_backfill.sql — ทีมยกเลิกแล้ว (เคยเป็น UPDATE ข้อมูลเดิม) ตอนนี้ Neo เขียนทับเป็น SELECT 1 ; ลบได้เลย
@@ -135,8 +147,21 @@
 - ต่ำ (บันทึก): หลัง smoke r2: แท็บ 'ปิดงานแล้ว' ในรายการ PO ไม่นับ COMPLETED (พฤติกรรมเดิม — เปลี่ยน = ถามผู้ใช้) ; PR ค้าง 'รอสั่ง Online' หลังเคลม/ยกเลิก PO (เดิม) ; รหัสแผนกจริงที่ขึ้นต้น 'ฝ่าย' จะถูกตัด — เช็กตอนย้ายข้อมูล Sheets ; writer ติดป้าย CLAIM_CREDIT ไม่มี docNo ให้ PO อื่นในแผนกได้ ; writer เขียน ledger แผนก ALL ได้ (เดิม) ; ORDER BY createdAt ที่รูปแบบปน
 - ต่ำ S6 (บันทึก): ไฟล์กำพร้าใน R2 ล้างเฉพาะเมื่อ admin สั่ง (เสนอ Cron Trigger) ; server ยังรับ data: URL ≤400k (บังคับหลัง deploy client ใหม่)
 - ต่ำ S8 (บันทึก): IN_NG สะสมต่อ PO ไม่มีเพดานรวม (ต่อคำขอจำกัด) ; GRN ใน grnHistory มาจาก client (รูปแบบไม่คงที่) ; poReceiveNotificationParams ยัง fallback 'ALL' ถ้าเส้นทางอื่นเรียก ; ตารางสต็อกแสดงแถว IN_NG เป็น +N สีเขียว (มีป้าย IN (NG))
+- ต่ำ M9 (บันทึก): gate แผนกกับ handler PUT/POST products (ยังไม่พบว่าโจมตีได้) ; csvCell ไม่ตรวจช่องว่างนำหน้า =
+- ผู้ใช้ลบเอง: C:\Users\Admin\Desktop\PRPO\.vt_malee.json, โฟลเดอร์ C:\Users\Admin\Desktop\PRPO\cloudflare\src\ และ C:\Users\Admin\Desktop\PRPO\cloudflare\public\_headers (สคริปต์ prepare สร้างเกิน)
+- ผู้ใช้รันเอง: git checkout -- cloudflare/.env.example cloudflare/index.html cloudflare/jsconfig.json cloudflare/tailwind.config.js cloudflare/vite.config.js cloudflare/wrangler.toml cloudflare/wrangler.toml.example (อนุมัติแล้ว แต่สิทธิ์เครื่องบล็อกทีม)
 
 ## 🎯 Milestones
+
+### M9: แก้บั๊กผู้ทดสอบ 2026-10-14 (docs/bug-log-tester-2026-10-14.md)
+
+- [x] TC-008 เบิกจ่ายด่วนตัดต้นทุนที่ราคาตั้งต้นแทน MAC
+- [x] TC-007 สถิติ/ประวัติเบิกจ่ายด่วนไม่มีข้อมูล
+- [x] TC-004 หมายเหตุสินค้าไม่บันทึก
+- [x] TC-003/006/009 สายเคลมค้างกลางทาง
+- [x] TC-005 กระดิ่งมี badge แต่รายการว่าง
+- [x] TC-002 รูป GRN เปิดเต็มไม่ได้
+- [x] /api/products/batch เขียนยอดสต็อกจาก cache client ทับยอดจริง (QA กลาง, ของเดิม)
 
 ### M8: แก้บั๊ก smoke test 2026-10-14 (docs/smoke-test-2026-10-14.md)
 

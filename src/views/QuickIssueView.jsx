@@ -17,6 +17,8 @@ import SearchableSelect from '../components/common/SearchableSelect';
 import Pagination from '../components/common/Pagination';
 import { safeStringCompare, formatThaiDateTime, parseSafeDate } from '../utils/formatters';
 import { healMACForProduct } from '../utils/macMigration';
+import { isCloudflareMode } from '../config/backendMode.js';
+import { csvCell } from '../utils/csvSafe';
 
 const ISSUE_REASONS = [
   'เบิกใช้ในสายการผลิต (Production Line)',
@@ -296,7 +298,8 @@ export default function QuickIssueView({
         const lSku = String(l.productCode || l.code || l.sku || '').trim().toLowerCase();
         const lId = String(l.productId || '').trim().toLowerCase();
         const lName = String(l.name || l.productName || '').trim().toLowerCase();
-        const match = (pId && lId === pId) || (pCode && (lSku === pCode || lId === pCode)) || (pName && lName === pName);
+        // cloudflare: same rule as the server (productId / code only, never the name)
+        const match = (pId && lId === pId) || (pCode && (lSku === pCode || lId === pCode)) || (!isCloudflareMode() && pName && lName === pName);
         const lType = String(l.type || '').toUpperCase();
         const qty = Number(l.quantity !== undefined ? l.quantity : (l.qty || 0));
         return match && lType === 'IN' && qty > 0;
@@ -304,13 +307,27 @@ export default function QuickIssueView({
 
       if (inLogs.length > 0) {
         inLogs.sort((a, b) => new Date(b.timestamp || b.date || 0).getTime() - new Date(a.timestamp || a.date || 0).getTime());
-        const fallbackCost = Number(
-          inLogs[0].unitPrice !== undefined ? inLogs[0].unitPrice : 
-          (inLogs[0].actualUnitPrice !== undefined ? inLogs[0].actualUnitPrice : 
-          (inLogs[0].unitCost || inLogs[0].baseUnitCost || 0))
-        );
-        if (fallbackCost > 0) return fallbackCost;
+        if (isCloudflareMode()) {
+          // server rule (productView fail-safe) : newest IN log with a positive unitPrice, else unitCost
+          for (const l of inLogs) {
+            const c = Number(l.unitPrice) > 0 ? Number(l.unitPrice) : Number(l.unitCost);
+            if (c > 0) return c;
+          }
+        } else {
+          const fallbackCost = Number(
+            inLogs[0].unitPrice !== undefined ? inLogs[0].unitPrice :
+            (inLogs[0].actualUnitPrice !== undefined ? inLogs[0].actualUnitPrice :
+            (inLogs[0].unitCost || inLogs[0].baseUnitCost || 0))
+          );
+          if (fallbackCost > 0) return fallbackCost;
+        }
       }
+    }
+
+    // GAS issue cost : avgCost || price (standard price, per stock unit as stored - no conversionRate division). Same as the cloudflare server.
+    if (isCloudflareMode() && selectedProduct) {
+      const std = Number(selectedProduct.standardPrice ?? selectedProduct.price ?? 0);
+      if (std > 0) return std;
     }
 
     return 0;
@@ -348,7 +365,7 @@ export default function QuickIssueView({
       }
     } catch (err) {
       console.error('[QuickIssueView] Error recalculating MAC:', err);
-      setCostUpdateToast('เกิดข้อผิดพลาดในการคำนวณ');
+      setCostUpdateToast((err && err.message) || 'เกิดข้อผิดพลาดในการคำนวณ');
     } finally {
       setIsRecalculating(false);
       setTimeout(() => {
@@ -768,16 +785,16 @@ export default function QuickIssueView({
     if (analytics.matrixRows.length === 0) return;
     const headers = ['หน่วยที่เบิก', 'รหัสสินค้า', 'ชื่อสินค้า', 'แผนก', 'จำนวนครั้งที่เบิก', 'ยอดรวมที่เบิก', 'หน่วยนับ', 'ต้นทุนเฉลี่ย (บาท)', 'มูลค่ารวม (บาท)', 'เบิกล่าสุด'];
     const rows = analytics.matrixRows.map(r => [
-      `"${r.unitName}"`,
-      `"${r.code}"`,
-      `"${r.name.replace(/"/g, '""')}"`,
-      `"${r.dept}"`,
+      csvCell(r.unitName),
+      csvCell(r.code),
+      csvCell(r.name),
+      csvCell(r.dept),
       r.count,
       r.qty,
-      `"${r.unit}"`,
+      csvCell(r.unit),
       Number(r.unitCost || 0).toFixed(2),
       Number(r.totalValue || 0).toFixed(2),
-      `"${r.lastDate}"`
+      csvCell(r.lastDate)
     ]);
 
     const csvContent = '\uFEFF' + [headers.join(','), ...rows.map(e => e.join(','))].join('\n');
