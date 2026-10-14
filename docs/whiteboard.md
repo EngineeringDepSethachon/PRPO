@@ -102,6 +102,8 @@
 
 ## ⏳ ค้างอยู่
 
+- **[2026-10-14 บ่าย] Claude deploy แก้บั๊ก S1-S8 ขึ้นจริงแล้ว (ผู้ใช้สั่ง "เอาขึ้นเลย")**: migrations 0015-0016 apply prod+preview ; npm test 2109/2109 ; deploy Production cd9b5482 + Preview 925516c9 ; /api/health 401 ทั้งคู่ ; commit `f2abd9a` (รวม docs/ADMIN_SETUP_GUIDE.md, reset-admin-password.bat, docs/smoke-test-2026-10-14.md) **ผู้ใช้ต้อง push เอง** ; **แก้แล้ว 2026-10-14 บ่าย: สร้างแผนกไม่บันทึก** สาเหตุ apiService.saveDepartment ตัดสิน isUpdate จาก payload.id ซึ่งฟอร์มสร้างใหม่ใส่ `DEPT-<code>` ล่วงหน้า → ส่ง PUT แทน POST → server UPDATE แถวที่ไม่มี ตอบ 200 → หน้าจอว่าสำเร็จแต่ไม่มีแถว (ผู้ใช้จึงสร้างต่อไม่ได้เพราะไม่มีแผนกให้เลือก) ; แก้ให้เช็คว่ามีแผนกนั้นอยู่แล้วจริงก่อนใช้ PUT ; ทดสอบ local ผ่าน (POST + แถวขึ้น) ; deploy แล้ว ; commit ต่อจาก f2abd9a (ผู้ใช้ push ด้วย `git push origin uat:main`) ; **ทีมควรเพิ่มเทสต์ + พิจารณาให้ server PUT /api/departments upsert ด้วย** ; บั๊กนี้มีในโค้ดเดิมก่อนย้าย (ตรรกะ isUpdate เดิม) แต่โหมด mock ไม่สังเกตเพราะ localStorage เก็บให้
+
 - ผู้ใช้ต้องลบเอง (สำคัญ ก่อน apply migrations): C:\Users\Admin\Desktop\PRPO\migrations\0016_stock_logs_grn_backfill.sql — ทีมยกเลิกแล้ว (เคยเป็น UPDATE ข้อมูลเดิม) ตอนนี้ Neo เขียนทับเป็น SELECT 1 ; ลบได้เลย
 - **รอผู้ใช้ตัดสิน (kla กลาง S4):** ผู้ขอซื้อ/ผู้ตรวจในแผนกเปลี่ยน PO เป็น CLOSED ผ่าน PUT ได้โดยไม่รับของจริง (short-close เดิม ตรง GAS ไม่มี RBAC) และตอนนี้ปิด PR ตามไปด้วย — ถ้าจะจำกัดให้เฉพาะผู้รับของ/ผู้ซื้อออนไลน์/admin หรือบังคับเหตุผล = เปลี่ยน business rule ; ตอนนี้เพิ่ม audit PR_COMPLETED_BY_PO ไว้ตามย้อน
 - ต่ำ S5 (บันทึก): PUT notifications/read-all ไม่มี rate limit ; key อ่านแล้วใน localStorage ใช้ชื่อผู้ใช้ ; โหมด GAS/mock สถานะอ่านค้างหลัง logout (เดิม) ; PO list COMPLETED_WITH_REFUND ยังแสดงรหัสดิบ (เทสต์เดิมล็อกไว้)

@@ -3671,8 +3671,12 @@ async function handleRequest(context, state) {
         const color = d.color || 'blue';
         const mgr = d.managerName || '';
 
+        // the row is located by id (the client keeps the original id when the code is edited) ; `code` is updated too,
+        // so renaming a department's short code sticks (documents / users keep the code they were created with)
+        const newCode = d.code ? String(d.code).trim().toUpperCase() : null;
         await db.prepare(`
           UPDATE departments SET
+            code = COALESCE(?, code),
             name = COALESCE(?, name),
             nameEn = COALESCE(?, nameEn),
             prefix = COALESCE(?, prefix),
@@ -3683,7 +3687,7 @@ async function handleRequest(context, state) {
             managerName = COALESCE(?, managerName),
             updatedAt = CURRENT_TIMESTAMP
           WHERE id = (SELECT id FROM departments WHERE id = ? OR code = ? ORDER BY (id = ?) DESC LIMIT 1)
-        `).bind(name, nameEn, prefix, desc, budget, isActive, color, mgr, id, code, id).run(); // admin only ; one row
+        `).bind(newCode, name, nameEn, prefix, desc, budget, isActive, color, mgr, id, code, id).run(); // admin only ; one row
 
         return jsonResponse({ ...d, id, code, name });
       }
