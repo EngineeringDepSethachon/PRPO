@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ZoomIn, ZoomOut, RotateCw, Download, ExternalLink, FileText, Image as ImageIcon, Globe, ShieldCheck } from 'lucide-react';
-import { useProxiedFileUrl, openProxiedFile } from '../../utils/cfAttachments';
+import { useProxiedFileUrl, openProxiedFile, isProxyFileUrl } from '../../utils/cfAttachments';
 import { extractDriveFileId, isDriveUrl, getDriveDisplayUrl } from '../../services/driveService';
 
 export default function AttachmentViewerModal({ file, url, title, onClose }) {
@@ -15,8 +15,10 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
   const targetUrl = url || file?.previewUrl || file?.url || file?.dataUrl || file?.fileUrl || '';
   const fileName = title || file?.name || file?.fileName || 'เอกสารแนบ (Attachment)';
   
-  const driveId = extractDriveFileId(targetUrl) || (file?.fileId ? extractDriveFileId(file.fileId) : null);
-  const isDrive = Boolean(driveId) || isDriveUrl(targetUrl);
+  // R2 file (cloudflare mode) : our own proxy path, never a Google Drive file (its fileId is a uuid, not a Drive id)
+  const isR2File = isProxyFileUrl(targetUrl);
+  const driveId = isR2File ? null : (extractDriveFileId(targetUrl) || (file?.fileId ? extractDriveFileId(file.fileId) : null));
+  const isDrive = !isR2File && (Boolean(driveId) || isDriveUrl(targetUrl));
 
   const isPdf = (file?.type === 'application/pdf') || 
                 (file?.mimeType === 'application/pdf') ||
@@ -281,7 +283,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
         <div className="px-6 py-3 bg-slate-800/80 border-t border-slate-700/80 flex items-center justify-between text-xs text-slate-400">
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>ระบบรักษาความปลอดภัยเอกสารจัดซื้อ • Google Drive Verified</span>
+            <span>ระบบรักษาความปลอดภัยเอกสารจัดซื้อ{isDrive ? ' • Google Drive Verified' : ''}</span>
           </div>
           <button
             type="button"

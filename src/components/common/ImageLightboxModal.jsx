@@ -3,7 +3,7 @@ import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Download, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import { resolveDriveImageUrl, getDriveFileViewUrl, handleDriveImageError } from '../../utils/driveHelper';
 import { pickAttachmentUrl } from '../../utils/attachmentUrls';
-import { useProxiedFileUrl, openProxiedFile, driveFileIdOf } from '../../utils/cfAttachments';
+import { useProxiedFileUrl, openProxiedFile, driveFileIdOf, isProxyFileUrl } from '../../utils/cfAttachments';
 
 /**
  * ImageLightboxModal
@@ -135,12 +135,12 @@ export default function ImageLightboxModal({
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition-all hover:scale-105 cursor-pointer"
-              title="เปิดดูใน Google Drive"
+              title={currentImage.isProxyFile ? 'เปิดดูไฟล์' : 'เปิดดูใน Google Drive'}
               onClick={e => { e.stopPropagation(); openViaProxy(e, false); }}
             >
               <ExternalLink className="w-3.5 h-3.5" />
-              <span className="hidden sm:inline">เปิดดูใน Google Drive</span>
-              <span className="sm:hidden">Drive</span>
+              <span className="hidden sm:inline">{currentImage.isProxyFile ? 'เปิดดูไฟล์' : 'เปิดดูใน Google Drive'}</span>
+              <span className="sm:hidden">{currentImage.isProxyFile ? 'เปิด' : 'Drive'}</span>
             </a>
           )}
 
@@ -205,7 +205,7 @@ export default function ImageLightboxModal({
                     className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
                   >
                     <ExternalLink className="w-4 h-4" />
-                    <span>เปิดดูใน Google Drive</span>
+                    <span>{currentImage.isProxyFile ? 'เปิดดูไฟล์' : 'เปิดดูใน Google Drive'}</span>
                   </a>
                 ) : (
                   <a
@@ -368,7 +368,9 @@ function useMemoImages(rawImages, defaultTitle) {
         }
       }
 
-      const driveViewUrl = fileId ? `https://drive.google.com/file/d/${fileId}/view` : getDriveFileViewUrl(rawInput);
+      // R2 file (cloudflare mode) : the stored url is our own proxy path, not a Google Drive file -> no Drive link / label
+      const proxyUrl = (item && typeof item === 'object' && isProxyFileUrl(item.url)) ? item.url : null;
+      const driveViewUrl = proxyUrl ? proxyUrl : (fileId ? `https://drive.google.com/file/d/${fileId}/view` : getDriveFileViewUrl(rawInput));
       const name = (typeof item === 'object' && (item.name || item.fileName || item.title))
         ? (item.name || item.fileName || item.title)
         : (defaultTitle ? `${defaultTitle} (${idx + 1})` : `รูปที่ ${idx + 1}`);
@@ -377,6 +379,7 @@ function useMemoImages(rawImages, defaultTitle) {
         raw: item,
         url: isLocal ? candidateUrl : (resolvedUrl || (typeof item === 'string' ? item : (item.url || item.previewUrl || ''))),
         driveViewUrl,
+        isProxyFile: Boolean(proxyUrl),
         fileId,
         isLocal,
         name

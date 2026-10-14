@@ -20,7 +20,7 @@ import { getNextPRNumber } from '../utils/idGenerator';
 import { safeStringCompare } from '../utils/formatters';
 import { getDriveFileViewUrl } from '../utils/driveHelper';
 import ProxiedImg from '../components/common/ProxiedImg';
-import { driveFileIdOf, openProxiedFile } from '../utils/cfAttachments';
+import { driveFileIdOf, openProxiedFile, isProxyFileUrl } from '../utils/cfAttachments';
 import { compressImage, compressImageFile, getBase64SizeBytes, MAX_IMAGE_SIZE_BYTES } from '../utils/fileUtils';
 import { isDepartmentMatch } from '../utils/permissions';
 
@@ -2470,7 +2470,7 @@ export default function PRCreateView({
                   <svg className="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
                   </svg>
-                  <span>เปิดดูใน Google Drive</span>
+                  <span>{isProxyFileUrl(previewImage?.url) ? 'เปิดดูไฟล์' : 'เปิดดูใน Google Drive'}</span>
                 </a>
               ) : <div />}
               <button 

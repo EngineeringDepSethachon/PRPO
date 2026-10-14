@@ -54,6 +54,9 @@ const idFromUrl = (u) => {
   return null;
 };
 
+/** true when `u` is our own authenticated file proxy path (an R2 file in cloudflare mode) - never a Google Drive link */
+export const isProxyFileUrl = (u) => typeof u === 'string' && /^\/api\/files\/[A-Za-z0-9_-]{10,128}(?:\?download=1)?$/.test(u);
+
 /** Drive file id of an attachment that must be shown through the proxy, or null (not cloudflare mode / local preview / no Drive file). */
 export function driveFileIdOf(att) {
   if (!isCloudflareMode() || !att) return null;
