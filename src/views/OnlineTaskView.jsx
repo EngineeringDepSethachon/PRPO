@@ -20,6 +20,7 @@ import {
   parseOrderYearMonth
 } from './procurement/OnlineProcurementHub';
 import { formatCurrency } from '../utils/formatters.js';
+import { currentYM, currentYear, recentMonthKeys } from '../utils/monthUtils';
 import { isPendingPurchaseOrder, isPendingClaimOrder } from '../services/procurementService';
 
 const formatMoney = (n) => formatCurrency(n);
@@ -171,7 +172,13 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
   });
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('PENDING'); // PENDING | ORDERED | CLAIM | CLOSED | ALL
-  const [selectedMonth, setSelectedMonth] = useState('2026-09');
+  const [selectedMonth, setSelectedMonth] = useState(() => currentYM());
+  const thisMonthYM = currentYM();
+  const thisMonthOptions = useMemo(() => recentMonthKeys(12), [thisMonthYM]);
+  // ถ้าเดือนที่เลือก (เช่นจากปุ่มย้อนหลัง) อยู่นอก 12 เดือน ให้แสดงไว้ใน <select> ด้วย
+  const monthChoices = (/^\d{4}-\d{2}$/.test(selectedMonth) && !thisMonthOptions.includes(selectedMonth))
+    ? [selectedMonth, ...thisMonthOptions]
+    : thisMonthOptions;
   const [completedPage, setCompletedPage] = useState(1);
   const [searchQuery, setSearchQuery] = useState('');
   const [deptFilter, setDeptFilter] = useState('ALL');
@@ -313,11 +320,11 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
         (Array.isArray(po.timeline) && po.timeline[po.timeline.length - 1]?.timestamp) || 
         '';
       const parsed = parseOrderYearMonth(orderDateStr);
-      const year = parsed.year || 2026;
-      const ymKey = parsed.ymKey || '2026-09';
+      const year = parsed.year || currentYear();
+      const ymKey = parsed.ymKey || currentYM();
 
       if (!selectedMonth || selectedMonth === 'ALL_YEAR' || selectedMonth === 'ALL' || selectedMonth === '2569' || selectedMonth === '2026') {
-        return year === 2026 || year === 2569;
+        return year === currentYear();
       }
       return ymKey === selectedMonth;
     });
@@ -382,11 +389,11 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
           (Array.isArray(po.timeline) && po.timeline[po.timeline.length - 1]?.timestamp) || 
           '';
         const parsed = parseOrderYearMonth(orderDateStr);
-        const year = parsed.year || 2026;
-        const ymKey = parsed.ymKey || '2026-09';
+        const year = parsed.year || currentYear();
+        const ymKey = parsed.ymKey || currentYM();
 
         if (!selectedMonth || selectedMonth === 'ALL_YEAR' || selectedMonth === 'ALL' || selectedMonth === '2569' || selectedMonth === '2026') {
-          if (year !== 2026 && year !== 2569) return false;
+          if (year !== currentYear()) return false;
         } else {
           if (ymKey !== selectedMonth) return false;
         }
@@ -609,16 +616,10 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
                     className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
                     title="เลือกรอบบัญชี"
                   >
-                    <option value="2026-09">กันยายน 2569</option>
-                    <option value="2026-08">สิงหาคม 2569</option>
-                    <option value="2026-07">กรกฎาคม 2569</option>
-                    <option value="2026-06">มิถุนายน 2569</option>
-                    <option value="2026-05">พฤษภาคม 2569</option>
-                    <option value="2026-04">เมษายน 2569</option>
-                    <option value="2026-03">มีนาคม 2569</option>
-                    <option value="2026-02">กุมภาพันธ์ 2569</option>
-                    <option value="2026-01">มกราคม 2569</option>
-                    <option value="ALL_YEAR">ทั้งหมดในปี 2569</option>
+                    {monthChoices.map(ym => (
+                      <option key={ym} value={ym}>{formatThaiMonth(ym)}</option>
+                    ))}
+                    <option value="ALL_YEAR">{`ทั้งหมดในปี ${currentYear() + 543}`}</option>
                   </select>
                 </div>
                 <button
@@ -635,9 +636,9 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
               <div className="flex items-center gap-1.5">
                 <button
                   type="button"
-                  onClick={() => setSelectedMonth('2026-09')}
+                  onClick={() => setSelectedMonth(thisMonthYM)}
                   className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
-                    selectedMonth === '2026-09'
+                    selectedMonth === thisMonthYM
                       ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-bold shadow-2xs'
                       : 'bg-white border-slate-200/80 text-slate-600 hover:bg-slate-50'
                   }`}
@@ -646,9 +647,9 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
                 </button>
                 <button
                   type="button"
-                  onClick={() => setSelectedMonth('2026-08')}
+                  onClick={() => setSelectedMonth(getPrevMonth(thisMonthYM))}
                   className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
-                    selectedMonth === '2026-08'
+                    selectedMonth === getPrevMonth(thisMonthYM)
                       ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-bold shadow-2xs'
                       : 'bg-white border-slate-200/80 text-slate-600 hover:bg-slate-50'
                   }`}
@@ -732,7 +733,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
                 className="inline-flex items-center gap-1.5 px-4 py-2 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 font-semibold text-xs rounded-xl border border-indigo-200 transition-colors shadow-2xs cursor-pointer"
               >
                 <Calendar className="w-3.5 h-3.5 text-indigo-600" />
-                <span>ดูคำสั่งซื้อทั้งหมดในปี 2569</span>
+                <span>{`ดูคำสั่งซื้อทั้งหมดในปี ${currentYear() + 543}`}</span>
               </button>
             ) : null
           }

@@ -1,4 +1,6 @@
 import { storageService } from './storageService';
+import { isCloudflareMode } from '../config/backendMode';
+import { cfWrite, cfBackground, withCfRollback } from './cfGuard';
 import { workflowEngine } from './workflowEngine';
 import { matchDepartment, isMultiDeptUser } from '../utils/permissions';
 
@@ -413,18 +415,20 @@ export const warehouseService = {
 
     try {
       await Promise.all([
-        fetch('/api/products/batch', {
+        cfWrite('บันทึกสต็อกสินค้าไม่สำเร็จ', '/api/products/batch', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(products)
         }),
-        fetch('/api/stock-logs', {
+        cfWrite('บันทึกประวัติสต็อกไม่สำเร็จ', '/api/stock-logs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(stockLogs)
         })
       ]);
-    } catch {
+    } catch (e) {
+      // Cloudflare: GRN must not look saved when the server rejected it (caller rolls local state back)
+      if (isCloudflareMode()) throw e;
       // Offline fallback
     }
 
@@ -503,13 +507,11 @@ export const warehouseService = {
     const updatedLogs = [initialLog, ...allLogs];
     storageService.saveStockLogs(updatedLogs);
 
-    try {
-      fetch('/api/stock-logs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updatedLogs)
-      }).catch(() => {});
-    } catch {}
+    cfBackground('stock-logs self-heal sync', '/api/stock-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(updatedLogs)
+    });
 
     return initialLog;
   },
@@ -570,5 +572,13 @@ export const warehouseService = {
     return generateGRNNumber(poNumber, roundNumber);
   }
 };
+
+// Cloudflare mode: roll local storage back if the server write for the GRN fails.
+{
+  const originalSubmitGRN = warehouseService.submitGRN;
+  warehouseService.submitGRN = function (...args) {
+    return withCfRollback(() => originalSubmitGRN.apply(this, args));
+  };
+}
 
 export default warehouseService;

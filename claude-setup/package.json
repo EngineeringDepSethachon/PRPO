@@ -1,0 +1,6 @@
+{
+  "name": "fable-office-claude-hooks",
+  "private": true,
+  "type": "commonjs",
+  "description": "ถูกคัดลอกไป .claude/ โดย office/setup.js เพื่อให้ hooks/*.js รันเป็น CommonJS (package.json รากโปรเจกต์ตั้ง type=module)"
+}

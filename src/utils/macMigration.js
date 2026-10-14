@@ -1,4 +1,5 @@
 import { storageService, isGAS, callGAS } from '../services/storageService';
+import { cfBackground } from '../services/cfGuard';
 
 /**
  * Recalculates Moving Average Cost (MAC) for a product from historical IN logs
@@ -112,15 +113,12 @@ export const healMACForProduct = async (targetSkuOrName) => {
           }
         }
       } else {
-        try {
-          await fetch('/api/products/' + encodeURIComponent(product.id), {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(product)
-          });
-        } catch {
-          // Dev server offline fallback
-        }
+        // Secondary (MAC self-heal): never throws; cloudflare mode logs a warning on failure
+        await cfBackground('MAC recalculation sync', '/api/products/' + encodeURIComponent(product.id), {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(product)
+        });
       }
 
       console.log(`[MAC Recalculation] คำนวณต้นทุน MAC ใหม่ของ "${product.name}" สำเร็จ: ฿${currentAvgCost}`);

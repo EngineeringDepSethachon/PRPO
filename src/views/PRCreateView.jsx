@@ -10,13 +10,17 @@ import {
 } from 'lucide-react';
 import { MEMO_THRESHOLD, DEPARTMENTS } from '../config/constants';
 import FileUploader from '../components/common/FileUploader';
+import { uploadAttachmentsForCloudflare } from '../utils/cfAttachments';
 import SearchableSelect from '../components/common/SearchableSelect';
 import { modalService } from '../services/modalService';
 import { budgetService } from '../services/budgetService';
+import { isCloudflareMode } from '../config/backendMode';
 import { sanitizeExternalUrl, getProductUrl } from '../utils/urlHelper';
 import { getNextPRNumber } from '../utils/idGenerator';
 import { safeStringCompare } from '../utils/formatters';
-import { resolveDriveImageUrl, handleDriveImageError, getDriveFileViewUrl } from '../utils/driveHelper';
+import { getDriveFileViewUrl } from '../utils/driveHelper';
+import ProxiedImg from '../components/common/ProxiedImg';
+import { driveFileIdOf, openProxiedFile } from '../utils/cfAttachments';
 import { compressImage, compressImageFile, getBase64SizeBytes, MAX_IMAGE_SIZE_BYTES } from '../utils/fileUtils';
 import { isDepartmentMatch } from '../utils/permissions';
 
@@ -520,7 +524,12 @@ export default function PRCreateView({
   // Department Budget Usage Bar (Directive 1)
   const budgetInfo = useMemo(() => {
     try {
-      const summary = apiService.calculateBudgetSummary();
+      // Cloudflare mode: same source + formula as BudgetView (zero-based, from D1 budgets/PRs/POs), not the legacy simulated engine
+      const summary = isCloudflareMode()
+        ? (context?.budgetSummary?.current
+            ? context.budgetSummary
+            : budgetService.calculatePeriodBudgetSummary(undefined, context?.prs, context?.pos))
+        : apiService.calculateBudgetSummary();
       const deptData = summary?.current?.[department];
       if (!deptData) return null;
       const allocated = Number(deptData.baseAllocated ?? deptData.allocated) || 0;
@@ -546,7 +555,7 @@ export default function PRCreateView({
     } catch {
       return null;
     }
-  }, [department, grandTotal]);
+  }, [department, grandTotal, context?.budgetSummary, context?.prs, context?.pos]);
 
   const handleAddItemRow = () => {
     const defaultProd = availableProducts[0];
@@ -1101,6 +1110,10 @@ export default function PRCreateView({
         return f;
       }));
 
+      // Cloudflare mode only: PDFs / big files go to Google Drive (/api/upload) and only their reference is saved ; other modes unchanged
+      const quotationFilesOut = await uploadAttachmentsForCloudflare(quotationFiles, { category: 'PR', department, docType: 'QUOTATION' });
+      const imageFilesOut = await uploadAttachmentsForCloudflare(processedImageFiles, { category: 'PR', department, docType: 'PR_ATTACHMENT' });
+
       const nowIso = new Date().toISOString();
       // Helper: Extracts only serializable plain-text fields from an attachment object.
       // Prevents "Failed due to illegal value in property: file" on google.script.run by
@@ -1140,12 +1153,12 @@ export default function PRCreateView({
         supplierName: vName,
         hasVat: currentChannel === 'SELF' ? hasVat : false,
         specUrl: quotationFiles[0] ? (quotationFiles[0].fileName || quotationFiles[0].name || '') : '',
-        quotationFiles: quotationFiles.map(f => sanitizeAttachment(f, { category: 'QUOTATION', type: f.mimeType || f.type || 'application/pdf' })),
-        generalAttachments: processedImageFiles.map(f => sanitizeAttachment(f, { category: 'GENERAL', type: f.mimeType || f.type || 'image/jpeg' })),
-        images: processedImageFiles.map(f => sanitizeAttachment(f, { category: 'IMAGE', type: f.mimeType || f.type || 'image/jpeg' })),
+        quotationFiles: quotationFilesOut.map(f => sanitizeAttachment(f, { category: 'QUOTATION', type: f.mimeType || f.type || 'application/pdf' })),
+        generalAttachments: imageFilesOut.map(f => sanitizeAttachment(f, { category: 'GENERAL', type: f.mimeType || f.type || 'image/jpeg' })),
+        images: imageFilesOut.map(f => sanitizeAttachment(f, { category: 'IMAGE', type: f.mimeType || f.type || 'image/jpeg' })),
         attachments: [
-          ...quotationFiles.map(f => sanitizeAttachment(f, { category: 'QUOTATION', type: f.mimeType || f.type || 'application/pdf' })),
-          ...processedImageFiles.map(f => sanitizeAttachment(f, { category: 'GENERAL', type: f.mimeType || f.type || 'image/jpeg' }))
+          ...quotationFilesOut.map(f => sanitizeAttachment(f, { category: 'QUOTATION', type: f.mimeType || f.type || 'application/pdf' })),
+          ...imageFilesOut.map(f => sanitizeAttachment(f, { category: 'GENERAL', type: f.mimeType || f.type || 'image/jpeg' }))
         ],
         note,
         items: processedItems.map(item => ({
@@ -1800,15 +1813,14 @@ export default function PRCreateView({
 
                             {/* Thumbnail Cards 48x48px */}
                             {itemImages.map((img, imgIdx) => {
-                              const imgSrc = resolveDriveImageUrl(img, 'w400');
                               return (
                                 <div key={imgIdx} className="relative group w-12 h-12 rounded-xl overflow-hidden border-2 border-white ring-1 ring-slate-200 shadow-2xs">
-                                  <img 
-                                    src={imgSrc} 
-                                    alt={img.name || `preview-${imgIdx}`} 
+                                  <ProxiedImg
+                                    att={img}
+                                    size="w400"
+                                    alt={img.name || `preview-${imgIdx}`}
                                     className="w-full h-full object-cover group-hover:scale-110 transition-transform cursor-pointer"
                                     onClick={() => handlePreviewImage(img)}
-                                    onError={(e) => handleDriveImageError(e, img)}
                                   />
                                   {/* Hover Action Overlay */}
                                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
@@ -1849,15 +1861,14 @@ export default function PRCreateView({
                               📷 รูปแนบ ({itemImages.length})
                             </span>
                             {itemImages.map((img, imgIdx) => {
-                              const imgSrc = resolveDriveImageUrl(img, 'w400');
                               return (
                                 <div key={imgIdx} className="relative group w-12 h-12 rounded-xl overflow-hidden border-2 border-white ring-1 ring-slate-200 shadow-2xs">
-                                  <img 
-                                    src={imgSrc} 
-                                    alt={img.name || `preview-${imgIdx}`} 
+                                  <ProxiedImg
+                                    att={img}
+                                    size="w400"
+                                    alt={img.name || `preview-${imgIdx}`}
                                     className="w-full h-full object-cover group-hover:scale-110 transition-transform cursor-pointer"
                                     onClick={() => handlePreviewImage(img)}
-                                    onError={(e) => handleDriveImageError(e, img)}
                                   />
                                   <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-1">
                                     <button 
@@ -2438,6 +2449,12 @@ export default function PRCreateView({
                   href={getDriveFileViewUrl(previewImage)}
                   target="_blank"
                   rel="noopener noreferrer"
+                  onClick={(e) => {
+                    // cloudflare mode : open the file through the proxy (no-op / normal link in other modes)
+                    if (!driveFileIdOf(previewImage)) return;
+                    e.preventDefault();
+                    openProxiedFile(previewImage).then((ok) => { if (!ok) window.open(getDriveFileViewUrl(previewImage), '_blank', 'noopener,noreferrer'); });
+                  }}
                   className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors"
                 >
                   <svg className="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -2456,11 +2473,11 @@ export default function PRCreateView({
               </button>
             </div>
             <div className="flex items-center justify-center overflow-auto max-h-[75vh] rounded-xl bg-slate-100">
-              <img 
-                src={resolveDriveImageUrl(previewImage, 'w1600')} 
-                alt="Product preview" 
+              <ProxiedImg
+                att={previewImage}
+                size="w1600"
+                alt="Product preview"
                 className="max-w-full max-h-[73vh] object-contain rounded-lg"
-                onError={(e) => handleDriveImageError(e, previewImage)}
               />
             </div>
             {previewImage.name && (

@@ -4,6 +4,8 @@ import { PO_STATUS } from '../../config/constants';
 import { apiService } from '../../services/apiService';
 import { storageService } from '../../services/storageService';
 import { modalService } from '../../services/modalService';
+import { driveService } from '../../services/driveService';
+import { isCloudflareMode } from '../../config/backendMode';
 import { useAppContext } from '../../context/AppContext';
 import { 
   Printer, Download, XCircle, AlertTriangle, 
@@ -20,7 +22,7 @@ import { generatePoPdf } from '../../utils/generatePoPdf';
 import { sanitizeExternalUrl, getProductUrl } from '../../utils/urlHelper';
 import ReceivingModal, { resolveRefundedQtyAndAmount } from '../../views/inventory/ReceivingModal';
 import { getValidConversionRate, toStockQuantity } from '../../utils/uomEngine.js';
-import { resolveDriveImageUrl, handleDriveImageError } from '../../utils/driveHelper';
+import ProxiedImg from '../common/ProxiedImg';
 
 const getVendorDisplayName = (vendorData) => {
   if (!vendorData) return '';
@@ -849,8 +851,20 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                     ref={claimFileInputRef}
                     onChange={async (e) => {
                       if (e.target.files?.[0]) {
-                        const c = await compressImageFile(e.target.files[0]);
-                        setClaimPhoto(c);
+                        const picked = e.target.files[0];
+                        const c = await compressImageFile(picked);
+                        if (isCloudflareMode()) {
+                          // Cloudflare: the evidence photo goes to Drive ; only its URL is kept (no data URL stored in the PO)
+                          try {
+                            const refNo = selectedPO?.poNo || selectedPO?.poNumber || selectedPO?.id;
+                            const up = await driveService.uploadFileToDrive({ file: picked, category: 'CLAIM', poNumber: refNo, docNo: refNo, docType: 'CLAIM_EVIDENCE' });
+                            setClaimPhoto({ ...c, dataUrl: up.fileUrl, previewUrl: up.fileUrl, url: up.fileUrl, fileId: up.fileId, viewUrl: up.viewUrl });
+                          } catch (upErr) {
+                            modalService.error('อัปโหลดรูปภาพหลักฐานไม่สำเร็จ', upErr.message);
+                          }
+                        } else {
+                          setClaimPhoto(c);
+                        }
                       }
                     }}
                     className="hidden"
@@ -866,7 +880,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                     </button>
                     {claimPhoto && (
                       <div className="relative group rounded-xl overflow-hidden border border-rose-300 w-14 h-14 shadow-2xs">
-                        <img src={claimPhoto.previewUrl} alt="Claim photo" className="w-full h-full object-cover" />
+                        <ProxiedImg att={claimPhoto} urlInput={claimPhoto.previewUrl} alt="Claim photo" className="w-full h-full object-cover" />
                         <button
                           type="button"
                           onClick={() => setClaimPhoto(null)}
@@ -1606,11 +1620,12 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                                 <FileText className="w-5 h-5" /><span className="text-[9px] font-bold mt-0.5">PDF</span>
                               </div>
                             ) : (
-                              <img 
-                                src={resolveDriveImageUrl(att.previewUrl || att.fileUrl || att.dataUrl || att.url, 'w400')} 
-                                alt={att.name || 'attachment'} 
-                                className="w-full h-16 object-cover rounded-lg group-hover:scale-105 transition-transform" 
-                                onError={(e) => handleDriveImageError(e, att)}
+                              <ProxiedImg
+                                att={att}
+                                urlInput={att.previewUrl || att.fileUrl || att.dataUrl || att.url}
+                                size="w400"
+                                alt={att.name || 'attachment'}
+                                className="w-full h-16 object-cover rounded-lg group-hover:scale-105 transition-transform"
                               />
                             )}
                             <p className="text-[10px] font-medium text-slate-600 truncate w-full mt-1 text-center font-mono">{att.name || att.fileName || `เอกสาร #${i + 1}`}</p>
@@ -1620,11 +1635,12 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                           <button key={`claim-att-${i}`} type="button"
                             onClick={() => setViewingAttachment({ file: att, url: att.previewUrl || att.fileUrl || att.dataUrl || att.url, title: att.name || 'หลักฐานเคลม' })}
                             className="group bg-rose-50/60 border border-rose-200 rounded-xl p-1.5 hover:border-rose-400 hover:shadow-sm transition-all cursor-pointer flex flex-col items-center">
-                            <img 
-                              src={resolveDriveImageUrl(att.previewUrl || att.fileUrl || att.dataUrl || att.url, 'w400')} 
-                              alt={att.name || 'claim evidence'} 
-                              className="w-full h-16 object-cover rounded-lg group-hover:scale-105 transition-transform" 
-                              onError={(e) => handleDriveImageError(e, att)}
+                            <ProxiedImg
+                              att={att}
+                              urlInput={att.previewUrl || att.fileUrl || att.dataUrl || att.url}
+                              size="w400"
+                              alt={att.name || 'claim evidence'}
+                              className="w-full h-16 object-cover rounded-lg group-hover:scale-105 transition-transform"
                             />
                             <p className="text-[10px] font-medium text-rose-700 truncate w-full mt-1 text-center font-mono">{att.name || `หลักฐาน #${i + 1}`}</p>
                           </button>

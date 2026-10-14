@@ -1,8 +1,17 @@
 import React, { useCallback, useState } from 'react';
 import { UploadCloud, File as FileIcon, X, Image as ImageIcon } from 'lucide-react';
 import { compressImageFile } from '../../utils/fileUtils';
+import { registerBlobUrl } from '../../utils/attachmentUrls';
+import { useProxiedFileUrl } from '../../utils/cfAttachments';
 
-export default function FileUploader({ 
+// cloudflare mode : an older draft can carry a Drive file (no local preview) -> shown through GET /api/files/:id ; other modes / local previews : unchanged
+function UploaderThumb({ f }) {
+  const proxied = useProxiedFileUrl(f, { imagesOnly: true });
+  const src = proxied.url || (proxied.state === 'loading' ? undefined : f.previewUrl);
+  return <img src={src} alt={f.name} className="w-full h-full object-cover" />;
+}
+
+export default function FileUploader({
   label, 
   required, 
   accept = "image/*,application/pdf", 
@@ -79,7 +88,7 @@ export default function FileUploader({
 
       let previewUrl = '';
       try {
-        previewUrl = URL.createObjectURL(file);
+        previewUrl = registerBlobUrl(URL.createObjectURL(file));
       } catch (_) {}
 
       return {
@@ -251,7 +260,7 @@ export default function FileUploader({
             <div key={f.id} className="relative group rounded-sm border border-slate-200 bg-white overflow-hidden shadow-sm hover:shadow-md transition-shadow">
               {f.isImage ? (
                 <div className="aspect-square bg-slate-100 w-full">
-                  <img src={f.previewUrl} alt={f.name} className="w-full h-full object-cover" />
+                  <UploaderThumb f={f} />
                 </div>
               ) : (
                 <div className="aspect-square bg-white flex flex-col items-center justify-center p-3 text-center">

@@ -1,0 +1,47 @@
+# ====================================================================
+# Cloudflare Pages + D1 Database Configuration Template
+# ใช้เป็นตัวอย่างสำหรับให้ทีมงาน/เครื่องอื่น/ผู้พัฒนาอื่น Deploy
+# ====================================================================
+
+name = "prpo-pdqc"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare D1 SQL Database Binding
+# 1. รันคำสั่งสร้างฐานข้อมูล: npx wrangler d1 create YOUR_DATABASE_NAME
+# 2. นำ database_id ที่ได้มาใส่ในช่อง database_id ด้านล่าง
+# 3. Apply migrations (ทดสอบ local): npx wrangler d1 migrations apply prpo-db --local
+#    Production: npx wrangler d1 migrations apply prpo-db --remote (ผู้ใช้รันเองเท่านั้น)
+[[d1_databases]]
+binding = "DB"
+database_name = "prpo-db"
+database_id = "YOUR_CLOUDFLARE_D1_DATABASE_ID_HERE"
+
+# Preview deployments (every non-production branch / PR) MUST use their own D1 - otherwise a Preview reads and writes the production database.
+# wrangler d1 create prpo-db-preview, apply the migrations to it, then put its id here. Until it is a real id a Preview build fails on purpose.
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "prpo-db-preview"
+database_id = "<PREVIEW_DATABASE_ID>"
+
+# File storage : Cloudflare R2 (private buckets, served only through /api/files/:id) - docs/requirements-file-storage.md
+# Enable R2 in the Dashboard, then (user runs these): npx wrangler r2 bucket create prpo-files ; npx wrangler r2 bucket create prpo-files-preview
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "prpo-files"
+
+[[env.preview.r2_buckets]]
+binding = "FILES"
+bucket_name = "prpo-files-preview"
+
+# Environment variables (not secret). FILE_STORAGE = "r2" (default) | "drive" (needs the GOOGLE_SA_* secrets + DRIVE_ROOT_FOLDER_ID, Shared Drive later)
+[vars]
+FILE_STORAGE = "r2"
+# DRIVE_ROOT_FOLDER_ID = "<YOUR_DRIVE_FOLDER_ID>"   # only when FILE_STORAGE = "drive"
+
+[env.preview.vars]
+FILE_STORAGE = "r2"
+# CORS allow-list (comma separated, exact origins). Leave unset/empty for same-origin only (the Pages app calling its own /api).
+# "*" is ignored. Dev only: ENVIRONMENT = "dev" (or ALLOW_DEV_SEED=true) allows http://localhost:5173 and :8788 when this is unset.
+# ALLOWED_ORIGINS = "https://prpo.example.com"

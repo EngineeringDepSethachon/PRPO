@@ -1,12 +1,26 @@
 import { resolveUserPermissions } from '../config/constants.js';
 import { isGAS, callGAS } from './storageService.js';
+import { isCloudflareMode } from '../config/backendMode.js';
+import { isAdminUser } from '../utils/adminRule.js';
 
 const AUTH_SESSION_KEY = 'prpo_auth_session';
 const REGISTERED_USERS_KEY = 'prpo_registered_users';
 export const EXPLICIT_SIGNOUT_KEY = 'prpo_explicit_signout';
 
+// `vite build --mode cloudflare` : Vite replaces import.meta.env.MODE by the string literal, so every demo account / password shortcut below is
+// dead code there and is dropped from the bundle (no credentials ship to production). mock / gas / dev / test builds keep them exactly as before.
+// (same definition as vite.config.js : --mode cloudflare OR VITE_BACKEND_MODE=cloudflare ; production is always built with `npm run build:cf`)
+export const IS_CLOUDFLARE_BUILD = import.meta.env.MODE === 'cloudflare' || String(import.meta.env.VITE_BACKEND_MODE || '').trim().toLowerCase() === 'cloudflare';
+
+// Inert placeholder for the Cloudflare build : no password, no pin, nobody can log in with it (the real accounts come from the server).
+// It only keeps the pre-login code paths that read DEFAULT_EMPLOYEE_ACCOUNTS[0] working.
+const CLOUDFLARE_PLACEHOLDER_ACCOUNTS = [{
+  id: 'GUEST', username: '', name: 'Guest', department: 'PD', primaryDepartment: 'PD', departments: ['PD'], assignedDepartments: ['PD'], allowedDepartments: ['PD'],
+  roleId: 'REQUESTER_PD', canonicalRole: 'REQUESTER', level: 1, status: 'INACTIVE'
+}];
+
 // Pre-configured Employee Accounts categorized by Position for Localhost Testing
-export const DEFAULT_EMPLOYEE_ACCOUNTS = [
+export const DEFAULT_EMPLOYEE_ACCOUNTS = IS_CLOUDFLARE_BUILD ? CLOUDFLARE_PLACEHOLDER_ACCOUNTS : [
   {
     id: 'USR-0001',
     employeeId: 'EMP-PD-001',
@@ -166,7 +180,7 @@ export const isUATEnv = () => {
 export const getRolePermissionsChecklist = (userOrRole) => {
   if (!userOrRole) return [];
   const roleStr = String(userOrRole.canonicalRole || userOrRole.roleId || userOrRole.role || userOrRole.positionKey || '').toUpperCase();
-  const isAdmin = userOrRole.isAdmin === true || roleStr.includes('ADMIN') || Number(userOrRole.level) >= 99 || userOrRole.username === 'admin';
+  const isAdmin = isAdminUser(userOrRole, userOrRole.isAdmin === true || roleStr.includes('ADMIN') || Number(userOrRole.level) >= 99 || userOrRole.username === 'admin');
   const isApprover = isAdmin || roleStr.includes('APPROV') || roleStr.includes('PLANT_MANAGER');
   const isPurchaser = isAdmin || roleStr.includes('PURCHAS') || roleStr.includes('BUYER');
   const isRequesterOrStaff = isAdmin || roleStr.includes('REQUEST') || roleStr.includes('REVIEW') || roleStr.includes('STOCK') || roleStr.includes('PD') || roleStr.includes('QC');
@@ -426,6 +440,73 @@ export const authService = {
       throw new Error('กรุณาระบุรหัสผ่าน (Password)');
     }
 
+    // 2a. Cloudflare mode: authenticate against D1 via /api/auth (token kept for Bearer header)
+    // No local-credential fallback in this mode: every failure throws.
+    if (isCloudflareMode()) {
+      const BAD_CRED_MSG = 'ชื่อผู้ใช้งาน หรือ รหัสผ่าน ไม่ถูกต้อง';
+      const UNAVAILABLE_MSG = 'ไม่สามารถเชื่อมต่อเซิร์ฟเวอร์ได้ กรุณาลองใหม่อีกครั้ง';
+      let apiRes;
+      try {
+        apiRes = await fetch('/api/auth', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: cleanUser, password: cleanPass })
+        });
+      } catch {
+        throw new Error(UNAVAILABLE_MSG);
+      }
+      {
+        if (apiRes.ok) {
+          const authData = await apiRes.json().catch(() => null);
+          if (authData && authData.user && typeof authData.token === 'string' && authData.token) {
+            const userObj = authData.user;
+            const rolePermissions = resolveUserPermissions(userObj);
+            const userDepts = rolePermissions.departments || userObj.departments || [userObj.department || 'PD'];
+            const sessionData = {
+              id: userObj.id,
+              username: userObj.username,
+              employeeId: userObj.employeeId,
+              name: userObj.name,
+              employeeName: userObj.employeeName || userObj.name,
+              displayName: userObj.displayName || userObj.name,
+              primaryDepartment: userObj.primaryDepartment || userObj.department,
+              department: userObj.department,
+              departments: userDepts,
+              assignedDepartments: userDepts,
+              allowedDepartments: userDepts,
+              roleId: userObj.roleId,
+              positionKey: userObj.positionKey || userObj.roleId,
+              title: userObj.title,
+              level: userObj.level || 1,
+              token: authData.token,
+              mustChangePassword: authData.mustChangePassword === true,
+              lastLogin: new Date().toISOString(),
+              ...rolePermissions,
+              // `id` is overwritten by rolePermissions.id (= roleId) above ; userId is the stable per-user key (client cache owner)
+              userId: userObj.id,
+              role: rolePermissions,
+              rolePermissions: rolePermissions,
+              expiresAt: Date.now() + (8 * 60 * 60 * 1000) // = server token TTL (TOKEN_TTL_SECONDS)
+            };
+            localStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(sessionData));
+            localStorage.setItem('prpo_auth_session', JSON.stringify(sessionData));
+            return sessionData;
+          }
+          throw new Error(UNAVAILABLE_MSG);
+        }
+        if (apiRes.status === 401 || apiRes.status === 400) {
+          const errorData = await apiRes.json().catch(() => ({}));
+          throw new Error(errorData.error || BAD_CRED_MSG);
+        }
+        // 429 (rate limit) / 403 (blocked): show the server's Thai message when provided
+        if (apiRes.status === 429 || apiRes.status === 403) {
+          const errorData = await apiRes.json().catch(() => ({}));
+          throw new Error(typeof errorData?.error === 'string' && errorData.error ? errorData.error : UNAVAILABLE_MSG);
+        }
+        throw new Error(UNAVAILABLE_MSG);
+      }
+    }
+
     // 2. In Google Apps Script environment: Authenticate directly against Users sheet backend
     if (isGAS()) {
       try {
@@ -506,9 +587,11 @@ export const authService = {
         (cleanUserLower === 'siraphat.pd' && uUser === 'wichai.pd') ||
         (cleanUserLower === 'natthinee.qc' && uUser === 'somying.qc') ||
         (cleanUserLower === 'kallayani.mgr' && uUser === 'somchai.am');
+      // the password shortcuts (admin123 / password123 / 123456 for anyone) exist for the localhost test modes only - not in the Cloudflare build
       const passMatch = u.password === cleanPass || u.pin === cleanPass ||
-        (uUser === 'admin' && (cleanPass === 'admin123' || cleanPass === 'password123' || cleanPass === '123456')) ||
-        (cleanPass === '123456');
+        (!IS_CLOUDFLARE_BUILD && (
+          (uUser === 'admin' && (cleanPass === 'admin123' || cleanPass === 'password123' || cleanPass === '123456')) ||
+          (cleanPass === '123456')));
       return userMatch && passMatch;
     });
 

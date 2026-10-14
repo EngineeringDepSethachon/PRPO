@@ -1,0 +1,6 @@
+{
+  "name": "fable-office-runtime",
+  "private": true,
+  "type": "commonjs",
+  "description": "ไฟล์นี้บอก Node ว่าสคริปต์ใน office/ เป็น CommonJS (package.json รากโปรเจกต์ตั้ง type=module)"
+}

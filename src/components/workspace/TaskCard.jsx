@@ -1,6 +1,7 @@
 import React from 'react';
 import { Building2, Store, AlertTriangle, CheckCircle2, RotateCcw } from 'lucide-react';
 import { PR_STATUS, PO_STATUS } from '../../config/constants.js';
+import { getCompletedPOStatus } from '../../utils/poCompletedStatus.js';
 import { useAppContext } from '../../context/AppContext';
 
 const formatDateTime = (dateVal) => {
@@ -176,7 +177,7 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
   
   let statusInfo = isPR 
     ? (PR_STATUS[task.status] || { label: task.status, color: 'bg-slate-50 text-slate-700 border-slate-200' })
-    : (PO_STATUS[task.status] || { label: task.status, color: 'bg-slate-50 text-slate-700 border-slate-200' });
+    : (PO_STATUS[task.status] || getCompletedPOStatus(task.status) || { label: task.status, color: 'bg-slate-50 text-slate-700 border-slate-200' });
     
   if (!isPR && task.status === 'CLOSED' && task.claimStatus === 'WRITE_OFF') {
     statusInfo = { label: 'ตัดจำหน่าย/ยกเว้นเคลม', color: 'bg-slate-100 text-slate-700 border-slate-300 font-bold' };

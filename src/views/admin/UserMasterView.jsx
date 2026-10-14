@@ -8,6 +8,11 @@ import { apiService } from '../../services/apiService';
 import { storageService } from '../../services/storageService';
 import { modalService } from '../../services/modalService';
 import Pagination from '../../components/common/Pagination';
+import { compressImage } from '../../utils/fileUtils';
+import { isCloudflareMode } from '../../config/backendMode';
+
+// the server accepts a signature as PNG/JPEG/WebP <= ~300 KB : keep what is sent well under that
+const SIGNATURE_MAX_BYTES = 200 * 1024;
 
 const ROLE_OPTIONS = [
   { id: 'REQUESTER', label: 'Requester - ผู้ขอซื้อ (ตามแผนกที่ได้รับมอบหมาย)', title: 'Requester', level: 1, color: 'bg-blue-50 text-blue-700 border-blue-200' },
@@ -328,7 +333,9 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
                 </tr>
               ) : (
                 paginatedUsers.map(user => {
-                  const roleCfg = ROLE_OPTIONS.find(r => r.id === user.roleId) || { label: user.roleId, color: 'bg-slate-100 text-slate-700 border-slate-200' };
+                  // legacy REQUESTER_PD / REQUESTER_QC -> REQUESTER so the label matches the other roles ; unknown ids fall back to the raw code
+                  const roleKey = user.roleId ? normalizeRoleId(user.roleId) : user.roleId;
+                  const roleCfg = ROLE_OPTIONS.find(r => r.id === roleKey) || { label: user.roleId, color: 'bg-slate-100 text-slate-700 border-slate-200' };
                   const hasSignature = Boolean(user.signature && user.signature.length > 50);
 
                   return (
@@ -560,11 +567,13 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
   const [name, setName] = useState(user?.name || '');
   const [employeeName, setEmployeeName] = useState(user?.employeeName || user?.name || '');
   const [username, setUsername] = useState(user?.username || '');
-  const [password, setPassword] = useState(user?.password || 'password123');
+  // Cloudflare: no default password - the admin sets a real one for a new user (the server refuses the known defaults) and leaves the field
+  // empty when editing to keep the current password. mock / gas keep the legacy default.
+  const [password, setPassword] = useState(user?.password || (isCloudflareMode() ? '' : 'password123'));
   const [position, setPosition] = useState(user?.position || user?.title || '');
   const [title, setTitle] = useState(user?.title || user?.position || '');
   const [assignedDepts, setAssignedDepts] = useState(resolveInitialDepts);
-  const [roleId, setRoleId] = useState(normalizeRoleId(user?.roleId) || 'REQUESTER');
+  const [roleId, setRoleId] = useState(user && user.roleId ? normalizeRoleId(user.roleId) : ''); // a new user must pick a role (no silent default)
   const [status, setStatus] = useState(user?.status || 'ACTIVE');
 
   // Toggle a single dept in/out of assignedDepts array
@@ -666,8 +675,14 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
       return modalService.warning('ยังไม่ได้วาดลายเซ็น', 'กรุณาวาดลายเซ็นลงบนกระดานก่อนบันทึก');
     }
     const dataUrl = canvas.toDataURL('image/png');
-    setSignatureDataUrl(dataUrl);
-    modalService.success('นำลายเซ็นไปใช้แล้ว', 'แปลงลายเซ็นเป็น Base64 เรียบร้อยแล้ว พร้อมบันทึก');
+    const applyIt = (url) => {
+      setSignatureDataUrl(url);
+      modalService.success('นำลายเซ็นไปใช้แล้ว', 'แปลงลายเซ็นเป็น Base64 เรียบร้อยแล้ว พร้อมบันทึก');
+    };
+    if (dataUrl.length <= SIGNATURE_MAX_BYTES * 1.37) return applyIt(dataUrl);
+    compressImage(dataUrl, { maxWidth: 800, maxHeight: 400, quality: 0.8, maxSizeBytes: SIGNATURE_MAX_BYTES, mimeType: 'image/jpeg' })
+      .then((res) => applyIt(res.dataUrl))
+      .catch(() => applyIt(dataUrl));
   };
 
   // Upload File Handler
@@ -675,7 +690,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    if (!file.type.startsWith('image/')) {
+    if (!file.type.startsWith('image/') || /svg/i.test(file.type)) {
       return modalService.warning('ไฟล์ไม่รองรับ', 'กรุณาเลือกไฟล์ภาพ PNG หรือ JPG');
     }
 
@@ -683,15 +698,22 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
       return modalService.warning('ขนาดไฟล์เกิน', 'ขนาดภาพลายเซ็นไม่ควรเกิน 2MB');
     }
 
-    const reader = new FileReader();
-    reader.onload = (loadEvt) => {
-      const result = loadEvt.target?.result;
-      if (result) {
-        setSignatureDataUrl(String(result));
-        modalService.success('อัปโหลดรูปลายเซ็นแล้ว', 'พร้อมบันทึกลงในฐานข้อมูล');
-      }
+    const done = (url) => {
+      setSignatureDataUrl(String(url));
+      modalService.success('อัปโหลดรูปลายเซ็นแล้ว', 'พร้อมบันทึกลงในฐานข้อมูล');
     };
-    reader.readAsDataURL(file);
+    const readRaw = () => {
+      const reader = new FileReader();
+      reader.onload = (loadEvt) => {
+        const result = loadEvt.target?.result;
+        if (result) done(result);
+      };
+      reader.readAsDataURL(file);
+    };
+    // shrink to a JPEG <= ~200 KB first (the server stores signatures <= ~300 KB) ; if the browser cannot, use the file as picked
+    compressImage(file, { maxWidth: 800, maxHeight: 400, quality: 0.8, maxSizeBytes: SIGNATURE_MAX_BYTES, mimeType: 'image/jpeg' })
+      .then((res) => (res && res.dataUrl ? done(res.dataUrl) : readRaw()))
+      .catch(readRaw);
   };
 
   // Form Submit
@@ -699,6 +721,16 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
     e.preventDefault();
     if (!name.trim() || !username.trim()) {
       return modalService.warning('ข้อมูลไม่ครบ', 'กรุณาระบุชื่อและ Username');
+    }
+    if (!roleId) {
+      return modalService.warning('ยังไม่ได้เลือกบทบาท', 'กรุณาเลือกบทบาทและสิทธิ์ในระบบของผู้ใช้งาน');
+    }
+    if (isCloudflareMode()) {
+      const pw = password.trim();
+      const isDefault = ['123456', 'password123', 'admin123'].includes(pw.toLowerCase());
+      if ((!user && !pw) || (pw && (pw.length < 6 || isDefault))) {
+        return modalService.warning('รหัสผ่านไม่ถูกต้อง', 'กรุณาตั้งรหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร) ห้ามใช้รหัสเริ่มต้น');
+      }
     }
     if (roleId !== 'ADMIN' && roleId !== 'PLANT_MANAGER' && roleId !== 'ONLINE_PURCHASER' && assignedDepts.length === 0) {
       return modalService.warning('ยังไม่ได้เลือกแผนก', 'กรุณาเลือกแผนกที่ผู้ใช้งานรับผิดชอบอย่างน้อย 1 แผนก');
@@ -722,7 +754,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
         employeeName: employeeName.trim() || name.trim(),
         displayName: name.trim(),
         username: username.trim(),
-        password: password || 'password123',
+        password: isCloudflareMode() ? (password.trim() || undefined) : (password || 'password123'),
         position: position.trim(),
         title: position.trim() || title.trim() || (ROLE_OPTIONS.find(r => r.id === roleId)?.title || 'Officer'),
         primaryDepartment: primaryDept,
@@ -886,6 +918,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                   }}
                   className="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
                 >
+                  {!roleId && <option value="">-- เลือกบทบาท --</option>}
                   {ROLE_OPTIONS.map(r => (
                     <option key={r.id} value={r.id}>{r.label}</option>
                   ))}

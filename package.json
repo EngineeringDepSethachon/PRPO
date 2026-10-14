@@ -4,12 +4,16 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
+    "setup": "node office/setup.js",
+    "office": "node office/setup.js && node office/server.js",
+    "office:test": "node --test --test-concurrency=1 \"office/test/*.test.js\"",
     "dev": "concurrently \"npm run backend\" \"vite\"",
     "dev:frontend": "vite",
     "backend": "node server/server.js",
     "start": "concurrently \"npm run backend\" \"vite\"",
     "build": "vite build",
     "build:gas": "vite build --mode gas",
+    "build:cf": "vite build --mode cloudflare",
     "prepare:gas": "node scripts/prepare-gas.js",
     "gas:build": "npm run build:gas && npm run prepare:gas",
     "gas:status": "clasp status",
@@ -18,6 +22,7 @@
     "test": "vitest run tests src/services/__tests__",
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
+    "test:e2e:cf": "playwright test -c playwright.cf.config.js",
     "lint": "oxlint",
     "preview": "vite preview"
   },
@@ -53,6 +58,7 @@
     "terser": "^5.51.2",
     "vite": "^8.2.0",
     "vite-plugin-singlefile": "^2.3.3",
-    "vitest": "^4.1.10"
+    "vitest": "^4.1.10",
+    "wrangler": "^4.149.0"
   }
 }

@@ -1,10 +1,14 @@
 // Unified In-App Modal & Notification Service (Impeccable Design Standard)
 // Completely replaces browser native window.alert(), window.confirm(), and window.prompt()
 
+import { isCloudflareMode } from '../config/backendMode.js';
+
 class ModalService {
   constructor() {
     this.listeners = new Set();
     this.currentModal = null;
+    this._lastErrorAt = 0;
+    this._lastErrorAuto = false;
   }
 
   subscribe(listener) {
@@ -69,6 +73,16 @@ class ModalService {
    * Show an error modal
    */
   error(title, message = '', options = {}) {
+    // Cloudflare mode only: one error modal per failed action. The automatic safety-net modal from
+    // cfGuard (cfAuto) is skipped when a modal was just shown, and a caller's own modal is skipped
+    // if the automatic one already appeared. mock / gas are untouched.
+    if (isCloudflareMode()) {
+      const now = Date.now();
+      const recent = now - this._lastErrorAt < 800;
+      if (recent && (options?.cfAuto || this._lastErrorAuto)) return Promise.resolve(true);
+      this._lastErrorAt = now;
+      this._lastErrorAuto = Boolean(options?.cfAuto);
+    }
     const errObj = options?.error || (message instanceof Error ? message : null) || (title instanceof Error ? title : null);
     if (errObj) {
       console.error('[Workflow Error Stack]:', errObj.stack || errObj);

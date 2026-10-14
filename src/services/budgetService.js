@@ -1,4 +1,6 @@
 import { storageService } from './storageService';
+import { isCloudflareMode } from '../config/backendMode';
+import { cfWrite, cfBackground, withCfRollback } from './cfGuard';
 import { apiService } from './apiService';
 import { auditService } from './auditService';
 
@@ -285,15 +287,24 @@ export const budgetService = {
 
     storageService.appendBudgetTransaction(tx);
 
-    try {
-      if (typeof fetch === 'function') {
-        fetch('/api/budget-transactions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(tx)
-        }).catch(() => {});
+    // Secondary ledger sync (never throws). Cloudflare: if the server did not accept it,
+    // warn and drop the local entry so the ledger is not reported as written.
+    const ledgerSync = cfBackground('budget ledger sync', '/api/budget-transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tx)
+    });
+    if (isCloudflareMode()) {
+      const res = await ledgerSync;
+      if (!res || !res.ok) {
+        try {
+          const kept = (storageService.getBudgetTransactions() || []).filter(t => t.id !== tx.id);
+          storageService.saveBudgetTransactions(kept);
+        } catch (e) {
+          console.warn('[cloudflare] budget ledger rollback failed:', e && e.message);
+        }
       }
-    } catch {}
+    }
 
     return tx;
   },
@@ -302,7 +313,7 @@ export const budgetService = {
    * Allocate monthly budget for specified period (YYYY-MM)
    * Enforces persistence in storageService & localStorage
    */
-  async allocateMonthlyBudget({ period, allocations = {}, actor = 'Asst. Manager', reason = '' }) {
+  async allocateMonthlyBudget({ period, allocations = {}, previousAmounts = {}, actor = 'Asst. Manager', reason = '' }) {
     if (!period || !/^\d{4}-\d{2}$/.test(period)) {
       throw new Error('รูปแบบรอบเดือนไม่ถูกต้อง ต้องเป็น YYYY-MM (ค.ศ.)');
     }
@@ -310,17 +321,26 @@ export const budgetService = {
     const budgets = storageService.getBudgets() || {};
     const today = new Date();
     const currentPeriodStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}`;
+    const createdTransactions = {};
 
     for (const [dept, amount] of Object.entries(allocations)) {
       const numAmount = Math.max(0, Number(amount) || 0);
       if (!budgets[dept]) {
         budgets[dept] = { monthlyBudget: 0, spent: 0, actualExpense: 0, pending: 0, variance: 0, history: {}, historicalSpent: {}, refundCredits: {} };
       }
-      // Strict Zero-based: Previous budget strictly refers to the same period history.
+      // Legacy budget records may not have a history map yet
+      if (!budgets[dept].history) budgets[dept].history = {};
+      // Strict Zero-based: Previous budget strictly refers to the same period history
+      // (or an explicit previousAmounts[dept] from the caller, mirroring the backend).
       // Initial state of any new month is strictly 0. Never fallback to master data!
-      const prevMonthAlloc = (budgets[dept].history[period] !== undefined && budgets[dept].history[period] !== null)
-        ? Number(budgets[dept].history[period])
-        : 0;
+      const explicitPrev = (previousAmounts && previousAmounts[dept] !== undefined && previousAmounts[dept] !== null && !isNaN(Number(previousAmounts[dept])))
+        ? Number(previousAmounts[dept])
+        : null;
+      const prevMonthAlloc = explicitPrev !== null
+        ? explicitPrev
+        : ((budgets[dept].history[period] !== undefined && budgets[dept].history[period] !== null)
+          ? Number(budgets[dept].history[period])
+          : 0);
       const isInitial = prevMonthAlloc === 0;
 
       budgets[dept].history[period] = numAmount;
@@ -358,6 +378,7 @@ export const budgetService = {
         targetMonth: period,
         period
       };
+      createdTransactions[dept] = tx;
       storageService.appendBudgetTransaction(tx);
     }
 
@@ -384,16 +405,20 @@ export const budgetService = {
       console.warn('[budgetService] Audit log error:', e);
     }
 
-    // Backend sync attempt
-    try {
-      if (typeof fetch === 'function') {
-        await fetch('/api/budgets/allocate', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ period, allocations, actor, reason })
-        }).catch(() => {});
-      }
-    } catch {}
+    // Backend sync. Cloudflare: failure throws (cfWrite) and the caller rolls local state back.
+    await cfWrite('จัดสรรงบประมาณไม่สำเร็จ', '/api/budgets/allocate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        period,
+        allocations,
+        previousAmounts,
+        actor,
+        reason,
+        transactions: createdTransactions,
+        transactionId: Object.values(createdTransactions)[0]?.id
+      })
+    });
 
     return {
       success: true,
@@ -410,17 +435,11 @@ export const budgetService = {
   resetBudgetData() {
     const cleanBudgets = generateCleanBudgetBaseline();
     storageService.saveBudgets(cleanBudgets);
-    try {
-      if (typeof fetch === 'function') {
-        fetch('/api/budgets/reset', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(cleanBudgets)
-        }).catch(() => {});
-      }
-    } catch {
-      // Graceful offline fallback
-    }
+    cfBackground('budget reset sync', '/api/budgets/reset', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(cleanBudgets)
+    });
     return cleanBudgets;
   },
 
@@ -591,23 +610,21 @@ export const budgetService = {
 
     storageService.appendBudgetTransaction(tx);
 
-    try {
-      if (typeof fetch === 'function') {
-        await fetch(`/api/budgets/${dept}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(budgets[dept])
-        }).catch(() => {});
-
-        await fetch('/api/budget-transactions', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(tx)
-        }).catch(() => {});
-      }
-    } catch {
-      // Graceful offline fallback
-    }
+    // Cloudflare: refund credit is a core write -> failure throws, caller's rollback undoes local credit.
+    await cfWrite('คืนงบประมาณไม่สำเร็จ', `/api/budgets/${dept}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      // Cloudflare: the server only accepts a refund credit that names the PO it comes from (docNo/poNumber) and de-duplicates a retry by
+      // transactionId. Other modes send the budget exactly as before.
+      body: JSON.stringify(isCloudflareMode()
+        ? { ...budgets[dept], referenceDoc: refPo, docNo: refPo, poNumber: refPo, storeKey: cleanStoreKey || 'STORE', transactionId: idempotencyKey, idempotencyKey }
+        : budgets[dept])
+    });
+    await cfWrite('บันทึกรายการงบประมาณไม่สำเร็จ', '/api/budget-transactions', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(tx)
+    });
 
     return {
       success: true,
@@ -685,7 +702,7 @@ export const budgetService = {
                 storeName: storeName,
                 reason: reason,
                 actor: claim.resolvedBy || 'Online Purchaser'
-              });
+              }).catch(e => console.warn('[budgetService] reconcile refund failed:', e && e.message));
               syncedCount++;
               reconciledRecords.push({ poNo: poDocNo, amount: refundVal, storeKey: cleanKey });
             }
@@ -720,7 +737,7 @@ export const budgetService = {
                 storeName: itemStore,
                 reason: `คืนเงินค่าสินค้า ${item.name || item.code} จาก ${poDocNo}`,
                 actor: 'Online Purchaser'
-              });
+              }).catch(e => console.warn('[budgetService] reconcile refund failed:', e && e.message));
               syncedCount++;
               reconciledRecords.push({ poNo: poDocNo, amount: refundVal, storeKey: itemStore });
             }
@@ -736,3 +753,11 @@ export const budgetService = {
     };
   }
 };
+
+// Cloudflare mode: roll local storage back if the server write for these core actions fails.
+['allocateMonthlyBudget', 'creditDepartmentBudget'].forEach((name) => {
+  const original = budgetService[name];
+  budgetService[name] = function (...args) {
+    return withCfRollback(() => original.apply(this, args));
+  };
+});

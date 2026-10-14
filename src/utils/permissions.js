@@ -1,4 +1,5 @@
 import { storageService } from '../services/storageService';
+import { isAdminUser } from './adminRule';
 
 /**
  * Permission and Department Access Control Utilities
@@ -51,11 +52,11 @@ export function getUserDepartments(user) {
 
   // If empty and user is admin or universal
   const roleId = String(user.roleId || user.role_id || user.id || '').toUpperCase();
-  const isAdmin = user.role === 'admin' ||
+  const isAdmin = isAdminUser(user, user.role === 'admin' ||
                   roleId === 'ADMIN' ||
                   Number(user.level) >= 99 ||
                   user.isAdmin === true ||
-                  user.username === 'admin';
+                  user.username === 'admin');
   if (uniqueDepts.length === 0 && isAdmin) {
     return ['ALL'];
   }
@@ -122,11 +123,11 @@ export function canAccessDepartmentData(user, targetDepartment) {
   const userDepts = getUserDepartments(user);
 
   const roleId = String(user.roleId || user.role_id || user.id || '').toUpperCase();
-  const isAdmin = user.role === 'admin' || 
-                  roleId === 'ADMIN' || 
-                  Number(user.level) >= 99 || 
-                  user.isAdmin === true || 
-                  user.username === 'admin' ||
+  const isAdmin = isAdminUser(user, user.role === 'admin' ||
+                  roleId === 'ADMIN' ||
+                  Number(user.level) >= 99 ||
+                  user.isAdmin === true ||
+                  user.username === 'admin') ||
                   userDepts.includes('ALL') || 
                   userDepts.includes('*') ||
                   (user.department === 'ALL' && user.canViewAllDepts);
@@ -163,11 +164,11 @@ export function getUserAccessibleDepartments(user, availableDepartments = null) 
 
   const userDepts = getUserDepartments(user);
   const roleId = String(user.roleId || user.role_id || user.id || '').toUpperCase();
-  const isAdmin = user.role === 'admin' ||
+  const isAdmin = isAdminUser(user, user.role === 'admin' ||
                   roleId === 'ADMIN' ||
                   Number(user.level) >= 99 ||
                   user.isAdmin === true ||
-                  user.username === 'admin' ||
+                  user.username === 'admin') ||
                   userDepts.includes('ALL') ||
                   userDepts.includes('*') ||
                   (user.department === 'ALL' && user.canViewAllDepts);
@@ -187,6 +188,26 @@ export function getUserAccessibleDepartments(user, availableDepartments = null) 
   }
 
   return allDepts;
+}
+
+/**
+ * DashboardView: does this user get the ALL / PD / QC department tabs? (moved unchanged from the view so it can be tested)
+ * @param {Object} effectiveUser - session user (currentUser || currentRole)
+ */
+export function isDashboardMultiDeptUser(effectiveUser) {
+  const rawDepts = effectiveUser?.departments || effectiveUser?.assignedDepartments;
+  const userDepts = (Array.isArray(rawDepts) && rawDepts.length > 0)
+    ? rawDepts
+    : (effectiveUser?.department ? [effectiveUser.department] : ['PD']);
+  const userRoleStr = String(effectiveUser?.role || effectiveUser?.roleId || '').toUpperCase();
+  return (
+    userDepts.length > 1 ||
+    ['ADMIN', 'ASST_MANAGER', 'PLANT_MANAGER', 'MANAGER'].includes(userRoleStr) ||
+    userDepts.includes('ALL') ||
+    userDepts.includes('BOTH') ||
+    userDepts.includes('*') ||
+    Boolean(effectiveUser?.canViewAllDepts)
+  );
 }
 
 /**

@@ -105,11 +105,15 @@ const matchesPeriod = (doc, period) => {
   return true;
 };
 
+import { getCompletedPOStatus } from '../utils/poCompletedStatus';
+
 const EMPTY_ARRAY = [];
 
 // Clean Short Status Labels (No English in parentheses, compact for tables)
-const getShortPOStatus = (status) => {
+export const getShortPOStatus = (status) => {
   switch (status) {
+    case 'COMPLETED': // รับครบ/ปิดจากการรับของ (GAS apiReceivePO) : แสดงเหมือน CLOSED ตามที่ PODetailsModal ทำอยู่แล้ว
+      return getCompletedPOStatus(status);
     case 'ISSUED':
       return { label: 'รอรับของ', color: 'bg-blue-50 text-blue-700 border-blue-200' };
     case 'IN_DELIVERY':

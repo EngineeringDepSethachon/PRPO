@@ -1,4 +1,5 @@
 import { storageService } from './storageService.js';
+import { cfBackground } from './cfGuard.js';
 import warehouseService from './warehouseService.js';
 
 export { default as warehouseService } from './warehouseService.js';
@@ -79,13 +80,11 @@ export const inventoryService = {
     storageService.saveStockLogs(updatedLogs);
 
     // Sync to local server if running
-    try {
-      fetch('/api/stock-logs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(movementRecord)
-      }).catch(() => {});
-    } catch {}
+    cfBackground('stock movement sync', '/api/stock-logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(movementRecord)
+    });
 
     return movementRecord;
   },
@@ -220,13 +219,11 @@ export const inventoryService = {
       storageService.saveProducts(products);
 
       // Sync to local server
-      try {
-        fetch('/api/stock-logs', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(updatedLogs)
-        }).catch(() => {});
-      } catch {}
+      cfBackground('GRN stock movement sync', '/api/stock-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(updatedLogs)
+      });
     }
 
     return movements;

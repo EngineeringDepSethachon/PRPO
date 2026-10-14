@@ -32,9 +32,10 @@ describe('Domain Suite: Budget Management & Financial Ledger', () => {
     });
 
     // ── Requirement 1: Reset Active Budget Month to 2026-09 (กันยายน 2569) ──
+    // หมายเหตุ: BudgetView เริ่มที่เดือนปัจจุบันของเครื่อง (ไม่ใช่ค่าฝังคงที่แล้ว) จึงระบุ ?month=2026-09 ชัดเจนในเทสต์
     it('Requirement 1: Budget view defaults immediately to operational period "กันยายน 2569" (2026-09)', () => {
       const html = renderToStaticMarkup(
-        <MemoryRouter initialEntries={['/budget']}>
+        <MemoryRouter initialEntries={['/budget?month=2026-09']}>
           <BudgetView
             currentUser={{ id: 'ADMIN', roleId: 'ADMIN', level: 99, assignedDepartments: ['ALL'] }}
           />
@@ -50,7 +51,7 @@ describe('Domain Suite: Budget Management & Financial Ledger', () => {
 
     it('Requirement 1b: MonthlyBudgetView and MonthlyBudgetManagement aliases both render default period "กันยายน 2569"', () => {
       const html1 = renderToStaticMarkup(
-        <MemoryRouter initialEntries={['/budget']}>
+        <MemoryRouter initialEntries={['/budget?month=2026-09']}>
           <MonthlyBudgetView
             currentUser={{ id: 'ADMIN', roleId: 'ADMIN', level: 99, assignedDepartments: ['ALL'] }}
           />
@@ -59,7 +60,7 @@ describe('Domain Suite: Budget Management & Financial Ledger', () => {
       expect(html1).toContain('กันยายน 2569');
 
       const html2 = renderToStaticMarkup(
-        <MemoryRouter initialEntries={['/budget']}>
+        <MemoryRouter initialEntries={['/budget?month=2026-09']}>
           <MonthlyBudgetManagement
             currentUser={{ id: 'ADMIN', roleId: 'ADMIN', level: 99, assignedDepartments: ['ALL'] }}
           />
@@ -100,7 +101,7 @@ describe('Domain Suite: Budget Management & Financial Ledger', () => {
     // ── Requirement 3: Elimination of Past Empty Placeholder Rows ──
     it('Requirement 3: Historical comparison table renders ONLY 1 row: "กันยายน 2569 (เดือนปัจจุบัน)" and eliminates empty past months', () => {
       const html = renderToStaticMarkup(
-        <MemoryRouter initialEntries={['/budget?tab=trends']}>
+        <MemoryRouter initialEntries={['/budget?tab=trends&month=2026-09']}>
           <BudgetView
             currentUser={{ id: 'ADMIN', roleId: 'ADMIN', level: 99, assignedDepartments: ['ALL'] }}
             prs={[]}
@@ -137,7 +138,7 @@ describe('Domain Suite: Budget Management & Financial Ledger', () => {
       };
 
       const html = renderToStaticMarkup(
-        <MemoryRouter initialEntries={['/budget?tab=trends']}>
+        <MemoryRouter initialEntries={['/budget?tab=trends&month=2026-09']}>
           <BudgetView
             currentUser={{ id: 'ADMIN', roleId: 'ADMIN', level: 99, assignedDepartments: ['ALL'] }}
             prs={[]}
@@ -302,7 +303,10 @@ describe('Domain Suite: Budget Management & Financial Ledger', () => {
 
       // Render MonthlyBudgetManagement / BudgetView
       const html = renderToStaticMarkup(
-        <MemoryRouter initialEntries={['/budget?tab=history']}>
+        // The refund is booked to the *current* calendar month (budgetService stamps period = now), while
+        // BudgetView defaults to a fixed 2026-09 view. Select the current month explicitly so the test
+        // does not depend on the date it runs (it started failing once the clock passed September 2026).
+        <MemoryRouter initialEntries={[`/budget?tab=history&month=${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, '0')}`]}>
           <MonthlyBudgetManagement
             pos={[po]}
             departments={[{ code: 'PD', name: 'ฝ่ายผลิต', monthlyBudget: 40000 }]}

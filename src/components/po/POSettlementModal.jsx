@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 import { modalService } from '../../services/modalService';
+import { isCloudflareMode } from '../../config/backendMode';
 
 export default function POSettlementModal({ po, currentUser, onClose, onSuccess }) {
   const originalTotal = Number(po.grandTotal || po.totalAmount || po.subtotal || 0);
@@ -89,9 +90,14 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
       };
 
       const updatedPO = await apiService.settlePO(po.id, settlementPayload, currentUser);
+      // Cloudflare: show what the server really refunded (0 on an edit of an already settled PO, or when the cap allowed nothing) ;
+      // other modes keep the figure computed on this screen
+      const refunded = isCloudflareMode() && updatedPO?.settlementResult && typeof updatedPO.settlementResult.refundedAmount === 'number'
+        ? updatedPO.settlementResult.refundedAmount
+        : savingsAmount;
       await modalService.success(
         'บันทึกปิดยอดสำเร็จ',
-        `ปิดยอดจ่ายจริง PO ${po.poNo || po.id} เรียบร้อยแล้ว${savingsAmount > 0 ? ` (คืนงบประมาณ ฿${savingsAmount.toLocaleString(undefined, { minimumFractionDigits: 2 })})` : ''}`
+        `ปิดยอดจ่ายจริง PO ${po.poNo || po.id} เรียบร้อยแล้ว${refunded > 0 ? ` (คืนงบประมาณ ฿${refunded.toLocaleString(undefined, { minimumFractionDigits: 2 })})` : ''}`
       );
 
       if (onSuccess) onSuccess(updatedPO);

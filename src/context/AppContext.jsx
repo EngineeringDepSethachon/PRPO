@@ -2,8 +2,11 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useNavigate, useLocation } from 'react-router-dom';
 import { storageService, isGAS, callGAS } from '../services/storageService';
 import { apiService } from '../services/apiService';
+import { isCloudflareMode, getAuthToken, readStoredSession, sessionOwnerKey, withLatestStoredToken, storedSessionBelongsToOther, isStoredSessionGone, announceSessionGone } from '../config/backendMode';
+import { cfWrite, setCfReloadHandler } from '../services/cfGuard';
 import { notificationService } from '../services/notificationService';
 import { workflowEngine } from '../services/workflowEngine';
+import { budgetService } from '../services/budgetService';
 import { authService, DEFAULT_EMPLOYEE_ACCOUNTS } from '../services/authService';
 import { resolveUserPermissions } from '../config/constants';
 import { modalService } from '../services/modalService';
@@ -113,6 +116,16 @@ export function AppProvider({ children }) {
   const [budgetSummary, setBudgetSummary] = useState(null);
   const [budgetTransactions, setBudgetTransactions] = useState([]);
 
+  // cloudflare : budget numbers for Dashboard / PR form = same zero-based formula + data as BudgetView (budgets from bootstrap, live prs/pos)
+  useEffect(() => {
+    if (!isCloudflareMode()) return;
+    try {
+      setBudgetSummary(budgetService.calculatePeriodBudgetSummary(undefined, prs, pos));
+    } catch (e) {
+      console.warn('[AppContext] budget summary:', e);
+    }
+  }, [prs, pos, budgetTransactions]);
+
   // 3. Selection, Modal & Draft States
   const [preselectedProduct, setPreselectedProduct] = useState(null);
   const [editingPR, setEditingPR] = useState(null);
@@ -122,6 +135,22 @@ export function AppProvider({ children }) {
 
   // ── Full Data Hydration on Mount & Refresh (Full-Stack Speed Optimization) ──
   const loadAllData = useCallback(async (silent = false) => {
+    // cloudflare : not signed in -> nothing to load (no /api/bootstrap 401) and no data may stay in memory from a previous user
+    if (isCloudflareMode() && !getAuthToken()) {
+      setProducts([]); setVendors([]); setStorageLocations([]); setUsageUnits([]); setDepartments([]);
+      setUsers([]); setPRs([]); setPOs([]); setStockLogs([]); setBudgetTransactions([]); setBudgetSummary(null);
+      setIsDataLoading(false);
+      setIsLoading(false);
+      return;
+    }
+    // cloudflare : cached data of a DIFFERENT user (or of unknown owner) must never be shown while this user's bootstrap is pending
+    const cfSessionId = isCloudflareMode() ? sessionOwnerKey(readStoredSession()) : '';
+    const cfTokenAtStart = isCloudflareMode() ? getAuthToken() : '';
+    if (isCloudflareMode() && storageService.getCloudflareCacheOwner?.() !== cfSessionId) {
+      storageService.clearCloudflareDataCache?.();
+      setProducts([]); setVendors([]); setStorageLocations([]); setUsageUnits([]); setDepartments([]);
+      setUsers([]); setPRs([]); setPOs([]); setStockLogs([]); setBudgetTransactions([]); setBudgetSummary(null);
+    }
     // 1. อ่านข้อมูลล่าสุดจาก localStorage มาเรนเดอร์ขึ้นหน้าจอทันที เพื่อไม่ให้หน้าจอขาวค้าง (0ms Instant Render)
     try {
       storageService.hydrateFromClientStorage?.();
@@ -147,8 +176,11 @@ export function AppProvider({ children }) {
       if (cachedLogs.length > 0) setStockLogs(cachedLogs);
       if (cachedTxs.length > 0) setBudgetTransactions(cachedTxs);
       
-      const cachedSummary = workflowEngine.calculateBudgetSummary();
-      if (cachedSummary) setBudgetSummary(cachedSummary);
+      // cloudflare : summary is derived from prs/pos/budgets by the effect below (same formula as BudgetView)
+      if (!isCloudflareMode()) {
+        const cachedSummary = workflowEngine.calculateBudgetSummary();
+        if (cachedSummary) setBudgetSummary(cachedSummary);
+      }
 
       // Unblock UI immediately: render cached data so screen never freezes or whites out
       setIsLoading(false);
@@ -161,8 +193,11 @@ export function AppProvider({ children }) {
     try {
       if (!silent) setIsDataLoading(true);
       const bootstrapData = await apiService.getBootstrapData();
-      
-      if (bootstrapData && typeof bootstrapData === 'object') {
+      // cloudflare : session ended / switched while the request was in flight -> discard (no cache owner, no setState)
+      const cfStale = isCloudflareMode() && (getAuthToken() !== cfTokenAtStart || sessionOwnerKey(readStoredSession()) !== cfSessionId);
+
+      if (!cfStale && bootstrapData && typeof bootstrapData === 'object') {
+        if (isCloudflareMode() && cfSessionId) storageService.setCloudflareCacheOwner?.(cfSessionId);
         const {
           prs: prsData,
           pos: posData,
@@ -183,7 +218,7 @@ export function AppProvider({ children }) {
           ? prodsData
           : (Array.isArray(invData) ? invData : []);
         const invList = Array.isArray(invData) ? invData : [];
-        if (prodsList.length > 0) {
+        if (prodsList.length > 0 || isCloudflareMode()) {
           const unified = getUnifiedProductList(prodsList, invList);
           setProducts(unified);
           storageService.saveProducts(unified);
@@ -239,24 +274,26 @@ export function AppProvider({ children }) {
           setUsers(usersData);
           setCurrentUser(prevUser => {
             if (!prevUser) return prevUser;
+            // cloudflare : another tab signed out (no stored session) -> never write one back ; this tab signs out too (AuthContext listens)
+            if (isStoredSessionGone()) { announceSessionGone(); return prevUser; }
             const fresh = usersData.find(u => u.id === prevUser.id || u.username === prevUser.username);
             if (fresh) {
               const permissions = resolveUserPermissions(fresh);
               const isAdmin = fresh.roleId === 'ADMIN' || fresh.level >= 99 || fresh.username === 'admin';
               const cleanDepts = getUserDepartments(fresh);
               const userDepts = cleanDepts.length > 0 ? cleanDepts : (fresh.department ? [fresh.department] : ['PD']);
-              const updatedSession = { 
-                ...prevUser, 
-                ...fresh, 
-                ...permissions, 
+              const updatedSession = withLatestStoredToken({
+                ...prevUser,
+                ...fresh,
+                ...permissions,
                 departments: userDepts,
                 assignedDepartments: fresh.assignedDepartments || userDepts,
                 allowedDepartments: fresh.allowedDepartments || userDepts,
                 primaryDepartment: fresh.primaryDepartment || userDepts[0] || 'PD',
                 department: fresh.department || userDepts[0] || 'PD',
                 role: isAdmin ? 'admin' : (fresh.roleId || 'user').toLowerCase(),
-                rolePermissions: permissions 
-              };
+                rolePermissions: permissions
+              });
               setCurrentRole(updatedSession);
               try { localStorage.setItem('prpo_auth_session', JSON.stringify(updatedSession)); } catch {}
               return updatedSession;
@@ -284,8 +321,10 @@ export function AppProvider({ children }) {
           notificationService.saveAll(merged);
         }
 
-        const bSummary = workflowEngine.calculateBudgetSummary();
-        setBudgetSummary(bSummary || null);
+        if (!isCloudflareMode()) {
+          const bSummary = workflowEngine.calculateBudgetSummary();
+          setBudgetSummary(bSummary || null);
+        }
       }
     } catch (err) {
       console.error('[AppContext] Error loading bootstrap data:', err);
@@ -345,8 +384,16 @@ export function AppProvider({ children }) {
   }, []);
 
   // Initial Data Hydration on Component Mount (Strictly runs once on mount)
+  // cloudflare : also re-runs when the session token changes (login -> /api/bootstrap right away ; logout -> state cleared)
+  const cfSessionToken = isCloudflareMode() ? (currentUser?.token || '') : null;
   useEffect(() => {
     loadAllData();
+  }, [loadAllData, cfSessionToken]);
+
+  // Cloudflare: after a failed write is rolled back locally, re-sync React state from the server
+  useEffect(() => {
+    if (!isCloudflareMode()) return undefined;
+    return setCfReloadHandler(() => loadAllData(true));
   }, [loadAllData]);
 
   // Subscribe to background revalidation (Stale-While-Revalidate)
@@ -362,24 +409,27 @@ export function AppProvider({ children }) {
           setUsers(payload.users);
           setCurrentUser(prevUser => {
             if (!prevUser) return prevUser;
+            // cloudflare : another tab signed out (no stored session) -> never write one back ; this tab signs out too (AuthContext listens)
+            if (isStoredSessionGone()) { announceSessionGone(); return prevUser; }
             const fresh = payload.users.find(u => u.id === prevUser.id || u.username === prevUser.username);
             if (fresh) {
               const permissions = resolveUserPermissions(fresh);
               const isAdmin = fresh.roleId === 'ADMIN' || fresh.level >= 99 || fresh.username === 'admin';
               const cleanDepts = getUserDepartments(fresh);
               const userDepts = cleanDepts.length > 0 ? cleanDepts : (fresh.department ? [fresh.department] : ['PD']);
-              const updatedSession = { 
-                ...prevUser, 
-                ...fresh, 
-                ...permissions, 
+              // cloudflare : keep the NEWEST stored token (a password change in this/another tab must not be overwritten by an older in-memory copy)
+              const updatedSession = withLatestStoredToken({
+                ...prevUser,
+                ...fresh,
+                ...permissions,
                 departments: userDepts,
                 assignedDepartments: fresh.assignedDepartments || userDepts,
                 allowedDepartments: fresh.allowedDepartments || userDepts,
                 primaryDepartment: fresh.primaryDepartment || userDepts[0] || 'PD',
                 department: fresh.department || userDepts[0] || 'PD',
                 role: isAdmin ? 'admin' : (fresh.roleId || 'user').toLowerCase(),
-                rolePermissions: permissions 
-              };
+                rolePermissions: permissions
+              });
               setCurrentRole(updatedSession);
               try { localStorage.setItem('prpo_auth_session', JSON.stringify(updatedSession)); } catch {}
               return updatedSession;
@@ -416,8 +466,10 @@ export function AppProvider({ children }) {
         if (Array.isArray(payload.notifications)) {
           notificationService.saveAll(payload.notifications);
         }
-        const bSummary = workflowEngine.calculateBudgetSummary();
-        if (bSummary) setBudgetSummary(bSummary);
+        if (!isCloudflareMode()) {
+          const bSummary = workflowEngine.calculateBudgetSummary();
+          if (bSummary) setBudgetSummary(bSummary);
+        }
         setIsDataLoading(false);
       }
     });
@@ -439,6 +491,11 @@ export function AppProvider({ children }) {
    * and auto-redirects to safe page if target user lacks access to current route.
    */
   const handleSwitchUser = useCallback((targetUserIdOrObject) => {
+    // Cloudflare mode: sessions must come from the server (/api/auth, with token).
+    if (isCloudflareMode()) {
+      modalService.error('ใช้ได้เฉพาะโหมดทดสอบ');
+      return;
+    }
     let targetUser = null;
 
     if (typeof targetUserIdOrObject === 'string') {
@@ -525,8 +582,11 @@ export function AppProvider({ children }) {
   // Clear session and navigate to /login
   const handleLogout = useCallback(() => {
     try {
-      localStorage.removeItem('prpo_auth_session');
-      localStorage.removeItem('prpo_current_user');
+      // another tab may hold a NEWER session : only this tab's state is dropped then
+      if (!storedSessionBelongsToOther(auth?.currentUser?.token)) {
+        localStorage.removeItem('prpo_auth_session');
+        localStorage.removeItem('prpo_current_user');
+      }
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.clear();
       }
@@ -690,11 +750,13 @@ export function AppProvider({ children }) {
       })
       .catch(err => {
         console.error('[AppContext] Failed to cancel PR on backend:', err);
+        // Cloudflare: the optimistic CANCELLED status was not accepted by the server -> reload true state
+        if (isCloudflareMode()) loadAllData(true);
       });
 
     // 3. Return instantly (No loadAllData full reload to save time)
     return { id: prId, prNo: prId, status: 'CANCELLED' };
-  }, [currentRole]);
+  }, [currentRole, loadAllData]);
 
   // Immutable PO updater in state with storage persistence
   const updatePO = useCallback((poId, updates) => {
@@ -727,7 +789,10 @@ export function AppProvider({ children }) {
             }
             setTimeout(() => loadAllData(true), 1000);
           })
-          .catch(e => console.warn(e));
+          .catch(e => {
+            console.warn(e);
+            if (isCloudflareMode()) loadAllData(true); // drop the optimistic edit the server rejected
+          });
       } else if (updates.status) {
         return apiService.updatePRStatus(prId, updates.status, currentRole)
           .then(res => {
@@ -736,7 +801,10 @@ export function AppProvider({ children }) {
             }
             setTimeout(() => loadAllData(true), 1000);
           })
-          .catch(e => console.warn(e));
+          .catch(e => {
+            console.warn(e);
+            if (isCloudflareMode()) loadAllData(true); // drop the optimistic status the server rejected
+          });
       }
     }
   }, [currentRole, loadAllData]);
@@ -1167,7 +1235,7 @@ export function AppProvider({ children }) {
     return result;
   }, [currentUser, currentRole, loadAllData]);
 
-  const handleRefundBudget = useCallback(async (department, amount, reason = 'เงินคืนจากการเคลมสินค้า') => {
+  const handleRefundBudget = useCallback(async (department, amount, reason = 'เงินคืนจากการเคลมสินค้า', options = {}) => {
     if (!department || !amount || Number(amount) <= 0) return;
     const actor = currentUser?.name || currentRole?.name || 'Online Purchaser';
     const deptBudgets = storageService.getBudgets();
@@ -1178,7 +1246,8 @@ export function AppProvider({ children }) {
       delta: Number(amount),
       previousAmount: prev,
       reason,
-      actor
+      actor,
+      docNo: options?.refDocNo || options?.docNo || undefined // PO this refund comes from (required by the Cloudflare server)
     });
     setTimeout(() => { loadAllData(true); }, 1500);
     return result;
@@ -1191,6 +1260,7 @@ export function AppProvider({ children }) {
       throw new Error('ยอดเงินคืนงบประมาณต้องมากกว่า 0 บาท');
     }
 
+    const cfSnapshot = isCloudflareMode() ? storageService.snapshotState() : null;
     const budgets = storageService.getBudgets();
     if (!budgets[dept]) {
       budgets[dept] = { monthlyBudget: 0, spent: 0, actualExpense: 0, pending: 0, variance: 0, history: {}, historicalSpent: {}, refundCredits: {} };
@@ -1245,9 +1315,16 @@ export function AppProvider({ children }) {
         delta: amount,
         reason,
         actor: tx.actor,
-        targetMonth
+        targetMonth,
+        docNo: options.refDocNo || options.docNo || undefined // PO this refund comes from (required by the Cloudflare server)
       });
-    } catch {}
+    } catch (adjustErr) {
+      // Cloudflare: do not report the rollback as done when the server rejected it
+      if (isCloudflareMode()) {
+        if (cfSnapshot) storageService.restoreState(cfSnapshot);
+        throw adjustErr;
+      }
+    }
 
     setTimeout(() => { loadAllData(true); }, 1500);
     return {
@@ -1366,6 +1443,7 @@ export function AppProvider({ children }) {
     });
 
     if (processedItems.length > 0) {
+      const cfSnapshot = isCloudflareMode() ? storageService.snapshotState() : null;
       storageService.saveProducts(prods);
       storageService.saveStockLogs(logs);
       setProducts(prods);
@@ -1373,18 +1451,25 @@ export function AppProvider({ children }) {
 
       try {
         await Promise.all([
-          fetch('/api/products/batch', {
+          cfWrite('บันทึกสต็อกสินค้าไม่สำเร็จ', '/api/products/batch', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(prods)
           }),
-          fetch('/api/stock-logs', {
+          cfWrite('บันทึกประวัติสต็อกไม่สำเร็จ', '/api/stock-logs', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(logs)
           })
         ]);
-      } catch {}
+      } catch (syncErr) {
+        // Cloudflare: server rejected the stock intake -> undo the local commit and surface the error
+        if (isCloudflareMode()) {
+          if (cfSnapshot) storageService.restoreState(cfSnapshot);
+          loadAllData(true);
+          throw syncErr;
+        }
+      }
     }
 
     setTimeout(() => { loadAllData(true); }, 1500);
@@ -1515,6 +1600,14 @@ export function AppProvider({ children }) {
       }
     } catch (err) {
       console.warn('[AppContext] issueStock backend RPC warning:', err.message);
+      if (isCloudflareMode()) {
+        // Cloudflare: server is the source of truth -> revert the optimistic issue and surface the error
+        storageService.saveProducts(currentProds);
+        storageService.saveStockLogs(currentLogs);
+        setProducts(currentProds);
+        setStockLogs(currentLogs);
+        throw err;
+      }
       if (err.message && err.message.includes('ไม่พอ')) {
         throw err;
       }

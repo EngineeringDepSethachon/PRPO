@@ -13,6 +13,9 @@
  */
 
 import { isGAS, callGAS } from './storageService.js';
+import { backendFetch, isCloudflareMode } from '../config/backendMode.js';
+import { cfWrite } from './cfGuard.js';
+const fetch = (input, init) => backendFetch(input, init);
 
 export const DRIVE_ROOT_FOLDER = '[ERP] PR-PO-Stock-System';
 
@@ -246,7 +249,8 @@ export const uploadFileToDrive = async ({
   poNumber = '',
   docNo = '',
   docType = '',
-  description = ''
+  description = '',
+  department = ''
 }) => {
   let resolvedBase64 = base64Data || '';
   let resolvedMime = mimeType || 'image/jpeg';
@@ -274,7 +278,8 @@ export const uploadFileToDrive = async ({
     docNo: docNo || poNumber || '',
     docType: docType || category || 'OTHER',
     folderPath,
-    description: description || ''
+    description: description || '',
+    ...(department ? { department } : {})
   };
 
   // 1. Google Apps Script Production Mode
@@ -304,6 +309,36 @@ export const uploadFileToDrive = async ({
       console.error('[driveService] Google Drive upload via GAS failed:', gasErr.message);
       throw gasErr;
     }
+  }
+
+  // 2a. Cloudflare: upload must succeed on the server; never fall back to a local Base64 "file"
+  if (isCloudflareMode()) {
+    const res = await cfWrite('อัปโหลดไฟล์ไม่สำเร็จ', '/api/upload', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json().catch(() => ({}));
+    // only the Drive file id / URLs returned by the server are stored (never the base64 itself)
+    if (!data || !data.fileId || !(data.fileUrl || data.viewUrl)) {
+      throw new Error('อัปโหลดไฟล์ไม่สำเร็จ (เซิร์ฟเวอร์ไม่ตอบข้อมูลไฟล์)');
+    }
+    const serverUrl = data.fileUrl || data.viewUrl;
+    return {
+      success: true,
+      attachmentId: data.attachmentId,
+      fileId: data.fileId,
+      fileUrl: serverUrl,
+      previewUrl: data.directUrl || serverUrl,
+      viewUrl: data.viewUrl,
+      downloadUrl: data.downloadUrl,
+      lh3Url: data.lh3Url,
+      fileName: data.fileName || resolvedName,
+      mimeType: data.mimeType || resolvedMime,
+      fileSize: data.fileSize || 0,
+      folderPath: data.folderPath || folderPath,
+      uploadedAt: data.uploadedAt || new Date().toISOString()
+    };
   }
 
   // 2. Local Dev: Try upload to Express backend

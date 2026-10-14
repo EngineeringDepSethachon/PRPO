@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(node \"C:/Users/Admin/Desktop/PRPO/office/decide.js\":*)",
+      "PowerShell(node \"C:/Users/Admin/Desktop/PRPO/office/consult.js\":*)",
+      "PowerShell(node \"C:/Users/Admin/Desktop/PRPO/office/memo.js\":*)",
+      "PowerShell(node \"C:/Users/Admin/Desktop/PRPO/office/ask.js\":*)"
+    ],
+    "deny": [
+      "Edit(/.claude/**)",
+      "Edit(/CLAUDE.md)",
+      "Edit(//**)",
+      "Write(//**)",
+      "NotebookEdit(//**)",
+      "Read(//**/.env*)",
+      "Read(//**/*.key)",
+      "Read(//**/ca-private/**)",
+      "Read(//**/mosquitto/certs*/**)",
+      "WebFetch",
+      "WebSearch",
+      "PowerShell(Remove-Item:*)",
+      "PowerShell(rm:*)",
+      "PowerShell(del:*)",
+      "PowerShell(git push:*)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"C:/Users/Admin/Desktop/PRPO/departments/executive/.claude/hooks/exec-guard.js\""
+          }
+        ]
+      }
+    ]
+  }
+}

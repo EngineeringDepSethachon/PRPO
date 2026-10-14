@@ -309,9 +309,10 @@ export async function generatePoPdf(po) {
     await document.fonts.ready;
   }
 
-  // Dynamically import heavyweight PDF libraries via CDN to reduce bundle size
-  const { PDFDocument, rgb } = await import('https://esm.sh/pdf-lib@1.17.1');
-  let fontkit = (await import('https://esm.sh/@pdf-lib/fontkit@1.1.1')).default;
+  // Dynamically import the heavyweight PDF libraries from the project's own dependencies (a separate chunk, loaded only when a PDF is made ;
+  // no third-party script host, so the Pages CSP needs no esm.sh)
+  const { PDFDocument, rgb } = await import('pdf-lib');
+  let fontkit = (await import('@pdf-lib/fontkit')).default;
   if (fontkit.default) fontkit = fontkit.default;
 
   const pdfDoc = await PDFDocument.create();
@@ -320,17 +321,16 @@ export async function generatePoPdf(po) {
   // 1. โหลดฟอนต์ TH Sarabun New รองรับภาษาไทยและชุดอักขระ Thai PUA Glyphs (U+F700 - U+F71A)
   const isGas = typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_GAS === 'true';
 
-  const loadFontBytes = async (localPath, fallbackCdnUrl) => {
-    try {
-      if (!isGas) {
-        const res = await fetch(localPath);
-        if (res.ok) return await res.arrayBuffer();
-      }
-      throw new Error('Fallback to CDN');
-    } catch (e) {
-      const fb = await fetch(fallbackCdnUrl);
+  // Web builds (dev / Cloudflare) read the font shipped in public/fonts (same origin). Only the single-file Apps Script build has no /fonts folder
+  // and still takes the CDN copy (that deployment has no Pages CSP).
+  const loadFontBytes = async (localPath, gasCdnUrl) => {
+    if (isGas) {
+      const fb = await fetch(gasCdnUrl);
       return await fb.arrayBuffer();
     }
+    const res = await fetch(localPath);
+    if (!res.ok) throw new Error(`font not available: ${localPath} (${res.status})`);
+    return await res.arrayBuffer();
   };
 
   const fontBytes = await loadFontBytes(

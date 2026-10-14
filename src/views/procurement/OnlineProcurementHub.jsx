@@ -9,6 +9,7 @@ import OnlineTaskView, {
 } from '../OnlineTaskView';
 import { calculateDisputeMetrics } from './OnlineOrderCard';
 import { isPendingPurchaseOrder, isPendingClaimOrder } from '../../services/procurementService';
+import { currentYM, currentYear } from '../../utils/monthUtils';
 
 /**
  * ฟังก์ชันคัดแยกรายการคำสั่งซื้อออนไลน์ตามแท็บ (Tab Filtering Logic)
@@ -21,7 +22,7 @@ export const THAI_MONTHS = [
 
 export function formatThaiMonth(monthStr) {
   if (!monthStr || monthStr === 'ALL') return 'ทุกรอบบัญชี';
-  if (monthStr === 'ALL_YEAR') return 'ตลอดปี 2569';
+  if (monthStr === 'ALL_YEAR') return `ตลอดปี ${currentYear() + 543}`;
   const parts = String(monthStr).split('-');
   if (parts.length === 2) {
     const year = parseInt(parts[0], 10) + 543;
@@ -33,7 +34,7 @@ export function formatThaiMonth(monthStr) {
 
 export function getPrevMonth(currentMonthStr) {
   if (!currentMonthStr || currentMonthStr === 'ALL' || currentMonthStr === 'ALL_YEAR') {
-    return '2026-08';
+    return getPrevMonth(currentYM());
   }
   const [y, m] = currentMonthStr.split('-').map(Number);
   let newY = y;
@@ -47,7 +48,7 @@ export function getPrevMonth(currentMonthStr) {
 
 export function getNextMonth(currentMonthStr) {
   if (!currentMonthStr || currentMonthStr === 'ALL' || currentMonthStr === 'ALL_YEAR') {
-    return '2026-10';
+    return getNextMonth(currentYM());
   }
   const [y, m] = currentMonthStr.split('-').map(Number);
   let newY = y;
@@ -216,11 +217,11 @@ export function filteredOrders(orders, activeTab, selectedMonth = null) {
         (Array.isArray(po.timeline) && po.timeline[po.timeline.length - 1]?.timestamp) || 
         '';
       const parsed = parseOrderYearMonth(orderDateStr);
-      const year = parsed.year || 2026;
-      const ymKey = parsed.ymKey || '2026-09';
+      const year = parsed.year || currentYear();
+      const ymKey = parsed.ymKey || currentYM();
 
       if (!selectedMonth || selectedMonth === 'ALL_YEAR' || selectedMonth === 'ALL' || selectedMonth === '2569' || selectedMonth === '2026') {
-        return year === 2026 || year === 2569;
+        return year === currentYear();
       }
       return ymKey === selectedMonth;
     }

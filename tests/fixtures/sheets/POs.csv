@@ -1,0 +1,2 @@
+id,poNo,prId,prNo,department,vendorName,vendorId,purchaseChannel,issueDate,orderDate,status,workflowStatus,items,subtotal,vat,grandTotal,isOnline,isClosed,claimStatus,ngItems,receiverName,actualTotalAmount,savingsAmount,activityLog,createdAt,updatedAt,budgetPeriod,committedAmount,actualPaidAmount,paymentStatus
+PO-1,PO-PD-2026-012,PR-1,PD001/2026,PD,ร้านทดสอบ,V-1,ONLINE,2026-03-01,2026-03-02,CLOSED,DONE,"[{""name"":""x"",""qty"":1}]",100,7,107,TRUE,TRUE,NONE,"[{""id"":1}]",สมชาย,105.5,1.5,"[{""a"":""b""}]",2026-03-01,2026-03-09,2026-03,107,105.5,PAID

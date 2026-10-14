@@ -2,8 +2,10 @@ import React from 'react';
 import { createPortal } from 'react-dom';
 import { 
   UserCheck, Shield, X, Check, User, ArrowRightLeft, 
-  Sparkles, Building2, ShoppingBag, Crown, Layers, LogOut
+  Sparkles, Building2, ShoppingBag, Crown, Layers, LogOut, KeyRound
 } from 'lucide-react';
+import ChangePasswordModal from './ChangePasswordModal';
+import { isCloudflareMode } from '../../config/backendMode';
 import { useAppContext } from '../../context/AppContext';
 import { useAuth, normalizeRole, PERMISSIONS } from '../../context/AuthContext';
 import { getUserDepartments } from '../../utils/permissions';
@@ -44,6 +46,8 @@ export default function UserProfileModal({
   } catch (e) {
     auth = null;
   }
+
+  const [showChangePassword, setShowChangePassword] = React.useState(false);
 
   if (!isOpen) return null;
 
@@ -406,6 +410,18 @@ export default function UserProfileModal({
               </button>
             )}
 
+            {isCloudflareMode() && (
+              <button
+                type="button"
+                onClick={() => setShowChangePassword(true)}
+                data-testid="modal-change-password-btn"
+                className="px-4 py-2 rounded-xl text-slate-600 hover:text-slate-900 hover:bg-slate-100 border border-slate-200 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5"
+              >
+                <KeyRound className="w-3.5 h-3.5 text-slate-400" />
+                <span>เปลี่ยนรหัสผ่าน</span>
+              </button>
+            )}
+
             <button
               type="button"
               onClick={handleLogoutFromModal}
@@ -430,8 +446,17 @@ export default function UserProfileModal({
     </div>
   );
 
+  const withPasswordModal = (
+    <>
+      {modalContent}
+      {isCloudflareMode() && (
+        <ChangePasswordModal isOpen={showChangePassword} onClose={() => setShowChangePassword(false)} onLogout={handleLogoutFromModal} />
+      )}
+    </>
+  );
+
   if (typeof document !== 'undefined' && document.body) {
-    return createPortal(modalContent, document.body);
+    return createPortal(withPasswordModal, document.body);
   }
-  return modalContent;
+  return withPasswordModal;
 }

@@ -6,6 +6,8 @@ import {
   Image as ImageIcon, X, Truck, Calendar
 } from 'lucide-react';
 import { sanitizeExternalUrl, getProductUrl } from '../../utils/urlHelper';
+import { pickAttachmentUrl } from '../../utils/attachmentUrls';
+import { driveFileIdOf, openProxiedFile } from '../../utils/cfAttachments';
 import { apiService } from '../../services/apiService';
 import { modalService } from '../../services/modalService';
 import { storageService } from '../../services/storageService';
@@ -19,7 +21,7 @@ import { getFallbackAttachmentsForCode } from '../../services/workflowEngine';
 import AttachmentViewerModal from '../../components/common/AttachmentViewerModal';
 import AttachmentThumbnail from '../../components/common/AttachmentThumbnail';
 import { formatCurrency } from '../../utils/formatters.js';
-import { resolveDriveImageUrl, handleDriveImageError } from '../../utils/driveHelper';
+import ProxiedImg from '../../components/common/ProxiedImg';
 import LoadingOverlay from '../../components/common/LoadingOverlay.jsx';
 
 const formatMoney = (n) => formatCurrency(n);
@@ -394,7 +396,7 @@ export const resolveGRNEvidence = (po, group = null) => {
       }
       return {
         ...img,
-        url: img.url || img.viewUrl || img.previewUrl || img.dataUrl || '',
+        url: pickAttachmentUrl(img, ['url', 'viewUrl', 'previewUrl', 'dataUrl', 'fileUrl']),
         name: img.name || img.fileName || `หลักฐานชำรุด ${i + 1}`
       };
     })
@@ -2755,7 +2757,6 @@ export default function OnlineOrderCard({
                               </div>
                               <div className="flex flex-wrap gap-2">
                                 {evData.images.map((img, imgIdx) => {
-                                  const driveSrc = resolveDriveImageUrl(img.url);
                                   return (
                                     <div
                                       key={img.id || imgIdx}
@@ -2763,10 +2764,10 @@ export default function OnlineOrderCard({
                                       className="relative group w-16 h-16 sm:w-20 sm:h-20 rounded-lg border border-amber-200 bg-white overflow-hidden cursor-pointer shadow-2xs hover:shadow-md hover:border-amber-400 transition-all"
                                       title="คลิกเพื่อดูภาพขนาดเต็มและบันทึกรูปไปยื่นเคลมบน Shopee/Lazada"
                                     >
-                                      <img
-                                        src={driveSrc}
+                                      <ProxiedImg
+                                        att={img}
+                                        size="w1200"
                                         alt={img.name || 'รูปหลักฐาน'}
-                                        onError={handleDriveImageError}
                                         className="w-full h-full object-cover group-hover:scale-105 transition-transform"
                                         loading="lazy"
                                       />
@@ -3184,6 +3185,12 @@ export default function OnlineOrderCard({
                           download={doc.name || 'document'}
                           target="_blank"
                           rel="noreferrer"
+                          onClick={(e) => {
+                            // cloudflare mode : a Drive file is downloaded through GET /api/files/:id (driveFileIdOf is null in other modes)
+                            if (!driveFileIdOf(doc)) return;
+                            e.preventDefault();
+                            openProxiedFile(doc, { download: true }).then((ok) => { if (!ok) window.open(doc.url, '_blank', 'noopener,noreferrer'); });
+                          }}
                           className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                           title="ดาวน์โหลดไฟล์"
                         >

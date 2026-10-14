@@ -1,4 +1,22 @@
 // Notification Service (In-App Local Caching)
+import { isAdminUser } from '../utils/adminRule';
+import { backendFetch, isCloudflareMode } from '../config/backendMode';
+
+// Cloudflare mode : the read mark of the signed-in user is kept on the server too (notification_reads, per user) so it follows the user to another
+// device. Only ids the server made (not the local NOTI-... ones) are sent : one id = PUT /api/notifications/:id, several = ONE PUT /api/notifications/read-all.
+// Best effort : the local mark always works.
+const serverMarkRead = (ids) => {
+  if (!isCloudflareMode()) return;
+  const list = Array.from(new Set((ids || []).map(String))).filter((id) => id && !id.startsWith('NOTI-')).slice(0, 200);
+  if (list.length === 0) return;
+  const headers = { 'Content-Type': 'application/json' };
+  (async () => {
+    try {
+      if (list.length === 1) await backendFetch(`/api/notifications/${encodeURIComponent(list[0])}`, { method: 'PUT', headers, body: JSON.stringify({ isRead: true }) });
+      else await backendFetch('/api/notifications/read-all', { method: 'PUT', headers, body: JSON.stringify({ ids: list }) });
+    } catch { /* offline : the local mark stays */ }
+  })();
+};
 
 const NOTIFICATIONS_STORAGE_KEY = 'prpo_in_app_notifications';
 
@@ -194,7 +212,7 @@ export const notificationService = {
   isNotificationTarget(n, currentRole) {
     if (!currentRole) return true;
     const roleId = String(currentRole.canonicalRole || currentRole.roleId || currentRole.id || currentRole.role || currentRole.positionKey || '').toUpperCase();
-    const isAdmin = currentRole.isAdmin === true || roleId.includes('ADMIN') || Number(currentRole.level) >= 99 || currentRole.username === 'admin';
+    const isAdmin = isAdminUser(currentRole, currentRole.isAdmin === true || roleId.includes('ADMIN') || Number(currentRole.level) >= 99 || currentRole.username === 'admin');
     if (isAdmin) return true;
 
     const userDept = String(currentRole.department || currentRole.primaryDepartment || currentRole.dept || '').toUpperCase();
@@ -301,6 +319,7 @@ export const notificationService = {
     const all = this.getAll();
     const updated = all.map(n => (n.id === id || n._id === id) ? { ...n, isRead: true, read: true, status: 'read' } : n);
     this.saveAll(updated);
+    serverMarkRead([id]);
 
     return updated;
   },
@@ -329,8 +348,8 @@ export const notificationService = {
     });
 
     this.saveAll(updated);
-
-
+    // only the ones that were not read yet
+    serverMarkRead(all.filter((n, i) => updated[i] !== n && !(n.isRead === true || n.read === true || n.status === 'read')).map(n => n.id || n._id));
 
     return updated;
   },

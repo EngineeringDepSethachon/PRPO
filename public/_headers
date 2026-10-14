@@ -1,0 +1,27 @@
+# Cloudflare Pages response headers for the static app (copied to dist/ by `npm run build:cf`). They apply to static files only ;
+# the API (Pages Functions) sets its own headers. Checked against the real build (dist/index.html) - see docs/DEPLOY_CLOUDFLARE.md ("Security headers").
+#
+# What the app needs and why (tests/cf_p6_phase2.test.js, group "public/_headers", keeps this list honest) :
+#  script-src  'self'                  : Vite emits ONE external module script (+ lazy chunks such as pdf-lib, same origin), no inline script, no CDN
+#  style-src   'unsafe-inline'         : the index.html loading-shell <style> block and React style="" attributes
+#              fonts.googleapis.com    : the Google Fonts stylesheet linked in index.html (Inter, Sarabun, IBM Plex Sans Thai, JetBrains Mono)
+#  font-src    fonts.gstatic.com, data : the font files of that stylesheet
+#  img-src     blob:, data:            : files fetched through /api/files/:id are shown as blob: URLs ; embedded item images are data: URLs
+#              drive.google.com, lh3-lh6.googleusercontent.com, drive.usercontent.google.com : legacy Drive thumbnails / lh3 links of imported data
+#                                        (the same hosts the server accepts in file fields - functions/_lib/sanitize.js DRIVE_HOST_RE)
+#  connect-src 'self'                  : /api/* and /fonts/*.ttf (PO PDF fonts) on the same origin
+#              api.ipify.org           : login IP note (AuthContext)
+#  frame-src   blob:, drive.google.com : the attachment viewer shows a blob: PDF and the Drive /preview page of legacy files in an <iframe>
+#  object-src  blob:                   : the browser PDF viewer opened for a blob: PDF
+#  frame-ancestors 'none'              : nobody may embed the app (clickjacking) - same as X-Frame-Options: DENY
+
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' data: https://fonts.gstatic.com; img-src 'self' data: blob: https://drive.google.com https://lh3.googleusercontent.com https://lh4.googleusercontent.com https://lh5.googleusercontent.com https://lh6.googleusercontent.com https://drive.usercontent.google.com; connect-src 'self' https://api.ipify.org; frame-src 'self' blob: https://drive.google.com https://docs.google.com; object-src 'self' blob:; worker-src 'self' blob:; media-src 'self' blob:; manifest-src 'self'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'
+  X-Frame-Options: DENY
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=(), interest-cohort=()
+
+# hashed build output never changes under the same name
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable

@@ -1,0 +1,6 @@
+id,employeeId,username,password,pin,email,name,position,department,departments,roleId,canonicalRole,level,status,isActive,description
+USR-T1,EMP-T1,test.pd,Fx-Plain-Pw-7731,9999,,O'Brien ทดสอบ,เจ้าหน้าที่,PD,"[""PD""]",REQUESTER_PD,REQUESTER,1,ACTIVE,TRUE,"บรรทัดแรก
+บรรทัดสอง"
+USR-T2,EMP-T2,test.default,123456,1234,,Default Pw,เจ้าหน้าที่,QC,,REQUESTER_QC,REQUESTER,1,,FALSE,
+USR-T3,EMP-T3,test.empty,,,,Empty Pw,เจ้าหน้าที่,WH,"PD,WH",REQUESTER_WH,REQUESTER,1,ACTIVE,TRUE,
+,EMP-T4,no.id,x,,,No Id,x,PD,,R,R,1,ACTIVE,TRUE,

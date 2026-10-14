@@ -1,0 +1,7 @@
+﻿id,employeeId,username,name,email,position,department,allowedDepartments,roleId,level,status,password,description
+USR-0001,EMP-PD-001,wichai.pd,วิชัย ใจดี,wichai@pdqc.co.th,พนักงานฝ่ายผลิต,PD,PD,REQUESTER_PD,1,ACTIVE,,ตัวอย่าง: ผู้ขอซื้อประจำแผนก PD
+USR-0002,EMP-QC-001,somying.qc,สมหญิง รักงาน,somying@pdqc.co.th,เจ้าหน้าที่ QC,QC,QC,REQUESTER_QC,1,ACTIVE,,ตัวอย่าง: ผู้ขอซื้อประจำแผนก QC
+USR-0003,EMP-PD-002,somchai.asst,สมชาย ตรวจทาน,somchai@pdqc.co.th,ผู้ช่วยผู้จัดการ,PD,"PD,QC",ASST_MANAGER,2,ACTIVE,,ตัวอย่าง: ตรวจทาน PR ขั้นแรก ดูได้ทั้ง PD และ QC
+USR-0004,EMP-MGT-001,prasert.pm,ประเสริฐ อนุมัติ,prasert@pdqc.co.th,ผู้จัดการโรงงาน,ALL,*,PLANT_MANAGER,3,ACTIVE,,ตัวอย่าง: อนุมัติขั้นสุดท้าย ตั้งงบ ดูทุกแผนก
+USR-0005,EMP-PUR-001,nat.online,นัท สั่งซื้อ,nat@pdqc.co.th,จัดซื้อออนไลน์,ALL,*,ONLINE_PURCHASER,2,ACTIVE,,ตัวอย่าง: รับงานสั่งซื้อออนไลน์ อัปเดตราคาจริง
+USR-0006,EMP-SYS-001,admin,ผู้ดูแลระบบ,admin@pdqc.co.th,System Admin,ALL,*,ADMIN,99,ACTIVE,,ตัวอย่าง: แอดมิน ต้องมีอย่างน้อย 1 คน

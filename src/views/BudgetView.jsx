@@ -231,14 +231,15 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
   const [editingBudget, setEditingBudget] = useState(null);
   const [editBaseValue, _setEditBaseValue] = useState('');
 
-  // Month & Year state: Defaults to active real-time operational fiscal period: September 2026 (2026-09 / กันยายน 2569)
+  // Month & Year state: Defaults to current month (local machine time, YYYY-MM); ?month=YYYY-MM overrides
   const initialFiscalPeriod = useMemo(() => {
     const urlMonth = searchParams.get('month');
     if (urlMonth && /^\d{4}-\d{2}$/.test(urlMonth)) {
       const [y, m] = urlMonth.split('-').map(Number);
       return { year: y, month: m };
     }
-    return { year: 2026, month: 9 };
+    const now = new Date();
+    return { year: now.getFullYear(), month: now.getMonth() + 1 };
   }, [searchParams]);
 
   const [selectedYear, setSelectedYear] = useState(initialFiscalPeriod.year);

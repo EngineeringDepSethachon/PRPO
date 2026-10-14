@@ -4,8 +4,17 @@ import { storageService } from '../services/storageService';
 import { apiService } from '../services/apiService';
 import { workflowEngine } from '../services/workflowEngine';
 import { budgetService } from '../services/budgetService';
+import { isCloudflareMode } from '../config/backendMode';
 
 const BudgetContext = createContext(null);
+
+// cloudflare : same zero-based formula as BudgetView ; other modes keep the legacy engine
+const summaryFor = (targetMonth) => (
+  isCloudflareMode()
+    ? budgetService.calculatePeriodBudgetSummary(targetMonth)
+    : workflowEngine.calculateBudgetSummary(targetMonth)
+);
+const EMPTY_SUMMARY = { current: {}, trends: {} };
 
 /**
  * Standalone & Context-Shared rollbackBudget implementation
@@ -70,13 +79,15 @@ export async function rollbackBudget(department, refundAmount, reason = 'คื�
       delta: amount,
       reason,
       actor: tx.actor,
-      targetMonth
+      targetMonth,
+      // PO this refund comes from (Cloudflare server requires it from users without the budget permission)
+      docNo: options.refDocNo || options.docNo || undefined
     });
   } catch {
     // Graceful offline fallback
   }
 
-  const newSummary = workflowEngine.calculateBudgetSummary(targetMonth);
+  const newSummary = summaryFor(targetMonth);
   return {
     success: true,
     department: dept,
@@ -148,13 +159,14 @@ export async function deductBudget(department, extraAmount, reason = 'หัก�
       delta: -amount,
       reason,
       actor: tx.actor,
-      targetMonth
+      targetMonth,
+      docNo: options.refDocNo || options.docNo || undefined
     });
   } catch {
     // Graceful offline fallback
   }
 
-  const newSummary = workflowEngine.calculateBudgetSummary(targetMonth);
+  const newSummary = summaryFor(targetMonth);
   return {
     success: true,
     department: dept,
@@ -194,14 +206,14 @@ export function BudgetProvider({ children }) {
 
   const value = useMemo(() => ({
     budgets: app?.budgets || storageService.getBudgets(),
-    budgetSummary: app?.budgetSummary || workflowEngine.calculateBudgetSummary(),
+    budgetSummary: app?.budgetSummary || (isCloudflareMode() ? EMPTY_SUMMARY : workflowEngine.calculateBudgetSummary()),
     budgetTransactions: app?.budgetTransactions || storageService.getBudgetTransactions(),
     updateBudget: app?.updateBudget || apiService.updateBudget.bind(apiService),
     adjustBudget: app?.adjustBudget || apiService.adjustBudget.bind(apiService),
     refundBudget: app?.refundBudget || apiService.adjustBudget.bind(apiService),
     rollbackBudget: handleRollbackBudget,
     deductBudget: handleDeductBudget,
-    calculateBudgetSummary: (m) => workflowEngine.calculateBudgetSummary(m)
+    calculateBudgetSummary: (m) => summaryFor(m)
   }), [app, handleRollbackBudget, handleDeductBudget]);
 
   return (
@@ -236,13 +248,13 @@ export const useBudgetContext = () => {
     const budgets = storageService.getBudgets();
     return {
       budgets,
-      budgetSummary: workflowEngine.calculateBudgetSummary(),
+      budgetSummary: isCloudflareMode() ? EMPTY_SUMMARY : workflowEngine.calculateBudgetSummary(),
       budgetTransactions: storageService.getBudgetTransactions(),
       updateBudget: apiService.updateBudget.bind(apiService),
       adjustBudget: apiService.adjustBudget.bind(apiService),
       rollbackBudget,
       deductBudget,
-      calculateBudgetSummary: (m) => workflowEngine.calculateBudgetSummary(m)
+      calculateBudgetSummary: (m) => summaryFor(m)
     };
   }
   return context;

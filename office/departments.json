@@ -1,0 +1,23 @@
+[
+  {
+    "id": "executive",
+    "name": "Executive",
+    "kind": "exec",
+    "root": "departments/executive",
+    "addDirs": ["."],
+    "manager": {
+      "name": "fable",
+      "model": "fable"
+    }
+  },
+  {
+    "id": "prototype",
+    "name": "Migrate Team",
+    "root": ".",
+    "approver": "executive",
+    "manager": {
+      "name": "neo",
+      "model": "opus"
+    }
+  }
+]

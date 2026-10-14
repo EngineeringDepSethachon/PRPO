@@ -1,6 +1,8 @@
 import React, { useState, useMemo, useCallback } from 'react';
 import { History, ArrowDownRight, ArrowUpRight, X, MapPin, Search, Calendar, ChevronLeft, ChevronRight, FileText, RefreshCw } from 'lucide-react';
 import Portal from '../common/Portal';
+import { formatIsoForDisplay } from '../../utils/timeUtils';
+import { cfBackground } from '../../services/cfGuard';
 import { storageService, normalizeDocNumber } from '../../services/storageService';
 import { AppContext } from '../../context/AppContext';
 import { matchDepartment, isMultiDeptUser } from '../../utils/permissions';
@@ -312,13 +314,11 @@ export default function StockMovementTable({
         };
         const updated = [healedLog, ...allLogs];
         storageService.saveStockLogs(updated);
-        try {
-          fetch('/api/stock-logs', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(updated)
-          }).catch(() => {});
-        } catch {}
+        cfBackground('stock-logs self-heal sync', '/api/stock-logs', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(updated)
+        });
       }
     }
   }, [selectedProduct, rawProductLogs.length]);
@@ -1028,7 +1028,7 @@ export default function StockMovementTable({
                     <div>
                       <h4 className="text-sm font-bold text-slate-900">หมายเหตุ / บันทึก</h4>
                       <div className="text-[11px] text-slate-400 font-mono">
-                        เอกสาร: {activeNoteModal.docNo} • {activeNoteModal.date}
+                        เอกสาร: {activeNoteModal.docNo} • {formatIsoForDisplay(activeNoteModal.date)}
                       </div>
                     </div>
                   </div>

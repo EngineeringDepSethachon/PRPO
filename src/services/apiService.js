@@ -6,11 +6,66 @@ import { PO_STATUS } from '../config/constants';
 import { clearMockTransactions, resetMockTransactions } from '../utils/dataResetHelper';
 import { matchDepartment } from '../utils/permissions';
 import { applyProductCostFailSafe } from './productService';
+import { backendFetch, isCloudflareMode, getAuthToken } from '../config/backendMode';
+import { cfWrite, cfReport, withCfRollback } from './cfGuard';
+
+// JSON request init for cfWrite
+const jsonInit = (method, body) => ({
+  method,
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify(body)
+});
+
+// id of the signed-in user (the pending goods-receipt stock queue is per user : an entry is only replayed by the user who made it)
+const pendingUserId = () => {
+  try { const s = JSON.parse(localStorage.getItem('prpo_auth_session') || 'null'); return (s && (s.id || s.userId || s.username)) || ''; } catch { return ''; }
+};
+
+// All /api/* calls in this module go through backendFetch, which attaches
+// `Authorization: Bearer <token>` only in cloudflare mode (pass-through otherwise).
+const fetch = (input, init) => backendFetch(input, init);
+
+// cloudflare : a GET that was in flight when the session ended / switched must not write its (old user's) response into the cache.
+// Take the token before fetching ; after the response check it is still the current one (always false in mock / GAS mode).
+const cfTokenSnap = () => (isCloudflareMode() ? getAuthToken() : '');
+const cfTokenGone = (tokenUsed) => isCloudflareMode() && getAuthToken() !== tokenUsed;
+
+// When the logged-in user's own record is edited (e.g. username renamed), refresh the
+// stored session so it does not keep stale identity fields. The session token is kept,
+// and the password is never copied into the session.
+function syncActiveSessionWithUser(saved) {
+  try {
+    if (!saved || typeof localStorage === 'undefined') return;
+    const raw = localStorage.getItem('prpo_auth_session');
+    if (!raw) return;
+    const session = JSON.parse(raw);
+    if (!session || session.id !== saved.id) return;
+    const { password, ...safe } = saved;
+    localStorage.setItem('prpo_auth_session', JSON.stringify({ ...session, ...safe, token: session.token }));
+  } catch {
+    // non-blocking
+  }
+}
 
 // API Service Layer for Data & Operations
 export const apiService = {
   // --- Audit Trail Operations ---
+  // cloudflare : server rows only (GET /api/audit-logs, bare array). No seed, no localStorage fallback : a failure gives an empty list + logged error.
+  // Resolves null when the session changed while the request was in flight (the caller keeps its current list).
   async getAuditLogs(filters, forceFetch = false) {
+    if (isCloudflareMode()) {
+      const tok = cfTokenSnap();
+      try {
+        const res = await fetch('/api/audit-logs?limit=2000');
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const data = await res.json();
+        if (cfTokenGone(tok)) return null;
+        return Array.isArray(data) ? data : [];
+      } catch (e) {
+        console.error('[apiService] cloudflare GET /api/audit-logs failed:', e && e.message);
+        return [];
+      }
+    }
     if (isGAS()) {
       if (forceFetch) {
         try {
@@ -88,18 +143,33 @@ export const apiService = {
     }
 
     // 3. Fallback for local dev server / offline mode
+    // cloudflare : data comes only from the server. No token = not signed in -> no request (would be a 401) and no cached/sample fallback.
+    if (isCloudflareMode() && !getAuthToken()) return null;
+    const cfTokenUsed = cfTokenSnap();
     try {
       const res = await fetch('/api/bootstrap');
       if (res.ok) {
         const payload = await res.json();
+        // cloudflare : the session changed (logout / another user) while this request was in flight -> drop the response, never cache it
+        if (cfTokenGone(cfTokenUsed)) return null;
         if (payload && typeof payload === 'object') {
           if (typeof storageService.applyInitialPayload === 'function') {
             storageService.applyInitialPayload(payload);
           }
           return payload;
         }
+      } else if (isCloudflareMode()) {
+        console.warn(`[apiService] cloudflare GET /api/bootstrap failed: HTTP ${res.status}`);
+        // 401 is reported by the session-invalid handler ; anything else is shown with the existing error modal. Never fall back to sample data.
+        if (res.status === 401) return null;
+        throw cfReport(new Error(`โหลดข้อมูลจากเซิร์ฟเวอร์ไม่สำเร็จ (HTTP ${res.status})`), 'โหลดข้อมูลไม่สำเร็จ');
       }
-    } catch (e) {}
+    } catch (e) {
+      if (isCloudflareMode()) {
+        console.warn('[apiService] cloudflare GET /api/bootstrap error:', e && e.message);
+        throw e && e.cfReported ? e : cfReport(e, 'โหลดข้อมูลไม่สำเร็จ');
+      }
+    }
 
     // 4. Return cached dataset from storageService (localStorage)
     const cachedProducts = storageService.getProducts() || [];
@@ -137,10 +207,11 @@ export const apiService = {
       return storageService.getProducts();
     }
     try {
+      const tok = cfTokenSnap();
       const res = await fetch('/api/products');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && !cfTokenGone(tok)) {
           const logs = storageService.getStockLogs() || [];
           const failSafeData = applyProductCostFailSafe(data, logs);
           storageService.saveProducts(failSafeData);
@@ -168,10 +239,11 @@ export const apiService = {
       return storageService.getVendors();
     }
     try {
+      const tok = cfTokenSnap();
       const res = await fetch('/api/vendors');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && !cfTokenGone(tok)) {
           storageService.saveVendors(data);
           return data;
         }
@@ -197,10 +269,11 @@ export const apiService = {
       return storageService.getStorageLocations();
     }
     try {
+      const tok = cfTokenSnap();
       const res = await fetch('/api/storage-locations');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && !cfTokenGone(tok)) {
           storageService.saveStorageLocations(data);
           return data;
         }
@@ -232,10 +305,11 @@ export const apiService = {
       const url = department && department !== 'ALL' 
         ? `/api/usage-units?department=${encodeURIComponent(department)}`
         : '/api/usage-units';
+      const tok = cfTokenSnap();
       const res = await fetch(url);
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && !cfTokenGone(tok)) {
           if (!department || department === 'ALL') {
             storageService.saveUsageUnits(data);
           }
@@ -263,10 +337,11 @@ export const apiService = {
       return storageService.getUsers();
     }
     try {
+      const tok = cfTokenSnap();
       const res = await fetch('/api/users');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && !cfTokenGone(tok)) {
           storageService.saveUsers(data);
           return data;
         }
@@ -292,10 +367,11 @@ export const apiService = {
       return storageService.getDepartments();
     }
     try {
+      const tok = cfTokenSnap();
       const res = await fetch('/api/departments');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && !cfTokenGone(tok)) {
           storageService.saveDepartments(data);
           return data;
         }
@@ -331,10 +407,11 @@ export const apiService = {
       return storageService.getPRs();
     }
     try {
+      const tok = cfTokenSnap();
       const res = await fetch('/api/prs');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && !cfTokenGone(tok)) {
           const seen = new Set();
           const unique = data.filter(p => {
             const key = p.id || p.prNo;
@@ -384,10 +461,11 @@ export const apiService = {
       return storageService.getPOs();
     }
     try {
+      const tok = cfTokenSnap();
       const res = await fetch('/api/pos');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && !cfTokenGone(tok)) {
           const seen = new Set();
           const unique = data.filter(p => {
             const key = p.poNo || p.poNumber || p.id;
@@ -427,10 +505,11 @@ export const apiService = {
       return storageService.getStockLogs();
     }
     try {
+      const tok = cfTokenSnap();
       const res = await fetch('/api/stock-logs');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && !cfTokenGone(tok)) {
           storageService.saveStockLogs(data);
           return data;
         }
@@ -456,10 +535,11 @@ export const apiService = {
       return storageService.getBudgets();
     }
     try {
+      const tok = cfTokenSnap();
       const res = await fetch('/api/budgets');
       if (res.ok) {
         const data = await res.json();
-        if (data && typeof data === 'object') {
+        if (data && typeof data === 'object' && !cfTokenGone(tok)) {
           storageService.saveBudgets(data);
           return data;
         }
@@ -485,10 +565,11 @@ export const apiService = {
       return storageService.getNotifications();
     }
     try {
+      const tok = cfTokenSnap();
       const res = await fetch('/api/notifications');
       if (res.ok) {
         const data = await res.json();
-        if (Array.isArray(data)) {
+        if (Array.isArray(data) && !cfTokenGone(tok)) {
           return data;
         }
       }
@@ -514,11 +595,14 @@ export const apiService = {
       return storageService.getBudgetTransactions();
     }
     try {
+      const tok = cfTokenSnap();
       const res = await fetch('/api/budget-transactions');
       if (res.ok) {
         const data = await res.json();
-        storageService.saveBudgetTransactions(data);
-        return data;
+        if (!cfTokenGone(tok)) {
+          storageService.saveBudgetTransactions(data);
+          return data;
+        }
       }
     } catch (e) {
       console.warn('[apiService] GET /api/budget-transactions fallback to storageService:', e.message);
@@ -527,6 +611,14 @@ export const apiService = {
   },
 
   async adjustBudget(params) {
+    if (isCloudflareMode()) {
+      // Cloudflare: server is the source of truth. Never fall back to a local-only budget change.
+      const res = await cfWrite('ปรับปรุงงบประมาณไม่สำเร็จ', '/api/budgets/adjust', jsonInit('POST', params));
+      const data = await res.json();
+      if (data.budgets) storageService.saveBudgets(data.budgets);
+      if (data.transactions) storageService.saveBudgetTransactions(data.transactions);
+      return data;
+    }
     try {
       const res = await fetch('/api/budgets/adjust', {
         method: 'POST',
@@ -689,6 +781,17 @@ export const apiService = {
       }
     }
 
+    // 2a. Cloudflare: a rejected/failed create must surface as an error (no silent newPR)
+    if (isCloudflareMode()) {
+      const res = await cfWrite('สร้างใบขอซื้อ (PR) ไม่สำเร็จ', '/api/prs', jsonInit('POST', newPR));
+      const body = await res.json().catch(() => null);
+      if (body && typeof body === 'object') {
+        if (body.pr && typeof body.pr === 'object') return body.pr;
+        if (body.id && body.success === undefined) return body;
+      }
+      return newPR;
+    }
+
     // 2. Direct Sync to Local API Backend File
     try {
       const res = await fetch('/api/prs', {
@@ -697,8 +800,15 @@ export const apiService = {
         body: JSON.stringify(newPR)
       });
       if (res.ok) {
-        const savedPR = await res.json();
-        return savedPR || newPR;
+        const body = await res.json();
+        // Cloudflare/express backends answer with an envelope { success, count, pr, id, prNo };
+        // unwrap it so callers always get the PR object itself.
+        if (body && typeof body === 'object') {
+          if (body.pr && typeof body.pr === 'object') return body.pr;
+          // Bare PR object (legacy mock backend) has an id and no envelope flag
+          if (body.id && body.success === undefined) return body;
+        }
+        return newPR;
       }
     } catch (e) {
       console.warn('[apiService] POST /api/prs backend sync warning:', e.message);
@@ -736,13 +846,7 @@ export const apiService = {
         throw e;
       }
     }
-    try {
-      await fetch(`/api/prs/${prId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-    } catch (e) {}
+    await cfWrite('แก้ไขใบขอซื้อ (PR) ไม่สำเร็จ', `/api/prs/${prId}`, jsonInit('PUT', isCloudflareMode() ? { ...updated, action: isDraft ? 'UPDATE' : 'RESUBMIT' } : updated));
     return updated;
   },
 
@@ -758,13 +862,7 @@ export const apiService = {
       }
       return result;
     }
-    try {
-      await fetch(`/api/prs/${prId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(result)
-      });
-    } catch (e) {}
+    await cfWrite('ยื่นส่ง PR ไม่สำเร็จ', `/api/prs/${prId}`, jsonInit('PUT', isCloudflareMode() ? { ...result, action: 'RESUBMIT' } : result));
     return result;
   },
 
@@ -808,25 +906,15 @@ export const apiService = {
       }
       return result;
     }
-    try {
-      if (result?.pr) {
-        await fetch(`/api/prs/${prId}`, {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(result.pr)
-        });
+    if (result?.pr) {
+      await cfWrite('ปรับสถานะ PR ไม่สำเร็จ', `/api/prs/${prId}`, jsonInit('PUT', result.pr));
+    }
+    if (result?.po) {
+      const poList = Array.isArray(result.po) ? result.po : [result.po];
+      for (const singlePo of poList) {
+        await cfWrite('สร้างใบสั่งซื้อ (PO) ไม่สำเร็จ', '/api/pos', jsonInit('POST', singlePo));
       }
-      if (result?.po) {
-        const poList = Array.isArray(result.po) ? result.po : [result.po];
-        for (const singlePo of poList) {
-          await fetch('/api/pos', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(singlePo)
-          });
-        }
-      }
-    } catch (e) {}
+    }
     return result;
   },
 
@@ -852,13 +940,7 @@ export const apiService = {
         throw e;
       }
     }
-    try {
-      await fetch(`/api/prs/${prId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-    } catch (e) {}
+    await cfWrite('ปฏิเสธ PR ไม่สำเร็จ', `/api/prs/${prId}`, jsonInit('PUT', updated));
     return updated;
   },
 
@@ -883,13 +965,7 @@ export const apiService = {
         throw e;
       }
     }
-    try {
-      await fetch(`/api/prs/${prId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-    } catch (e) {}
+    await cfWrite('แก้ไขรายการ PR ไม่สำเร็จ', `/api/prs/${prId}`, jsonInit('PUT', updated));
     return updated;
   },
 
@@ -915,13 +991,8 @@ export const apiService = {
         throw e;
       }
     }
-    try {
-      await fetch(`/api/prs/${prId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cancelled)
-      });
-    } catch (e) {}
+    // Cloudflare : the cancel reason travels in its own keys (cancelReason / comment) - `reason` is the PR's purpose and is not overwritten
+    await cfWrite('ยกเลิก PR ไม่สำเร็จ', `/api/prs/${prId}`, jsonInit('PUT', isCloudflareMode() ? { ...cancelled, cancelReason: reason, comment: reason } : cancelled));
     return cancelled;
   },
 
@@ -937,15 +1008,7 @@ export const apiService = {
       }
       return cancelled;
     }
-    try {
-      await fetch(`/api/pos/${poId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(cancelled)
-      });
-    } catch (e) {
-      console.warn('[apiService] Backend PUT /api/pos/:id fallback:', e.message);
-    }
+    await cfWrite('ยกเลิก PO ไม่สำเร็จ', `/api/pos/${poId}`, jsonInit('PUT', cancelled));
     return cancelled;
   },
 
@@ -959,15 +1022,7 @@ export const apiService = {
       }
       return updated;
     }
-    try {
-      await fetch(`/api/pos/${poId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-    } catch (e) {
-      console.warn('[apiService] Backend PUT /api/pos/:id fallback:', e.message);
-    }
+    await cfWrite('ยืนยันรับงานออนไลน์ไม่สำเร็จ', `/api/pos/${poId}`, jsonInit('PUT', updated));
     return updated;
   },
 
@@ -1012,15 +1067,7 @@ export const apiService = {
       }
       return updated;
     }
-    try {
-      await fetch(`/api/pos/${poId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-    } catch (e) {
-      console.warn('[apiService] Backend PUT /api/pos/:id fallback:', e.message);
-    }
+    await cfWrite('มอบหมายผู้ขายไม่สำเร็จ', `/api/pos/${poId}`, jsonInit('PUT', updated));
     return updated;
   },
 
@@ -1037,15 +1084,7 @@ export const apiService = {
       }
       return updated;
     }
-    try {
-      await fetch(`/api/pos/${poId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-    } catch (e) {
-      console.warn('[apiService] Backend PUT /api/pos/:id fallback:', e.message);
-    }
+    await cfWrite('ยื่นเคลมพัสดุไม่สำเร็จ', `/api/pos/${poId}`, jsonInit('PUT', updated));
     return updated;
   },
   async fileOnlineClaim(poId, claimData, user) {
@@ -1078,15 +1117,7 @@ export const apiService = {
       }
       return resolved;
     }
-    try {
-      await fetch(`/api/pos/${poId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(resolved)
-      });
-    } catch (e) {
-      console.warn('[apiService] Backend PUT /api/pos/:id fallback:', e.message);
-    }
+    await cfWrite('บันทึกผลการเคลมไม่สำเร็จ', `/api/pos/${poId}`, jsonInit('PUT', resolved));
     return resolved;
   },
   async resolveOnlineClaim(poId, resolution, user) {
@@ -1105,20 +1136,17 @@ export const apiService = {
       }
       return updated;
     }
-    try {
-      await fetch(`/api/pos/${poId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-    } catch (e) {
-      console.warn('[apiService] Backend PUT /api/pos/:id fallback:', e.message);
-    }
+    await cfWrite('ปรับสถานะ PO ไม่สำเร็จ', `/api/pos/${poId}`, jsonInit('PUT', updated));
     return updated;
   },
 
   async updateActualPrice(poId, itemIndex, actPrice, user) {
-    return workflowEngine.updateActualPrice(poId, itemIndex, actPrice, user);
+    const po = await workflowEngine.updateActualPrice(poId, itemIndex, actPrice, user);
+    // Cloudflare: persist to the server (previously local-only). Other modes unchanged.
+    if (isCloudflareMode() && po) {
+      await cfWrite('บันทึกราคาจริงไม่สำเร็จ', `/api/pos/${poId}`, jsonInit('PUT', po));
+    }
+    return po;
   },
 
   async closePO(poId, user, note = '') {
@@ -1144,15 +1172,7 @@ export const apiService = {
         throw e;
       }
     }
-    try {
-      await fetch(`/api/pos/${poId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(updated)
-      });
-    } catch (e) {
-      console.warn('[apiService] Backend PUT /api/pos/:id fallback:', e.message);
-    }
+    await cfWrite('บันทึกใบสั่งซื้อ (PO) ไม่สำเร็จ', `/api/pos/${poId}`, jsonInit('PUT', updated));
     return updated;
   },
 
@@ -1174,14 +1194,11 @@ export const apiService = {
         throw e;
       }
     }
-    try {
-      await fetch(`/api/pos/${poId}/settle`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...settlementData, user })
-      });
-    } catch (e) {
-      console.warn('[apiService] Backend POST /api/pos/:id/settle fallback:', e.message);
+    const res = await cfWrite('ปิดยอดจ่ายจริงไม่สำเร็จ', `/api/pos/${poId}/settle`, jsonInit('POST', { ...settlementData, user }));
+    if (isCloudflareMode() && res && typeof res.json === 'function') {
+      // hand the server's answer (refundedAmount, savingsAmount ...) to the caller : the settle modal shows what was REALLY refunded
+      const settlementResult = await res.json().catch(() => null);
+      if (settlementResult && typeof settlementResult === 'object') return { ...updated, settlementResult };
     }
     return updated;
   },
@@ -1226,7 +1243,7 @@ export const apiService = {
           storageService.saveBudgets(data.budgets);
         }
         return { ...(data.po || {}), backendData: data };
-      } else if (res.status === 404) {
+      } else if (res.status === 404 && !isCloudflareMode()) {
         // PO not in backend disk (e.g. Vitest in-memory test environment) -> fallback to workflowEngine
         return workflowEngine.receiveGoods(poId, receivingItems, user, note, { ...options, grNumber, grId: grNumber });
       } else {
@@ -1234,11 +1251,77 @@ export const apiService = {
         throw new Error(errJson.error || `HTTP error ${res.status}`);
       }
     } catch (e) {
+      if (isCloudflareMode()) {
+        // Cloudflare: never "receive" goods locally when the server did not accept it
+        throw cfReport(e, 'รับสินค้าไม่สำเร็จ');
+      }
       if (e.message && !e.message.includes('fetch') && !e.message.includes('Failed to fetch')) {
         throw e; // Validation errors from backend should be thrown to the user
       }
       console.warn('[apiService] Backend receive offline, falling back to workflowEngine:', e.message);
       return workflowEngine.receiveGoods(poId, receivingItems, user, note, { ...options, grNumber, grId: grNumber });
+    }
+  },
+
+  // Cloudflare: the stock side of a goods receipt done in ReceivingModal (which saves the PO itself afterwards). The server adds currentStock, moves the
+  // moving average cost and writes ONE IN stock log per line, once per GRN number (a retry / double click changes nothing). Returns the server's
+  // products + stockLogs, which replace the local copies.
+  async receiveStock(poId, grNumber, receivingItems) {
+    const PENDING_KEY = 'prpo_pending_receive_stock';
+    const readPending = () => { try { const v = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); return Array.isArray(v) ? v : []; } catch { return []; } };
+    const writePending = (list) => { try { localStorage.setItem(PENDING_KEY, JSON.stringify(list)); } catch { /* storage full / unavailable */ } };
+    const same = (a) => a.poId === poId && a.grNumber === grNumber && (a.userId || '') === pendingUserId();
+    let res;
+    try {
+      res = await cfWrite('บันทึกสต็อกจากการตรวจรับไม่สำเร็จ', `/api/pos/${encodeURIComponent(poId)}/receive`,
+        jsonInit('POST', { poId, stockOnly: true, grNumber, receivingItems }));
+    } catch (e) {
+      // the PO (with this GRN) is already saved : keep the request so it can be replayed with the SAME GRN number (idempotent on the server) -
+      // unless the server answered 400 / 409 (invalid / over the ceiling / already settled : replaying cannot change that)
+      if (e && e.status !== 400 && e.status !== 409 && !readPending().some(same)) writePending([...readPending(), { poId, grNumber, receivingItems, userId: pendingUserId() }]);
+      throw e;
+    }
+    writePending(readPending().filter((a) => !same(a)));
+    const data = res && typeof res.json === 'function' ? await res.json().catch(() => null) : null;
+    if (data && Array.isArray(data.products) && data.products.length) {
+      const cur = storageService.getProducts() || [];
+      const byId = new Map(data.products.map((p) => [p.id, p]));
+      storageService.saveProducts(cur.map((p) => (byId.has(p.id) ? { ...p, ...byId.get(p.id) } : p)));
+    }
+    if (data && Array.isArray(data.stockLogs) && data.stockLogs.length) {
+      const logs = storageService.getStockLogs() || [];
+      const have = new Set(logs.map((l) => l.id));
+      storageService.saveStockLogs([...data.stockLogs.filter((l) => !have.has(l.id)), ...logs]);
+    }
+    return data;
+  },
+
+  // Replays the stock calls of THIS user that failed after their PO was saved (see receiveStock) ; other users' entries stay for them.
+  //  - 200 : done, removed.  400 / 409 : the server says it is invalid / over the ceiling / already settled -> removed and the user is told (modal).
+  //  - 401 / 403 / 408 / 429 / 5xx / network : kept (403 also tells the user, nothing is dropped silently).
+  async flushPendingReceiveStock() {
+    if (!isCloudflareMode()) return;
+    const PENDING_KEY = 'prpo_pending_receive_stock';
+    const me = pendingUserId();
+    let list = [];
+    try { const v = JSON.parse(localStorage.getItem(PENDING_KEY) || '[]'); list = Array.isArray(v) ? v : []; } catch { list = []; }
+    if (!list.length) return;
+    const keep = [];
+    const told = [];
+    for (const a of list) {
+      if ((a.userId || '') !== me) { keep.push(a); continue; }
+      try {
+        const res = await backendFetch(`/api/pos/${encodeURIComponent(a.poId)}/receive`, jsonInit('POST', { poId: a.poId, stockOnly: true, grNumber: a.grNumber, receivingItems: a.receivingItems }));
+        if (res.ok) continue;
+        if (res.status === 400 || res.status === 409) { told.push(`${a.grNumber} (HTTP ${res.status})`); continue; }
+        // 403 : the user is told ONCE for this entry (then it is marked and kept, never dropped silently)
+        if (res.status === 403 && !a.notified) { told.push(`${a.grNumber} (HTTP 403)`); a.notified = true; }
+        keep.push(a);
+      } catch { keep.push(a); }
+    }
+    try { localStorage.setItem(PENDING_KEY, JSON.stringify(keep)); } catch { /* ignore */ }
+    if (told.length) {
+      try { modalService.error('บันทึกสต็อกจากการตรวจรับค้างอยู่ไม่สำเร็จ', `เลขที่ GRN: ${told.join(', ')} กรุณาตรวจสอบสต็อกกับผู้ดูแลระบบ`); } catch { /* UI optional */ }
     }
   },
 
@@ -1251,12 +1334,30 @@ export const apiService = {
       productId: item.productId,
       receivedThisTime: Number(item.orderedQty ?? item.purchaseQty ?? item.qty) - (Number(item.receivedQty) || 0)
     }));
+    // Cloudflare: goods receipt must go through the server endpoint, not the local engine
+    if (isCloudflareMode()) {
+      return this.receiveGoods(poId, receivingItems, user, note, options);
+    }
     return workflowEngine.receiveGoods(poId, receivingItems, user, note, options);
   },
 
   // Short-Close PO (ปิด PO ก่อนกำหนดเมื่อได้ของไม่ครบและไม่รอของแล้ว)
   async shortClosePO(poId, reason, user) {
-    return workflowEngine.shortClosePO(poId, reason, user);
+    const po = await workflowEngine.shortClosePO(poId, reason, user);
+    // Cloudflare: persist to the server (previously local-only). Other modes unchanged.
+    if (isCloudflareMode() && po) {
+      await cfWrite('ปิด PO ก่อนกำหนดไม่สำเร็จ', `/api/pos/${poId}`, jsonInit('PUT', po));
+      const prs = storageService.getPRs() || [];
+      const relatedPR = prs.find(p =>
+        (po.prId && (p.id === po.prId || p.prNo === po.prId)) ||
+        (po.prNo && (p.prNo === po.prNo || p.id === po.prNo)) ||
+        (po.prNumber && (p.prNo === po.prNumber || p.id === po.prNumber || p.prNo === po.prNo))
+      );
+      if (relatedPR) {
+        await cfWrite('อัปเดตสถานะ PR ไม่สำเร็จ', `/api/prs/${relatedPR.id}`, jsonInit('PUT', relatedPR));
+      }
+    }
+    return po;
   },
 
   // --- Quick Issue Stock (เบิกจ่ายสินค้า) ---
@@ -1300,6 +1401,38 @@ export const apiService = {
       }
     }
 
+    // Cloudflare mode: atomic stock issue on D1 via /api/stock/issue
+    let backendResult = null;
+    if (isCloudflareMode()) {
+      try {
+        const issueRes = await fetch('/api/stock/issue', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            productId,
+            productCode,
+            department,
+            quantity,
+            issuedTo,
+            location: issuedTo,
+            reason,
+            requesterId,
+            requesterName,
+            user
+          })
+        });
+        if (!issueRes.ok) {
+          const errBody = await issueRes.json().catch(() => ({}));
+          throw new Error(errBody.error || errBody.message || `เบิกจ่ายไม่สำเร็จ (HTTP ${issueRes.status})`);
+        }
+        backendResult = await issueRes.json();
+      } catch (backendErr) {
+        // Cloudflare mode: server is the source of truth; never decrement local stock on failure
+        console.error('[apiService] issueStock /api/stock/issue error:', backendErr.message);
+        throw backendErr;
+      }
+    }
+
     // Update workflow engine & storageService for immediate local state
     const updatedProduct = await workflowEngine.quickIssueStock(
       productId,
@@ -1310,8 +1443,9 @@ export const apiService = {
     );
 
     // Sync with local express backend if in dev/express mode
+    // (cloudflare mode already persisted atomically above)
     try {
-      if (updatedProduct && !isGAS()) {
+      if (updatedProduct && !isGAS() && !isCloudflareMode()) {
         await fetch(`/api/products/${productId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
@@ -1319,7 +1453,7 @@ export const apiService = {
         }).catch(() => {});
       }
       const logs = storageService.getStockLogs();
-      if (logs && logs.length > 0 && !isGAS()) {
+      if (logs && logs.length > 0 && !isGAS() && !isCloudflareMode()) {
         await fetch('/api/stock-logs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -1347,12 +1481,12 @@ export const apiService = {
     }
 
     const latestLogs = storageService.getStockLogs();
-    const finalLog = gasResult?.logEntry || (latestLogs && latestLogs[0]);
+    const finalLog = backendResult?.logEntry || gasResult?.logEntry || (latestLogs && latestLogs[0]);
 
     return {
       success: true,
-      updatedProduct: gasResult?.updatedProduct || updatedProduct,
-      product: gasResult?.updatedProduct || updatedProduct,
+      updatedProduct: backendResult?.updatedProduct || gasResult?.updatedProduct || updatedProduct,
+      product: backendResult?.updatedProduct || gasResult?.updatedProduct || updatedProduct,
       logEntry: finalLog
     };
   },
@@ -1433,12 +1567,8 @@ export const apiService = {
     try {
       const url = isUpdate ? `/api/products/${encodeURIComponent(product.id)}` : '/api/products';
       const method = isUpdate ? 'PUT' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(product)
-      });
-      if (res.ok) {
+      const res = await cfWrite('บันทึกสินค้าไม่สำเร็จ', url, jsonInit(method, product));
+      if (res && res.ok) {
         const saved = await res.json();
         const targetId = String(product.id || '').trim().toLowerCase();
         const targetCode = String(product.code || '').trim().toLowerCase();
@@ -1464,6 +1594,7 @@ export const apiService = {
         return saved;
       }
     } catch (e) {
+      if (isCloudflareMode()) throw cfReport(e, 'บันทึกสินค้าไม่สำเร็จ');
       console.warn('[apiService] saveProduct API error, falling back:', e.message);
     }
 
@@ -1524,8 +1655,9 @@ export const apiService = {
     }
 
     try {
-      await fetch(`/api/products/${encodeURIComponent(productId)}`, { method: 'DELETE' });
+      await cfWrite('ลบสินค้าไม่สำเร็จ', `/api/products/${encodeURIComponent(productId)}`, { method: 'DELETE' });
     } catch (e) {
+      if (isCloudflareMode()) throw e;
       console.warn('[apiService] Backend deleteProduct offline or failed:', e);
     }
     const currentProducts = storageService.getProducts();
@@ -1600,12 +1732,8 @@ export const apiService = {
     try {
       const url = isUpdate ? `/api/vendors/${encodeURIComponent(vendor.id)}` : '/api/vendors';
       const method = isUpdate ? 'PUT' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(vendor)
-      });
-      if (res.ok) {
+      const res = await cfWrite('บันทึกผู้ขายไม่สำเร็จ', url, jsonInit(method, vendor));
+      if (res && res.ok) {
         const saved = await res.json();
         const targetId = String(vendor.id || '').trim().toLowerCase();
         const targetCode = String(vendor.code || '').trim().toLowerCase();
@@ -1632,6 +1760,7 @@ export const apiService = {
         return saved;
       }
     } catch (e) {
+      if (isCloudflareMode()) throw cfReport(e, 'บันทึกผู้ขายไม่สำเร็จ');
       console.warn('[apiService] saveVendor API fallback:', e.message);
     }
 
@@ -1693,8 +1822,9 @@ export const apiService = {
     }
 
     try {
-      await fetch(`/api/vendors/${encodeURIComponent(vendorId)}`, { method: 'DELETE' });
+      await cfWrite('ลบผู้ขายไม่สำเร็จ', `/api/vendors/${encodeURIComponent(vendorId)}`, { method: 'DELETE' });
     } catch (e) {
+      if (isCloudflareMode()) throw e;
       console.warn('[apiService] Backend deleteVendor offline or failed:', e);
     }
     const currentVendors = storageService.getVendors();
@@ -1754,12 +1884,8 @@ export const apiService = {
     try {
       const url = isUpdate ? `/api/storage-locations/${location.id}` : '/api/storage-locations';
       const method = isUpdate ? 'PUT' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(location)
-      });
-      if (res.ok) {
+      const res = await cfWrite('บันทึกจุดจัดเก็บไม่สำเร็จ', url, jsonInit(method, location));
+      if (res && res.ok) {
         const saved = await res.json();
         const updatedList = isUpdate ? locations.map(l => l.id === location.id ? saved : l) : [saved, ...locations];
         storageService.saveStorageLocations(updatedList);
@@ -1776,6 +1902,7 @@ export const apiService = {
         return saved;
       }
     } catch (e) {
+      if (isCloudflareMode()) throw cfReport(e, 'บันทึกจุดจัดเก็บไม่สำเร็จ');
       console.warn('[apiService] saveStorageLocation API fallback:', e.message);
     }
 
@@ -1818,9 +1945,7 @@ export const apiService = {
       return true;
     }
 
-    try {
-      await fetch(`/api/storage-locations/${locationId}`, { method: 'DELETE' });
-    } catch (e) {}
+    await cfWrite('ลบจุดจัดเก็บไม่สำเร็จ', `/api/storage-locations/${locationId}`, { method: 'DELETE' });
     const locations = storageService.getStorageLocations();
     const loc = locations.find(l => l.id === locationId);
     storageService.deleteStorageLocation(locationId, options);
@@ -1880,12 +2005,8 @@ export const apiService = {
     try {
       const url = isUpdate ? `/api/usage-units/${unit.id}` : '/api/usage-units';
       const method = isUpdate ? 'PUT' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(unit)
-      });
-      if (res.ok) {
+      const res = await cfWrite('บันทึกหน่วยเบิกใช้งานไม่สำเร็จ', url, jsonInit(method, unit));
+      if (res && res.ok) {
         const saved = await res.json();
         const updatedList = isUpdate ? units.map(u => u.id === unit.id ? saved : u) : [...units, saved];
         storageService.saveUsageUnits(updatedList);
@@ -1902,6 +2023,7 @@ export const apiService = {
         return saved;
       }
     } catch (e) {
+      if (isCloudflareMode()) throw cfReport(e, 'บันทึกหน่วยเบิกใช้งานไม่สำเร็จ');
       console.warn('[apiService] saveUsageUnit API fallback:', e.message);
     }
 
@@ -1944,9 +2066,7 @@ export const apiService = {
       return true;
     }
 
-    try {
-      await fetch(`/api/usage-units/${unitId}`, { method: 'DELETE' });
-    } catch (e) {}
+    await cfWrite('ลบหน่วยเบิกใช้งานไม่สำเร็จ', `/api/usage-units/${unitId}`, { method: 'DELETE' });
     const units = storageService.getUsageUnits();
     const unit = units.find(u => u.id === unitId);
     storageService.deleteUsageUnit(unitId);
@@ -2008,15 +2128,12 @@ export const apiService = {
     try {
       const url = isUpdate ? `/api/users/${user.id}` : '/api/users';
       const method = isUpdate ? 'PUT' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(userPayload)
-      });
-      if (res.ok) {
+      const res = await cfWrite('บันทึกผู้ใช้ไม่สำเร็จ', url, jsonInit(method, userPayload));
+      if (res && res.ok) {
         const saved = await res.json();
         const updatedList = isUpdate ? users.map(u => u.id === user.id ? saved : u) : [...users, saved];
         storageService.saveUsers(updatedList);
+        syncActiveSessionWithUser(saved);
 
         auditService.logAction({
           action: isUpdate ? 'USER_UPDATED' : 'USER_CREATED',
@@ -2030,10 +2147,12 @@ export const apiService = {
         return saved;
       }
     } catch (e) {
+      if (isCloudflareMode()) throw cfReport(e, 'บันทึกผู้ใช้ไม่สำเร็จ');
       console.warn('[apiService] saveUser API fallback:', e.message);
     }
 
     const saved = storageService.saveUser(userPayload);
+    syncActiveSessionWithUser(saved);
 
     auditService.logAction({
       action: isUpdate ? 'USER_UPDATED' : 'USER_CREATED',
@@ -2055,9 +2174,7 @@ export const apiService = {
         console.warn('[apiService] GAS apiDeleteUser error:', e.message);
       }
     }
-    try {
-      await fetch(`/api/users/${userId}`, { method: 'DELETE' });
-    } catch (e) {}
+    await cfWrite('ลบผู้ใช้ไม่สำเร็จ', `/api/users/${userId}`, { method: 'DELETE' });
     const users = storageService.getUsers();
     const target = users.find(u => u.id === userId);
     storageService.deleteUser(userId);
@@ -2078,13 +2195,7 @@ export const apiService = {
 
   async saveDepartments(departments) {
     storageService.saveDepartments(departments);
-    try {
-      await fetch('/api/departments', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(departments)
-      });
-    } catch (e) {}
+    await cfWrite('บันทึกแผนกไม่สำเร็จ', '/api/departments', jsonInit('POST', departments));
   },
 
   async saveDepartment(deptPayload, actor = null) {
@@ -2097,12 +2208,8 @@ export const apiService = {
         ? `/api/departments/${deptPayload.id}` 
         : '/api/departments';
       const method = isUpdate ? 'PUT' : 'POST';
-      const res = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(deptPayload)
-      });
-      if (res.ok) {
+      const res = await cfWrite('บันทึกแผนกไม่สำเร็จ', url, jsonInit(method, deptPayload));
+      if (res && res.ok) {
         const saved = await res.json();
         const depts = storageService.getDepartments();
         const updated = isUpdate ? depts.map(d => d.id === saved.id ? saved : d) : [...depts, saved];
@@ -2120,6 +2227,7 @@ export const apiService = {
         return saved;
       }
     } catch (e) {
+      if (isCloudflareMode()) throw cfReport(e, 'บันทึกแผนกไม่สำเร็จ');
       console.warn('[apiService] saveDepartment API fallback:', e.message);
     }
 
@@ -2136,9 +2244,7 @@ export const apiService = {
   },
 
   async deleteDepartment(deptId, actor = null) {
-    try {
-      await fetch(`/api/departments/${deptId}`, { method: 'DELETE' });
-    } catch (e) {}
+    await cfWrite('ลบแผนกไม่สำเร็จ', `/api/departments/${deptId}`, { method: 'DELETE' });
     const depts = storageService.getDepartments();
     const target = depts.find(d => d.id === deptId || d.code === deptId);
     storageService.deleteDepartment(deptId);
@@ -2171,3 +2277,22 @@ export const apiService = {
     return { success: true, message: 'Simulated Drive Public Read Migration' };
   }
 };
+
+// Cloudflare mode: core write actions apply their change to local storage first (workflowEngine /
+// storageService) and then sync to the server. If the server call throws, roll local storage back
+// so nothing stays "committed" locally. In mock/gas modes withCfRollback is a plain pass-through.
+[
+  'createPR', 'updatePR', 'submitPR', 'updatePRStatus', 'rejectPR', 'editPRItems', 'cancelPR',
+  'cancelPO', 'acknowledgeOnlineTask', 'assignVendor', 'fileClaim', 'resolveClaim',
+  'updatePOStatus', 'updateActualPrice', 'updatePO', 'settlePO', 'receiveGoods', 'receiveAllGoods',
+  'shortClosePO', 'issueStock', 'adjustBudget',
+  'saveProduct', 'deleteProduct', 'saveVendor', 'deleteVendor', 'saveStorageLocation',
+  'deleteStorageLocation', 'saveUsageUnit', 'deleteUsageUnit', 'saveUser', 'deleteUser',
+  'saveDepartments', 'saveDepartment', 'deleteDepartment'
+].forEach((name) => {
+  const original = apiService[name];
+  if (typeof original !== 'function') return;
+  apiService[name] = function (...args) {
+    return withCfRollback(() => original.apply(this, args));
+  };
+});

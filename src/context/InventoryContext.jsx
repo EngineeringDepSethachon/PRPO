@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useMemo, useCallback } from 'react';
 import { useAppContext } from './AppContext';
 import { storageService } from '../services/storageService';
+import { isCloudflareMode } from '../config/backendMode';
+import { cfWrite } from '../services/cfGuard';
 import { apiService } from '../services/apiService';
 import { generateGRNNumber } from '../services/warehouseService';
 
@@ -121,25 +123,31 @@ export async function receiveToStock(items, options = {}) {
   });
 
   if (processedItems.length > 0) {
+    const cfSnapshot = isCloudflareMode() ? storageService.snapshotState() : null;
     storageService.saveProducts(products);
     storageService.saveStockLogs(stockLogs);
 
     // Atomic backend sync for both products and stock logs
     try {
       await Promise.all([
-        fetch('/api/products/batch', {
+        cfWrite('บันทึกสต็อกสินค้าไม่สำเร็จ', '/api/products/batch', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(products)
         }),
-        fetch('/api/stock-logs', {
+        cfWrite('บันทึกประวัติสต็อกไม่สำเร็จ', '/api/stock-logs', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(stockLogs)
         })
       ]);
-    } catch {
-      // Graceful offline fallback
+    } catch (syncErr) {
+      // Cloudflare: server rejected the stock intake -> undo the local commit and surface the error
+      if (isCloudflareMode()) {
+        if (cfSnapshot) storageService.restoreState(cfSnapshot);
+        throw syncErr;
+      }
+      // Graceful offline fallback (mock / gas)
     }
   }
 

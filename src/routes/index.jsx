@@ -8,6 +8,8 @@ import { InventoryProvider } from '../context/InventoryContext';
 import MainLayout from '../layouts/MainLayout';
 import LoginView from '../views/auth/LoginView';
 import ProtectedRoute from '../components/common/ProtectedRoute';
+import ChangePasswordModal from '../components/common/ChangePasswordModal';
+import { isCloudflareMode } from '../config/backendMode';
 
 // View Imports
 import DashboardView from '../views/DashboardView';
@@ -69,6 +71,11 @@ function DirectAppLayout() {
   // If user is not authenticated, redirect to /login
   if (!auth?.isAuthenticated && !auth?.currentUser) {
     return <Navigate to="/login" replace />;
+  }
+
+  // cloudflare mode : an account the admin created / reset must choose its own password first (the server refuses everything else until then)
+  if (isCloudflareMode() && auth?.currentUser?.mustChangePassword === true) {
+    return <ChangePasswordModal isOpen forced onLogout={auth.logout} />;
   }
 
   return <MainLayout />;

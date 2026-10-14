@@ -1,0 +1,53 @@
+{
+  "name": "prpo-pdqc-cloudflare",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "dev:pages": "npx wrangler pages dev dist",
+    "build": "vite build --mode cloudflare",
+    "build:cf": "vite build --mode cloudflare",
+    "preview": "vite preview",
+    "deploy": "npm run build &&npx wrangler pages deploy dist",
+    "db:create": "npx wrangler d1 create prpo-db",
+    "db:migrate": "npx wrangler d1 migrations apply prpo-db",
+    "db:migrate:local": "npx wrangler d1 migrations apply prpo-db --local",
+    "lint": "oxlint"
+  },
+  "dependencies": {
+    "@pdf-lib/fontkit": "^1.1.1",
+    "lucide-react": "^1.31.0",
+    "pdf-lib": "^1.17.1",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.3",
+    "recharts": "^3.10.1"
+  },
+  "devDependencies": {
+    "@google/clasp": "^2.4.2",
+    "@playwright/test": "^1.62.1",
+    "@tailwindcss/postcss": "^4.3.3",
+    "@testing-library/jest-dom": "^7.0.1",
+    "@testing-library/react": "^16.3.3",
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^6.0.4",
+    "autoprefixer": "^10.5.4",
+    "concurrently": "^9.2.4",
+    "cors": "^2.8.6",
+    "esbuild": "^0.28.2",
+    "express": "^4.22.2",
+    "jsdom": "^30.0.1",
+    "oxlint": "^1.75.0",
+    "postcss": "^8.5.26",
+    "rollup-plugin-visualizer": "^7.1.1",
+    "source-map-explorer": "^2.5.3",
+    "tailwindcss": "^3.4.19",
+    "terser": "^5.51.2",
+    "vite": "^8.2.0",
+    "vite-plugin-singlefile": "^2.3.3",
+    "vitest": "^4.1.10",
+    "wrangler": "^3.109.2"
+  }
+}

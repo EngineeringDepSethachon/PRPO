@@ -1,0 +1,4 @@
+id,timestamp,date,type,productId,productCode,productName,department,changeQty,qty,unit,unitCost,totalCost,balanceAfter,documentNo,poNumber,prNo,actorName,reason
+SL-1,2026-03-09T00:00:00Z,2026-03-09,IN,P-1,SKU-001,น้ำมัน,PD,10,10,ลิตร,24,240,10,GRN-PO-PD-2026-012-01,PO-PD-2026-012,PD001/2026,สมชาย,รับของ
+SL-2,2026-03-10T00:00:00Z,2026-03-10,OUT,P-1,SKU-001,น้ำมัน,PD,-3,3,ลิตร,24,72,7,ISS-1,,,สมชาย,
+SL-3,2026-03-10T00:00:00Z,2026-03-10,OUT,,,,PD,-3,3,,,,,,,,,

@@ -96,8 +96,8 @@ function handleApiRequest(fn, actionName, rawPayload, userContext) {
         username: rawUser.username || rawUser.employeeId || 'system',
         name: rawUser.name || rawUser.displayName || rawUser.employeeName || 'System User',
         department: rawUser.department || rawUser.dept || rawUser.primaryDepartment || payload.department || payload.dept || 'PD',
-        role: rawUser.role || rawUser.roleId || rawUser.canonicalRole || 'ADMIN',
-        canonicalRole: rawUser.canonicalRole || rawUser.role || rawUser.roleId || 'ADMIN',
+        role: rawUser.role || rawUser.roleId || rawUser.canonicalRole || 'GUEST',
+        canonicalRole: rawUser.canonicalRole || rawUser.role || rawUser.roleId || 'GUEST',
         isAdmin: !!(rawUser.isAdmin || rawUser.role === 'ADMIN' || rawUser.canonicalRole === 'ADMIN')
       };
       for (var k in rawUser) {
@@ -110,9 +110,9 @@ function handleApiRequest(fn, actionName, rawPayload, userContext) {
         username: 'system',
         name: 'System User',
         department: payload.department || payload.dept || 'PD',
-        role: 'ADMIN',
-        canonicalRole: 'ADMIN',
-        isAdmin: true
+        role: 'GUEST', // T4.5: no user context must NOT default to ADMIN
+        canonicalRole: 'GUEST',
+        isAdmin: false
       };
     }
 
@@ -213,23 +213,7 @@ function getUserProfile(email) {
     }
   }
 
-  return buildUserProfile({
-    id: 'USR-APP-SESSION',
-    employeeId: 'EMP-APP-001',
-    username: targetEmail ? targetEmail.split('@')[0] : 'webapp.user',
-    email: targetEmail || 'webapp@company.local',
-    name: targetEmail ? `User (${targetEmail.split('@')[0]})` : 'ผู้ใช้งานระบบ',
-    displayName: 'App User',
-    department: 'MGT',
-    primaryDepartment: 'MGT',
-    allowedDepartments: ['*'],
-    roleId: SYSTEM_ROLES.ADMIN,
-    canonicalRole: SYSTEM_ROLES.ADMIN,
-    level: 99,
-    status: 'ACTIVE',
-    isActive: true,
-    description: 'ผู้ใช้งานระบบผ่าน Web App'
-  });
+  throw new Error('AUTH_FAILED: ไม่พบบัญชีผู้ใช้งาน กรุณาติดต่อผู้ดูแลระบบ');
 }
 
 /**
@@ -264,36 +248,8 @@ function authenticateUserByPassword(username, password) {
     return uUser === cleanUser || uEmp === cleanUser || (uEmail && uEmail === cleanUser);
   });
 
-  const DEFAULT_INITIAL_PASSWORDS = ['123456', 'password123', 'admin123'];
-
   if (!matchedUser) {
-    const adminEmails = getAdminEmails();
-    const isBootstrapAdmin = cleanUser === 'admin' || adminEmails.some(e => e.toLowerCase() === cleanUser);
-    if (isBootstrapAdmin && DEFAULT_INITIAL_PASSWORDS.includes(cleanPass)) {
-      matchedUser = {
-        id: 'USR-0006',
-        employeeId: 'EMP-SYS-999',
-        username: 'admin',
-        email: adminEmails[0] || 'admin@company.com',
-        name: 'System Administrator (Bootstrap)',
-        displayName: 'System Admin',
-        department: 'MGT',
-        primaryDepartment: 'MGT',
-        departments: ['*'],
-        allowedDepartments: ['*'],
-        roleId: SYSTEM_ROLES.ADMIN,
-        canonicalRole: SYSTEM_ROLES.ADMIN,
-        level: 99,
-        status: 'ACTIVE',
-        isActive: true,
-        password: cleanPass
-      };
-      try {
-        upsertRecordById(SHEET_NAMES.USERS, 'id', matchedUser);
-      } catch (e) {}
-    } else {
-      throw new Error('AUTH_FAILED: ชื่อผู้ใช้งาน (Username) หรือรหัสผ่าน (Password) ไม่ถูกต้อง');
-    }
+    throw new Error('AUTH_FAILED: ชื่อผู้ใช้งาน (Username) หรือรหัสผ่าน (Password) ไม่ถูกต้อง');
   }
 
   const storedPass = String(matchedUser.password || '').trim();
@@ -301,15 +257,6 @@ function authenticateUserByPassword(username, password) {
 
   if (storedPass) {
     isPasswordValid = (storedPass === cleanPass);
-  } else {
-    if (DEFAULT_INITIAL_PASSWORDS.includes(cleanPass)) {
-      isPasswordValid = true;
-      try {
-        matchedUser.password = cleanPass;
-        matchedUser.updatedAt = new Date().toISOString();
-        upsertRecordById(SHEET_NAMES.USERS, 'id', matchedUser);
-      } catch (saveErr) {}
-    }
   }
 
   if (!isPasswordValid) {
@@ -467,6 +414,10 @@ function requireDepartment(targetDepartment) {
  */
 function apiGetCurrentUser(rawPayload, userContext) {
   return handleApiRequest(function(payload, user) {
+    // T4.5: no user context (no session yet) -> not logged in; never hand out a default identity
+    if (!user || user.canonicalRole === 'GUEST' || user.role === 'GUEST') {
+      return { success: false, error: 'ยังไม่ได้เข้าสู่ระบบ' };
+    }
     return {
       username: user.username,
       name: user.name,

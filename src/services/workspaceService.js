@@ -1,4 +1,52 @@
 import { workflowEngine } from './workflowEngine';
+import { hasDepartmentAccess } from '../utils/permissions';
+
+// WorkspaceView's own user matching (email / name / username only ; NOT the id) - kept exactly as the view had it
+const isWorkspaceUserMatched = (targetValue, currentUser) => {
+  if (!targetValue || !currentUser) return false;
+  const val = String(targetValue).trim().toLowerCase();
+  const email = String(currentUser.email || '').trim().toLowerCase();
+  const name = String(currentUser.name || '').trim().toLowerCase();
+  const username = String(currentUser.username || '').trim().toLowerCase();
+  return (email && val === email) || (name && val === name) || (username && val === username);
+};
+
+/**
+ * WorkspaceView RBAC pre-filter (moved here unchanged from the view so the server can be tested against the real function) :
+ * may `user` see document `doc` ({ ...pr|po, docType: 'PR' | 'PO' }) in the workspace?
+ */
+export const canSeeWorkspaceDocument = (doc, user) => {
+  if (!user) return false;
+  const roleId = String(user.roleId || user.id || '').toUpperCase();
+  const userLevel = Number(user.level || 1);
+
+  // Admin, Plant Manager, Central Purchaser sees ALL
+  const isAdminOrGlobal = roleId === 'ADMIN' || user.role === 'admin' || userLevel >= 99 ||
+                          roleId === 'PLANT_MANAGER' || userLevel >= 3 ||
+                          roleId === 'PURCHASER' || roleId === 'ONLINE_PURCHASER';
+  if (isAdminOrGlobal) return true;
+
+  // Reviewer / Approver (Asst. Manager) - sees ALL docs in their department(s)
+  const isReviewer = roleId === 'ASST_MANAGER' || roleId === 'REVIEWER' || userLevel === 2;
+  if (isReviewer) {
+    return hasDepartmentAccess(user, doc.department);
+  }
+
+  // Requester - sees ONLY docs they created, OR POs in their dept (since they receive goods)
+  const isCreator =
+    isWorkspaceUserMatched(doc.requestedBy, user) ||
+    isWorkspaceUserMatched(doc.applicantName1, user) ||
+    isWorkspaceUserMatched(doc.createdBy, user) ||
+    doc.requesterId === user.id;
+  if (isCreator) return true;
+
+  // Requesters can see POs in their department (for receiving goods)
+  if (doc.docType === 'PO' && hasDepartmentAccess(user, doc.department)) {
+    return true;
+  }
+
+  return false; // Not allowed to see this document (Data Leak Prevention)
+};
 
 /**
  * Workspace Service - Single Source of Truth for Workspace Task Routing & Lifecycle

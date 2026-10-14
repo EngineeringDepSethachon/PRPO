@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(node office/ask.js:*)",
+      "Bash(node:*)",
+      "Bash(npm:*)",
+      "Bash(npx:*)",
+      "Bash(ls:*)",
+      "Bash(mkdir:*)",
+      "Bash(git status:*)",
+      "Bash(git diff:*)",
+      "Bash(git log:*)","PowerShell(node office/ask.js:*)", "PowerShell(node office/consult.js:*)","PowerShell(node office/memo.js:*)","PowerShell(node:*)", "PowerShell(npm:*)", "PowerShell(npx:*)"
+    ],
+    "deny": [
+      "Bash(rm -rf:*)",
+      "Bash(git push:*)",
+      "Edit(/.claude/hooks/**)",
+      "PowerShell(Remove-Item:*)",
+      "PowerShell(git push:*)",
+      "Read(//**/.env*)",
+      "Read(//**/*.key)",
+      "Read(//**/ca-private/**)",
+      "Read(//**/mosquitto/certs*/**)",
+      "Edit(/office/*.json)",
+      "Edit(/office/memos.json)",
+      "Edit(/office/consults.json)"
+    ]
+  }
+}

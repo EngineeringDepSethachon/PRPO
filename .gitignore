@@ -32,8 +32,31 @@ blob-report
 .codex
 .agents
 
+# Fable Office — สถานะรันไทม์ (ห้าม commit)
+office/consults.json
+office/memos.json
+office/.session-*
+office/.token
+.claude/settings.local.json
+departments/*/.claude/settings.local.json
+
 # Google Apps Script & Clasp Deployment Security Guardrails
 .clasprc.json
 .clasp.json
 gas-deploy/
 dist-gas/
+
+# ข้อมูลจริงจาก Sheets / ไฟล์ import D1 (มีข้อมูลบุคคล ห้าม commit)
+sheets-export/
+/import/
+*.import.sql
+
+# Wrangler local state (D1 --local)
+.wrangler/
+
+# Secrets / local env (never commit)
+.env
+.env.*
+!.env.example
+.dev.vars*
+!.dev.vars.example

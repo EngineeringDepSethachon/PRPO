@@ -1,0 +1,47 @@
+name: CI (Lint, Test, Build)
+
+# The GitHub Pages deploy job was removed on 2026-10-13 : the frontend is served by Cloudflare Pages (see docs/DEPLOY_CLOUDFLARE.md).
+# This workflow only checks every push ; it never deploys.
+
+on:
+  push:
+    branches:
+      - main
+      - uat
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Lint, Test, Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: 'npm'
+
+      - name: Install Dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Test
+        run: npm test
+
+      - name: Build Frontend
+        run: npm run build
+
+      - name: Verify Cloudflare Build (no deploy)
+        run: npm run build:cf

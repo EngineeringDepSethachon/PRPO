@@ -1,0 +1,16 @@
+# ====================================================================
+# Cloudflare Pages + D1 Database Configuration
+# Project: PRPO_PDQC System
+# ====================================================================
+
+name = "prpo-pdqc"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare D1 SQL Database Binding
+[[d1_databases]]
+binding = "DB"
+database_name = "prpo-db"
+database_id = "c64022bb-88eb-485f-94f7-dd9e9617e44c"
+migrations_dir = "../migrations"

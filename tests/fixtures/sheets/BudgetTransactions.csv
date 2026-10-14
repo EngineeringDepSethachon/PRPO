@@ -1,0 +1,2 @@
+id,date,createdAt,transactionId,period,type,actionType,dept,amount,refundAmount,creditAmount,docType,docNo,poNumber,actorName,actorRole,note,timestamp
+TX-1,2026-09-01,2026-09-01T00:00:00Z,TXN-DOC-77-BUDGET_ROLLBACK,2026-09,BUDGET_ROLLBACK,BUDGET_ROLLBACK,PD,5,123.45,6.5,PO,DOC-77,PO-PD-2026-077,Somchai,FINANCE,note,2026-09-01T00:00:00Z

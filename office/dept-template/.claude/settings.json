@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(node \"{{ASK_PATH}}\":*)",
+      "PowerShell(node \"{{CONSULT_PATH}}\":*)",
+      "PowerShell(node \"{{MEMO_PATH}}\":*)"
+    ],
+    "deny": [
+      "Edit(/.claude/**)",
+      "Edit(/CLAUDE.md)",
+      "Bash(rm:*)",
+      "Bash(rm -rf:*)",
+      "Bash(git push:*)",
+      "PowerShell(Remove-Item:*)",
+      "PowerShell(rm:*)",
+      "PowerShell(del:*)",
+      "PowerShell(git push:*)",
+      "Read(//**/.env*)",
+      "Read(//**/*.key)",
+      "Read(//**/ca-private/**)",
+      "Read(//**/mosquitto/certs*/**)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit|NotebookEdit|WebFetch|WebSearch",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"{{GUARD_PATH}}\""
+          }
+        ]
+      }
+    ]
+  }
+}

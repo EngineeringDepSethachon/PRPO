@@ -1,0 +1,5 @@
+id,prNo,department,requestedBy,requesterSignature,status,items,subtotal,totalAmount,createdAt,updatedAt,reviewedBy,reviewedAt,approvedBy,approvedAt,poNumber,note,budgetPeriod,committedAmount,actualPaidAmount,paymentStatus
+PR-1,PD001/2026,PD,test.pd,,PO_ISSUED,"[{""name"":""น้ำมัน 5'L"",""qty"":2,""price"":100}]",200,200,2026-03-01T00:00:00Z,2026-03-02T00:00:00Z,boss,2026-03-01T01:00:00Z,boss2,2026-03-01T02:00:00Z,"PO-PD-2026-001, PO-PD-2026-002","หมายเหตุ it's
+สองบรรทัด",2026-03,200,0,UNPAID
+PR-2,QC007/2026,QC,test.default,,DRAFT,,,50,2026-03-05T00:00:00Z,2026-03-05T00:00:00Z,,,,,,,,,,
+PR-3,PD002/2025,PD,test.pd,,DRAFT,not-json,,0,2025-03-05T00:00:00Z,2025-03-05T00:00:00Z,,,,,PO-PD-2025-004,,,,,

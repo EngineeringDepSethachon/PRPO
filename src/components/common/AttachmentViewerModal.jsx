@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ZoomIn, ZoomOut, RotateCw, Download, ExternalLink, FileText, Image as ImageIcon, Globe, ShieldCheck } from 'lucide-react';
+import { useProxiedFileUrl, openProxiedFile } from '../../utils/cfAttachments';
 import { extractDriveFileId, isDriveUrl, getDriveDisplayUrl } from '../../services/driveService';
 
 export default function AttachmentViewerModal({ file, url, title, onClose }) {
   const [zoom, setZoom] = useState(1);
   const [rotation, setRotation] = useState(0);
+  // cloudflare mode : a Drive file is read through GET /api/files/:id (blob: URL) instead of the public Drive preview ; 'off' in other modes
+  const proxied = useProxiedFileUrl(file && typeof file === 'object' ? file : (url ? { url } : null));
 
   if (!file && !url) return null;
 
@@ -33,14 +36,29 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
                   (!isPdf && !isShoppingStore && (targetUrl.startsWith('blob:') || targetUrl.startsWith('data:image/'))) ||
                   (isDrive && !isPdf);
 
+  // only what this modal can draw (image / PDF) goes through the proxy ; other Drive files keep the Drive preview
+  const knownMime = String(file?.mimeType || file?.type || '');
+  const useProxy = Boolean(proxied.url) && (isPdf || (isImage && (knownMime.startsWith('image/') || /\.(jpe?g|png|gif|webp)($|\?)/i.test(fileName)
+    || (!knownMime && !/\.[a-z0-9]{2,5}$/i.test(fileName)))));
+  // cloudflare mode : the proxy has the file but this modal cannot draw it (docx, xlsx ...) -> offer it through the proxy, never the Drive preview
+  const proxyOnlyFile = Boolean(proxied.fileId) && proxied.state === 'ready' && !useProxy;
+
   // Resolved URLs
-  const resolvedImageSrc = isDrive
+  const resolvedImageSrc = useProxy ? proxied.url : isDrive
     ? getDriveDisplayUrl(driveId || targetUrl, { type: 'image', size: 'w1600' })
     : targetUrl;
 
-  const resolvedPdfSrc = isDrive
+  const resolvedPdfSrc = useProxy ? proxied.url : isDrive
     ? getDriveDisplayUrl(driveId || targetUrl, { type: 'pdf' })
     : targetUrl;
+
+  const handleProxiedDownload = (e) => {
+    if (!proxied.fileId) return;
+    e.preventDefault();
+    openProxiedFile(file && typeof file === 'object' ? file : { url }, { download: true }).then((ok) => {
+      if (!ok) window.open(downloadHref, '_blank', 'noopener,noreferrer');
+    });
+  };
 
   const downloadHref = isDrive
     ? getDriveDisplayUrl(driveId || targetUrl, { type: 'download' })
@@ -84,7 +102,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
 
           {/* Controls */}
           <div className="flex items-center gap-2">
-            {isImage && (!isDrive || targetUrl.startsWith('blob:') || targetUrl.startsWith('data:')) && (
+            {isImage && (!isDrive || useProxy || targetUrl.startsWith('blob:') || targetUrl.startsWith('data:')) && (
               <div className="hidden sm:flex items-center gap-1 bg-slate-700/60 p-1 rounded-lg border border-slate-600">
                 <button
                   type="button"
@@ -127,6 +145,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
                 target="_blank"
                 rel="noopener noreferrer"
                 download={!isOnlineUrl ? fileName : undefined}
+                onClick={handleProxiedDownload}
                 className="p-2 hover:bg-slate-700 bg-slate-800 border border-slate-600 rounded-lg transition-colors text-slate-300 hover:text-white"
                 title={isShoppingStore ? 'เปิดลิงก์ในแท็บใหม่' : 'ดาวน์โหลด / เปิดไฟล์'}
               >
@@ -147,8 +166,22 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
 
         {/* Modal Content / Preview Area */}
         <div className="flex-1 overflow-auto p-4 sm:p-6 flex items-center justify-center min-h-[360px] max-h-[calc(92vh-140px)] bg-slate-950/60">
-          {isImage ? (
-            (isDrive && driveId && !targetUrl.startsWith('blob:') && !targetUrl.startsWith('data:')) ? (
+          {proxied.state === 'loading' ? (
+            <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
+          ) : proxyOnlyFile ? (
+            <div className="text-center p-8 space-y-3">
+              <FileText className="w-12 h-12 text-slate-500 mx-auto" />
+              <p className="text-sm text-slate-400">ไฟล์เอกสาร: <span className="text-white font-semibold">{fileName}</span></p>
+              <button
+                type="button"
+                onClick={() => openProxiedFile(file && typeof file === 'object' ? file : { url }, { download: true })}
+                className="inline-flex items-center gap-2 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold rounded-lg border border-slate-600 transition-colors"
+              >
+                <ExternalLink className="w-4 h-4" /> เปิดไฟล์
+              </button>
+            </div>
+          ) : isImage ? (
+            (isDrive && driveId && !useProxy && !targetUrl.startsWith('blob:') && !targetUrl.startsWith('data:')) ? (
               <div className="w-full h-[64vh] flex flex-col bg-slate-900 rounded-lg border border-slate-700 overflow-hidden shadow-inner">
                 <iframe
                   src={`https://drive.google.com/file/d/${driveId}/preview`}
@@ -173,7 +206,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
             )
           ) : isPdf ? (
             <div className="w-full h-[64vh] flex flex-col bg-slate-900/90 rounded-lg border border-slate-700 overflow-hidden shadow-inner">
-              {isDrive ? (
+              {isDrive || useProxy ? (
                 <iframe
                   src={resolvedPdfSrc}
                   title={fileName}

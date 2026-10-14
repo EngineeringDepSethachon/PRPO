@@ -1,0 +1,3 @@
+id,code,name,isActive,createdAt
+DEPT-PD,PD,ฝ่ายผลิต,TRUE,2026-01-01T00:00:00.000Z
+DEPT-QC,QC,ฝ่ายควบคุมคุณภาพ,TRUE,2026-01-01T00:00:00.000Z

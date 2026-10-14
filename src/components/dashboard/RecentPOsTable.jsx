@@ -1,5 +1,6 @@
 import React from 'react';
 import { PO_STATUS } from '../../config/constants';
+import { getCompletedPOStatus } from '../../utils/poCompletedStatus';
 import { ShoppingCart, Store, Building2, ChevronRight, ArrowRight, Eye } from 'lucide-react';
 
 export default function RecentPOsTable({ pos = [], onNavigate, onOpenPO }) {
@@ -52,7 +53,7 @@ export default function RecentPOsTable({ pos = [], onNavigate, onOpenPO }) {
       ) : (
         <div className="space-y-2">
           {recentPOs.map((po) => {
-            const statusInfo = PO_STATUS[po.status] || {
+            const statusInfo = PO_STATUS[po.status] || getCompletedPOStatus(po.status) || {
               label: po.status,
               color: 'bg-slate-100 text-slate-700 border-slate-200'
             };

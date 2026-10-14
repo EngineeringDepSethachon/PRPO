@@ -12,6 +12,8 @@ import { authService } from '../../services/authService';
 import { modalService } from '../../services/modalService';
 import { apiService } from '../../services/apiService';
 import { storageService, isGAS, callGAS } from '../../services/storageService';
+import { isCloudflareMode } from '../../config/backendMode';
+import { attachmentsForServer, registerBlobUrl } from '../../utils/attachmentUrls';
 import { generateGRNNumber } from '../../services/warehouseService';
 import { formatLocalTimestamp } from '../../services/inventoryService';
 import { getValidConversionRate, toStockQuantity, toStockUnitCost } from '../../utils/uomEngine.js';
@@ -456,12 +458,13 @@ export default function ReceivingModal({
 
     try {
       const processed = [];
+      let failedUpload = null;
       for (const file of files) {
         // Create local object URL for instant, reliable browser preview
         let localPreview = '';
         if (typeof window !== 'undefined' && window.URL && file.type?.startsWith('image/')) {
           try {
-            localPreview = URL.createObjectURL(file);
+            localPreview = registerBlobUrl(URL.createObjectURL(file));
           } catch (e) {
             console.warn('[ReceivingModal] Could not create ObjectURL:', e);
           }
@@ -491,6 +494,13 @@ export default function ReceivingModal({
             uploadedAt: new Date().toLocaleString('th-TH')
           });
         } catch (uploadErr) {
+          // Cloudflare: an attachment that never reached Drive must not look uploaded.
+          // Stop here, but keep the files of this batch that already reached Drive (added to state below) and report the error.
+          if (isCloudflareMode()) {
+            if (localPreview) { try { URL.revokeObjectURL(localPreview); } catch (_) { /* ignore */ } }
+            failedUpload = uploadErr;
+            break;
+          }
           console.warn('[ReceivingModal] Drive upload fallback to local preview:', uploadErr.message);
           let base64 = '';
           try {
@@ -515,7 +525,8 @@ export default function ReceivingModal({
           });
         }
       }
-      setAttachments(prev => [...prev, ...processed]);
+      if (processed.length > 0) setAttachments(prev => [...prev, ...processed]);
+      if (failedUpload) modalService.error('อัปโหลดไฟล์ล้มเหลว', `${failedUpload.message}${processed.length > 0 ? ` (อัปโหลดสำเร็จแล้ว ${processed.length} ไฟล์ก่อนหน้า)` : ''}`);
     } catch (err) {
       modalService.error('อัปโหลดไฟล์ล้มเหลว', err.message);
     } finally {
@@ -533,6 +544,8 @@ export default function ReceivingModal({
   // Main Confirm Receiving Handler
   const handleConfirmReceiving = async () => {
     if (isSubmitting) return;
+    // what is sent to the server / stored : no blob: URLs (cloudflare mode keeps only the Drive fileUrl)
+    const serverAttachments = attachmentsForServer(attachments) || [];
 
     // Double-Receipt Guard: ห้ามรับของซ้ำหาก PO อยู่ในสถานะเสร็จสิ้นแล้วโดยเด็ดขาด
     const isAlreadyClosed = TERMINAL_RECEIVE_STATUSES.includes(String(targetPO?.status || '').toUpperCase());
@@ -611,8 +624,12 @@ export default function ReceivingModal({
     if (!confirmed) return;
 
     setIsSubmitting(true);
+    // Cloudflare mode: remember local state so a failed server save can be rolled back
+    const cfSnapshot = isCloudflareMode() ? storageService.snapshotState() : null;
 
     try {
+      // Cloudflare: replay a stock call of an earlier receipt that failed after its PO was saved (same GRN number, idempotent)
+      if (isCloudflareMode()) await apiService.flushPendingReceiveStock().catch(() => {});
       // ดึงข้อมูลผู้ใช้งานปัจจุบันอย่างปลอดภัย
       const currentUser = activeUser;
       
@@ -681,7 +698,7 @@ export default function ReceivingModal({
          inspectorName: currentUser?.name || receiverName,
          inspectedAt: receivedAtIso,
          notes: grnNote.trim(),
-         attachments: attachments || []
+         attachments: serverAttachments
       } : null;
 
       const grnPayload = {
@@ -708,7 +725,7 @@ export default function ReceivingModal({
           canonicalRole: actorRole
         },
         note: grnNote.trim(),
-        attachments,
+        attachments: serverAttachments,
         claimEvidence,
         statusOverride,
         waitingRound2: summary.hasSplitShipment,
@@ -739,6 +756,7 @@ export default function ReceivingModal({
 
       // 5. Call receiveToStock / submitGRN and emit enterprise stockMovements with Dual-UOM (Strictly good goods only)
       const stockItemsToReceive = computedItems
+        .map((row, rowIdx) => ({ ...row, lineIndex: rowIdx })) // position of the line in the PO (the same product can be on several lines)
         .filter(it => Number(it.acceptedQty || 0) > 0 && !it.isRowLocked)
         .map(it => {
           const uom = storageService?.getUomConversion ? storageService.getUomConversion(it.code || it.productId || it.id) : null;
@@ -756,6 +774,7 @@ export default function ReceivingModal({
           const totalVal = baseStockQty * baseUnitCost;
 
           return {
+            lineIndex: it.lineIndex,
             productId: it.productId || it.id,
             id: it.id || it.productId,
             code: it.code,
@@ -787,7 +806,9 @@ export default function ReceivingModal({
           };
         });
 
-      if (stockItemsToReceive.length > 0) {
+      // Cloudflare: the server owns stock and the stock call is made AFTER the PO is saved (step 8 : the server only adds stock for a GRN that is on
+      // the PO already), see runCfStock below. Nothing is logged or posted from here in that mode.
+      if (stockItemsToReceive.length > 0 && !isCloudflareMode()) {
         // Single SSOT Pipeline: logStockMovements is the canonical Dual-UOM stock intake path.
         // It updates stockBalance, enforces deduplication by (documentNo + productCode),
         // and persists atomically to storage and backend.
@@ -1045,8 +1066,8 @@ export default function ReceivingModal({
           reportedAt: timestamp,
           disputeItems,
           items: disputeItems,
-          attachments: attachments || [],
-          defectImages: attachments || []
+          attachments: serverAttachments,
+          defectImages: serverAttachments
         };
 
         // Reset storeClaims for stores associated with disputed items in this round
@@ -1071,7 +1092,7 @@ export default function ReceivingModal({
             reportedAt: timestamp,
             reportedBy: actorName || currentUser?.name || 'Warehouse Inspector',
             defectNote: dItem.description || '',
-            attachments: attachments || []
+            attachments: serverAttachments
           };
           
           if (storeGroupKey) currentStoreClaims[storeGroupKey] = resetClaimEntry;
@@ -1098,7 +1119,9 @@ export default function ReceivingModal({
 
         try {
           await apiService.fileClaim(targetPO.id, claimData, currentUser);
-        } catch {
+        } catch (claimErr) {
+          // Cloudflare: do not report success when the server rejected the claim
+          if (isCloudflareMode()) throw claimErr;
           // Backend offline fallback
         }
       } else if (summary.hasSplitShipment && !isCompleteReceipt) {
@@ -1128,8 +1151,27 @@ export default function ReceivingModal({
 
       try {
         await apiService.updatePO(targetPO.id, finalTargetPO, activeUser);
-      } catch {
+      } catch (savePoErr) {
+        // Cloudflare: do not report success when the server rejected the PO save
+        if (isCloudflareMode()) throw savePoErr;
         // Backend offline fallback
+      }
+
+      if (stockItemsToReceive.length > 0 && isCloudflareMode()) {
+        // One request adds currentStock, moves the moving average cost and writes ONE IN log per line for this GRN number (idempotent on the server).
+        // It follows the PO save above. If it fails (network) the request is kept as pending and is replayed with the SAME GRN number the next
+        // time this screen is used, so the receipt is never lost and never added twice.
+        const stockResult = await apiService.receiveStock(
+          targetPO.id,
+          grnNumber,
+          stockItemsToReceive.map(it => ({ lineIndex: it.lineIndex, productId: it.productId, code: it.code, goodQty: it.goodQty, defectiveQty: 0 }))
+        );
+        if (appContext?.setStockLogs && Array.isArray(stockResult?.stockLogs) && stockResult.stockLogs.length) {
+          appContext.setStockLogs(prev => {
+            const have = new Set((prev || []).map(l => l.id));
+            return [...stockResult.stockLogs.filter(l => !have.has(l.id)), ...(prev || [])];
+          });
+        }
       }
 
       if (isGAS()) {
@@ -1192,7 +1234,11 @@ export default function ReceivingModal({
       if (onClose) onClose();
 
     } catch (err) {
-      modalService.error('เกิดข้อผิดพลาดในการตรวจรับสินค้า', err.message);
+      if (cfSnapshot) {
+        storageService.restoreState(cfSnapshot);
+        if (appContext?.loadAllData) appContext.loadAllData(true);
+      }
+      if (!err?.cfReported) modalService.error('เกิดข้อผิดพลาดในการตรวจรับสินค้า', err.message);
     } finally {
       setIsSubmitting(false);
     }

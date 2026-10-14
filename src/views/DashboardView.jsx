@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import KPICards from '../components/dashboard/KPICards';
 import DashboardSkeleton from '../components/dashboard/DashboardSkeleton';
-import { matchDepartment } from '../utils/permissions';
+import { matchDepartment, isDashboardMultiDeptUser } from '../utils/permissions';
 
 export default function DashboardView({
   prs = [],
@@ -32,16 +32,7 @@ export default function DashboardView({
   }, [effectiveUser]);
 
   const userRoleStr = String(effectiveUser?.role || effectiveUser?.roleId || '').toUpperCase();
-  const isMultiDeptUser = useMemo(() => {
-    return (
-      userDepts.length > 1 ||
-      ['ADMIN', 'ASST_MANAGER', 'PLANT_MANAGER', 'MANAGER'].includes(userRoleStr) ||
-      userDepts.includes('ALL') ||
-      userDepts.includes('BOTH') ||
-      userDepts.includes('*') ||
-      Boolean(effectiveUser?.canViewAllDepts)
-    );
-  }, [userDepts, userRoleStr, effectiveUser]);
+  const isMultiDeptUser = useMemo(() => isDashboardMultiDeptUser(effectiveUser), [effectiveUser]);
 
   // กำหนดค่าเริ่มต้นตัวกรองแผนก (ผู้บริหาร/Multi-Dept เริ่มที่ 'ALL', ผู้ใช้แผนกเดียวเริ่มที่แผนกตนเอง)
   const defaultDept = initialDeptFilter || (isMultiDeptUser ? 'ALL' : (effectiveUser?.department || userDepts[0] || 'PD'));

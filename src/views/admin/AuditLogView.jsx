@@ -13,6 +13,8 @@ import {
   seedInitialAuditLogs
 } from '../../services/auditLogger';
 import Pagination from '../../components/common/Pagination';
+import { apiService } from '../../services/apiService';
+import { isCloudflareMode } from '../../config/backendMode';
 import { modalService } from '../../services/modalService';
 import { clearMockTransactions, resetMockTransactions } from '../../utils/dataResetHelper';
 import { formatLocalTimestamp } from '../../utils/timeUtils';
@@ -76,7 +78,20 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
   const [isDiffModalOpen, setIsDiffModalOpen] = useState(false);
 
   // Load audit logs
-  const loadLogs = () => {
+  const loadLogs = async () => {
+    // cloudflare : rows come from the server only (apiService). auditLogger would seed sample rows and read localStorage, so it is not called here.
+    if (isCloudflareMode()) {
+      setIsLoading(true);
+      try {
+        const data = await apiService.getAuditLogs({}, true);
+        if (data) setLogs(data); // null = session changed while loading -> keep the current list
+      } catch (err) {
+        console.error('Failed to load audit logs:', err);
+      } finally {
+        setIsLoading(false);
+      }
+      return;
+    }
     setIsLoading(true);
     try {
       const data = getAuditLogs();

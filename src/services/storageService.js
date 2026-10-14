@@ -4,23 +4,15 @@ import { DEFAULT_EMPLOYEE_ACCOUNTS } from './authService.js';
 import { modalService } from './modalService.js';
 import { normalizePR, normalizePO } from '../utils/dataNormalizer.js';
 import { matchDepartment } from '../utils/permissions.js';
+import { isGASMode, isCloudflareMode, backendFetch, readStoredSession, sessionOwnerKey } from '../config/backendMode.js';
+const fetch = (input, init) => backendFetch(input, init);
 const DATA_VERSION = 'prpo_clean_v16_empty_state';
 const API_URL = '/api/storage';
 
 /**
  * Environment detection: Checks if running inside Google Apps Script Web App
  */
-export const isGAS = () => {
-  if (typeof import.meta !== 'undefined' && import.meta.env?.VITE_USE_GAS === 'true') {
-    return true;
-  }
-  return (
-    typeof window !== 'undefined' &&
-    typeof window.google !== 'undefined' &&
-    typeof window.google.script !== 'undefined' &&
-    typeof window.google.script.run !== 'undefined'
-  );
-};
+export const isGAS = () => isGASMode();
 
 /**
  * Recursively strips non-serializable Browser objects (File, Blob, ArrayBuffer)
@@ -237,8 +229,14 @@ let _apiReady = false;
 const _resultCache = new Map();
 const _dirtyKeys = new Set();
 
+// Sample catalogue (mockData / INITIAL_* constants) must never be served in GAS (Google Sheet is SSOT)
+// nor in cloudflare mode (D1 via the bootstrap route is SSOT). Only mock mode seeds sample data.
+const noSampleSeed = () => isGAS() || isCloudflareMode();
+
 const _syncApi = async () => {
   if (isGAS()) return;
+  // cloudflare mode: the state blob endpoint belongs to the mock backend only ; D1 routes persist data instead
+  if (isCloudflareMode()) return;
   if (!_apiReady) return;
   try {
     await fetch(API_URL, {
@@ -251,8 +249,49 @@ const _syncApi = async () => {
   }
 };
 
+const CF_SNAPSHOT_KEYS = Object.entries(STORAGE_KEYS)
+  .filter(([name]) => name !== 'CURRENT_ROLE')
+  .map(([, key]) => key)
+  .concat(['prpo_notifications', 'prpo_in_app_notifications', 'prpo_registered_users', 'prpo_budgets']);
+
+const CF_CACHE_MARKER_KEY = 'prpo_cf_cache_ver';
+const CF_CACHE_MARKER = 'cf1-no-sample';
+const CF_CACHE_OWNER_KEY = 'prpo_cf_cache_owner';
+
+const _clientDataKeys = () => Object.values(STORAGE_KEYS).concat([
+  'prpo_notifications', 'prpo_in_app_notifications',
+  'prpo_audit_logs', 'prpo_budget_transactions', 'prpo_summary_stats',
+  'prpo_registered_users', 'prpo_users_cache', 'prpo_budgets'
+]);
+
+const _removeClientDataKeys = () => {
+  _clientDataKeys().forEach(k => {
+    try { if (typeof sessionStorage !== 'undefined') sessionStorage.removeItem(k); } catch (e) {}
+    try { if (typeof localStorage !== 'undefined') localStorage.removeItem(k); } catch (e) {}
+  });
+};
+
 const _migrateLocalStorageCache = () => {
   if (typeof localStorage === 'undefined') return;
+  // cloudflare mode: never seed/reset sample data. Drop any sample catalogue cached by an older build once ; real data arrives via the bootstrap route
+  if (isCloudflareMode()) {
+    try {
+      if (localStorage.getItem(CF_CACHE_MARKER_KEY) !== CF_CACHE_MARKER) {
+        _removeClientDataKeys();
+        localStorage.removeItem('prpo_data_version');
+        localStorage.removeItem('app_data_cleared');
+        localStorage.setItem(CF_CACHE_MARKER_KEY, CF_CACHE_MARKER);
+      }
+      // cached data must belong to the signed-in user : no session, or cache of another user id -> drop it before anything renders
+      const sess = readStoredSession();
+      const sessId = sessionOwnerKey(sess);
+      if (localStorage.getItem(CF_CACHE_OWNER_KEY) !== sessId || !sessId) {
+        _removeClientDataKeys();
+        localStorage.removeItem(CF_CACHE_OWNER_KEY);
+      }
+    } catch (e) {}
+    return;
+  }
   try {
     // Always purge dummy blacklisted products & stock logs from local storage
     const storedProds = localStorage.getItem(STORAGE_KEYS.PRODUCTS);
@@ -381,7 +420,7 @@ const _setItem = (key, value, syncWithBackend = false) => {
   }
 };
 
-const isDataCleared = () => typeof localStorage !== 'undefined' && localStorage.getItem('app_data_cleared') === 'true';
+const isDataCleared = () => isCloudflareMode() || typeof localStorage !== 'undefined' && localStorage.getItem('app_data_cleared') === 'true';
 
 export const storageService = {
   // Fast hydration from sessionStorage / localStorage (instant 0ms client startup)
@@ -492,6 +531,12 @@ export const storageService = {
     this.hydrateFromClientStorage();
     _migrateLocalStorageCache();
 
+    // cloudflare mode: no state-blob endpoint ; data is loaded through apiService.getBootstrapData
+    if (isCloudflareMode()) {
+      _apiReady = true;
+      return;
+    }
+
     if (isGAS()) {
       const hasCachedData = Boolean(
         (_cache[STORAGE_KEYS.PRODUCTS]?.length > 0) ||
@@ -568,8 +613,68 @@ export const storageService = {
     });
   },
 
+  // cloudflare mode (logout): drop the previous user's real data from memory + browser storage so the next person never sees it
+  clearCloudflareDataCache() {
+    if (!isCloudflareMode()) return;
+    this.invalidateAllClientCache();
+    try { delete _cache[STORAGE_KEYS.CURRENT_ROLE]; sessionStorage.removeItem(STORAGE_KEYS.CURRENT_ROLE); localStorage.removeItem(STORAGE_KEYS.CURRENT_ROLE); } catch (e) {}
+    _removeClientDataKeys(); // also keys invalidateAllClientCache does not list (prpo_budgets)
+    try {
+      // per-user "read notifications" lists must not outlive the session either
+      const stale = [];
+      for (let i = 0; i < localStorage.length; i += 1) {
+        const k = localStorage.key(i);
+        if (k && k.startsWith('prpo_read_notifications_')) stale.push(k);
+      }
+      stale.forEach(k => localStorage.removeItem(k));
+    } catch (e) {}
+    try { localStorage.removeItem(CF_CACHE_OWNER_KEY); } catch (e) {}
+    this.hydrateFromClientStorage();
+  },
+
+  // cloudflare mode : which user id the cached real data belongs to
+  getCloudflareCacheOwner() {
+    try { return localStorage.getItem(CF_CACHE_OWNER_KEY) || ''; } catch (e) { return ''; }
+  },
+  setCloudflareCacheOwner(userId) {
+    if (!isCloudflareMode() || !userId) return;
+    try { localStorage.setItem(CF_CACHE_OWNER_KEY, String(userId)); } catch (e) {}
+  },
+
+  // Cloudflare mode: capture transactional/master data so a failed backend write can be
+  // rolled back (nothing may stay "committed" locally when the server rejected it).
+  snapshotState() {
+    const snap = { local: {}, session: {} };
+    CF_SNAPSHOT_KEYS.forEach(k => {
+      try { if (typeof localStorage !== 'undefined') snap.local[k] = localStorage.getItem(k); } catch (e) {}
+      try { if (typeof sessionStorage !== 'undefined') snap.session[k] = sessionStorage.getItem(k); } catch (e) {}
+    });
+    return snap;
+  },
+  restoreState(snap) {
+    if (!snap) return;
+    CF_SNAPSHOT_KEYS.forEach(k => {
+      try {
+        if (typeof localStorage !== 'undefined') {
+          if (snap.local[k] === null || snap.local[k] === undefined) localStorage.removeItem(k);
+          else localStorage.setItem(k, snap.local[k]);
+        }
+      } catch (e) {}
+      try {
+        if (typeof sessionStorage !== 'undefined') {
+          if (snap.session[k] === null || snap.session[k] === undefined) sessionStorage.removeItem(k);
+          else sessionStorage.setItem(k, snap.session[k]);
+        }
+      } catch (e) {}
+      delete _cache[k];
+      _resultCache.delete(k);
+      _dirtyKeys.add(k);
+    });
+  },
+
   // Reset local browser cache only (Strictly NEVER overwrites server SSOT files)
   resetData() {
+    if (isCloudflareMode()) { this.clearCloudflareDataCache(); return; }
     if (typeof localStorage !== 'undefined') {
       localStorage.setItem('prpo_data_version', DATA_VERSION);
     }
@@ -612,6 +717,11 @@ export const storageService = {
     return data || ROLES.REQUESTER_PD;
   },
   setCurrentRole(role) {
+    // cloudflare : the bearer token lives only in the auth session ; never duplicate it into prpo_current_role (nothing reads a token from here)
+    if (isCloudflareMode() && role && typeof role === 'object' && 'token' in role) {
+      const { token: _token, ...rest } = role;
+      role = rest;
+    }
     _setItem(STORAGE_KEYS.CURRENT_ROLE, role);
   },
 
@@ -656,7 +766,7 @@ export const storageService = {
       } catch (e) {}
     }
 
-    const inGAS = isGAS();
+    const inGAS = noSampleSeed();
     // In GAS Production mode: Google Sheet is SSOT 100% - Never fallback to initialProducts when empty
     const products = data !== null && data !== undefined
       ? data
@@ -877,7 +987,7 @@ export const storageService = {
   getStorageLocations() {
     const data = _getItem(STORAGE_KEYS.STORAGE_LOCATIONS);
     if (!data) {
-      if (isGAS()) {
+      if (noSampleSeed()) {
         return [];
       }
       this.saveStorageLocations(initialStorageLocations);
@@ -894,7 +1004,7 @@ export const storageService = {
     const data = _getItem(STORAGE_KEYS.USAGE_UNITS);
     let list;
     if (!data) {
-      if (isGAS()) {
+      if (noSampleSeed()) {
         list = [];
       } else {
         this.saveUsageUnits(INITIAL_USAGE_UNITS);
@@ -952,7 +1062,7 @@ export const storageService = {
   getDepartments() {
     const data = _getItem(STORAGE_KEYS.DEPARTMENTS);
     if (!data || !Array.isArray(data) || data.length === 0) {
-      if (isGAS()) {
+      if (noSampleSeed()) {
         return [];
       }
       this.saveDepartments(INITIAL_DEPARTMENTS);
@@ -1008,7 +1118,7 @@ export const storageService = {
   getUsers() {
     const data = _getItem(STORAGE_KEYS.USERS);
     if (!data) {
-      if (isGAS()) {
+      if (noSampleSeed()) {
         return [];
       }
       this.saveUsers(DEFAULT_EMPLOYEE_ACCOUNTS);
@@ -1164,7 +1274,7 @@ export const storageService = {
   getVendors() {
     const data = _getItem(STORAGE_KEYS.VENDORS);
     if (!data) {
-      if (isGAS()) {
+      if (noSampleSeed()) {
         return [];
       }
       return initialVendors;
@@ -1382,7 +1492,8 @@ export const storageService = {
       // If PO has legacy VAT, reset it so it matches PR exactly
       let vat = po.vat;
       let grandTotal = po.grandTotal;
-      if (vat > 0) {
+      // (Cloudflare: the PO amounts are the server's - a PO keeps its VAT and grandTotal after goods receipt)
+      if (vat > 0 && !isCloudflareMode()) {
         vat = 0;
         grandTotal = po.subtotal || po.totalAmount || grandTotal;
         poUpdated = true;
@@ -1928,7 +2039,9 @@ export const storageService = {
       });
 
     // Ensure GRN stock movement records for received/closed POs exist
-    const posList = _cache[STORAGE_KEYS.POS] || [];
+    // Cloudflare: the server owns the stock card (one IN row per GRN line, written by POST /api/pos/:id/receive) - never invent rows here from the
+    // PO ; this heal made the second (duplicate) row of a GRN.
+    const posList = isCloudflareMode() ? [] : (_cache[STORAGE_KEYS.POS] || []);
     posList.forEach(po => {
       const isReceived = ['closed', 'completed', 'received'].includes(String(po.status || '').toLowerCase()) ||
         Boolean(po.isClosed) || Boolean(po.isCompleted);
@@ -1992,8 +2105,8 @@ export const storageService = {
             purchaseUnit: it.purchaseUnit || 'คู่',
             conversionRate: conv,
             conversionRatio: conv,
-            balanceAfter: Number(po.stockBalanceAfter || (stockQty + (it.previousBalance || 16))),
-            balance: Number(po.stockBalanceAfter || (stockQty + (it.previousBalance || 16))),
+            balanceAfter: Number(po.stockBalanceAfter || (stockQty + (Number(it.previousBalance) || 0))),
+            balance: Number(po.stockBalanceAfter || (stockQty + (Number(it.previousBalance) || 0))),
             unitPrice: Number(stockUnitPrice),
             baseUnitCost: Number(stockUnitPrice),
             totalAmount: Number(totalAmt),
@@ -2249,7 +2362,13 @@ export const storageService = {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(currentLogs)
-          }).catch(() => {});
+          }).then((res) => {
+            if (isCloudflareMode() && res && !res.ok) {
+              console.warn(`[cloudflare] stock movement sync failed: HTTP ${res.status}`);
+            }
+          }).catch((e) => {
+            if (isCloudflareMode()) console.warn('[cloudflare] stock movement sync failed:', e && e.message);
+          });
         } catch {}
       }
     }
@@ -2285,7 +2404,7 @@ export const storageService = {
   // Budgets
   getBudgets() {
     const data = _getItem(STORAGE_KEYS.BUDGETS);
-    if (!data && isGAS()) {
+    if (!data && noSampleSeed()) {
       return {};
     }
     const budgets = data || initialBudgets;

@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { isAdminUser } from '../../utils/adminRule';
 import { 
   Bell, 
   CheckCheck, 
@@ -67,7 +68,7 @@ export default function NotificationPopover(props) {
     if (!user) return true;
 
     const roleStr = String(user.role || user.canonicalRole || user.roleId || user.positionKey || '').toUpperCase();
-    const isAdmin = user.isAdmin === true || roleStr.includes('ADMIN') || Number(user.level) >= 99 || user.username === 'admin';
+    const isAdmin = isAdminUser(user, user.isAdmin === true || roleStr.includes('ADMIN') || Number(user.level) >= 99 || user.username === 'admin');
     if (isAdmin) return true;
 
     const userDept = String(user.department || user.primaryDepartment || user.dept || '').toUpperCase();

@@ -1,11 +1,17 @@
 import React, { useState } from 'react';
 import { Paperclip } from 'lucide-react';
 import { resolveDriveImageUrl, handleDriveImageError } from '../../utils/driveHelper';
+import { pickAttachmentUrl } from '../../utils/attachmentUrls';
+import { useProxiedFileUrl } from '../../utils/cfAttachments';
 
 export default function AttachmentThumbnail({ img, imgIdx, onClick, sizeClass = "w-8 h-8", altText, title }) {
   const [hasError, setHasError] = useState(false);
-  const src = typeof img === 'string' ? img : (img.localUrl || img.previewUrl || img.dataUrl || img.fileUrl || img.url || img.directUrl || '');
-  const resolvedThumb = resolveDriveImageUrl(src, 'w400');
+  // a blob: URL from another session is dead -> falls through to fileUrl / url / directUrl
+  // cloudflare mode : a Drive file is read through GET /api/files/:id (blob: URL). While it loads nothing is requested from Drive ; if the proxy
+  // does not serve it (an old link that is not a project file) the original URL logic below is used. Other modes : state is 'off' = unchanged.
+  const proxied = useProxiedFileUrl(img, { imagesOnly: true });
+  const src = pickAttachmentUrl(img, ['localUrl', 'previewUrl', 'dataUrl', 'fileUrl', 'url', 'directUrl']);
+  const resolvedThumb = proxied.url || (proxied.state === 'loading' ? '' : resolveDriveImageUrl(src, 'w400'));
   const defaultName = (typeof img === 'object' && (img.name || img.fileName)) ? (img.name || img.fileName) : `ไฟล์แนบ ${imgIdx + 1}`;
   const finalAlt = altText || defaultName;
   const finalTitle = title || defaultName;

@@ -1,0 +1,161 @@
+/* src/assets/styles/print.css */
+
+/* Thai Typography & PO Document Container Rules */
+.font-sarabun,
+.font-sarabun *,
+.thai-doc-container,
+.thai-doc-container * {
+  font-family: 'TH Sarabun New', 'Sarabun', 'Prompt', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif !important;
+  letter-spacing: 0 !important;
+  font-variant-ligatures: normal !important;
+  font-feature-settings: "liga" 1, "kern" 1 !important;
+  text-rendering: optimizeLegibility !important;
+  word-break: normal !important;
+  overflow-wrap: break-word !important;
+}
+
+/* Ensure PO document logo preserves natural wide aspect ratio */
+.thai-doc-container img {
+  max-width: none !important;
+  height: 44px !important;
+  width: auto !important;
+  object-fit: contain !important;
+  flex-shrink: 0 !important;
+}
+
+/* Page Setup: A4 Portrait with standard margins (12mm - 15mm) */
+@page {
+  size: A4 portrait;
+  margin: 12mm 15mm;
+}
+
+@media print {
+  /* 1. Document Flow & Wrapper Constraints: Unlock heights and allow free multi-page flow */
+  html, body {
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: white !important;
+    background-color: white !important;
+    overflow: visible !important;
+    overflow-x: visible !important;
+    overflow-y: visible !important;
+  }
+
+  #root {
+    width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* When printing from a modal portal mounted in document.body, hide the background #root */
+  body:has(> div:not(#root) .thai-doc-container) > #root,
+  body:has(> .thai-doc-container) > #root,
+  body:has(> [class*="print:block"]) > #root {
+    display: none !important;
+  }
+
+  /* 2. Document Container: Cancel screen margins/padding/shadows to respect physical @page */
+  .thai-doc-container {
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    height: auto !important;
+    min-height: auto !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    box-shadow: none !important;
+    border: none !important;
+    overflow: visible !important;
+  }
+
+  /* 3. Table Pagination Integrity */
+  table {
+    width: 100% !important;
+    border-collapse: collapse !important;
+    page-break-inside: auto !important;
+    break-inside: auto !important;
+  }
+
+  thead {
+    display: table-header-group !important;
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  tbody {
+    display: table-row-group !important;
+  }
+
+  tfoot {
+    display: table-footer-group !important;
+  }
+
+  tr {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  th, td {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* 4. Atomic Financial Summary & Signature Section: Never split across pages */
+  .po-atomic-summary-signatures,
+  .break-inside-avoid,
+  .print\:break-inside-avoid {
+    break-inside: avoid !important;
+    page-break-inside: avoid !important;
+  }
+
+  /* 5. Typography and Contrast Fidelity */
+  * {
+    color: black !important;
+    text-shadow: none !important;
+    box-shadow: none !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  /* Force Thai typography and zero letter-spacing on print */
+  .font-sarabun,
+  .font-sarabun *,
+  .thai-doc-container,
+  .thai-doc-container * {
+    font-family: 'TH Sarabun New', 'Sarabun', 'Prompt', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif !important;
+    letter-spacing: 0 !important;
+    font-variant-ligatures: normal !important;
+    font-feature-settings: "liga" 1, "kern" 1 !important;
+    text-rendering: optimizeLegibility !important;
+    word-break: normal !important;
+    overflow-wrap: break-word !important;
+  }
+
+  /* Hide scrollbars & interactive elements during print */
+  ::-webkit-scrollbar {
+    display: none !important;
+  }
+
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* Force background colors on specific elements */
+  .bg-gray-100 {
+    background-color: #f3f4f6 !important;
+  }
+
+  .bg-gray-50,
+  .bg-gray-50\/50 {
+    background-color: #f9fafb !important;
+  }
+
+  .bg-slate-50 {
+    background-color: #f8fafc !important;
+  }
+}
+

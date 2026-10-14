@@ -5,6 +5,8 @@ import { apiService } from '../../services/apiService';
 import { useAppContext } from '../../context/AppContext';
 import { storageService } from '../../services/storageService';
 import { workflowEngine } from '../../services/workflowEngine';
+import { budgetService } from '../../services/budgetService';
+import { isCloudflareMode } from '../../config/backendMode';
 import { modalService } from '../../services/modalService';
 import { 
   ExternalLink, ShieldCheck, CheckCircle2, XCircle, 
@@ -20,7 +22,7 @@ import ImageLightboxModal from '../common/ImageLightboxModal';
 import RejectPRModal from './RejectPRModal';
 import CollapsibleActivityTimeline from '../common/CollapsibleActivityTimeline';
 import { sanitizeExternalUrl, getProductUrl } from '../../utils/urlHelper';
-import { resolveDriveImageUrl, handleDriveImageError } from '../../utils/driveHelper';
+import { driveFileIdOf, openProxiedFile } from '../../utils/cfAttachments';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
 import LoadingOverlay from '../common/LoadingOverlay';
 
@@ -442,7 +444,16 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
     label: selectedPR.status || resolvedStatusKey, 
     color: 'bg-slate-100 text-slate-700 border-slate-200' 
   };
-  const isOverBudget = apiService.isOverBudget(selectedPR.department, calculatedTotal);
+  // Cloudflare mode: same numbers as BudgetView (zero-based budgetService summary); comparison rule unchanged
+  const isOverBudget = (() => {
+    if (!isCloudflareMode()) return apiService.isOverBudget(selectedPR.department, calculatedTotal);
+    const current = (context?.budgetSummary?.current)
+      || budgetService.calculatePeriodBudgetSummary(undefined, context?.prs, context?.pos).current;
+    const deptInfo = current?.[selectedPR.department];
+    if (!deptInfo) return false;
+    const remaining = deptInfo.allocated - (deptInfo.actualSpent + deptInfo.committed);
+    return calculatedTotal > remaining;
+  })();
 
   const modalContent = (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in print:hidden">
@@ -711,7 +722,6 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
                                       {photos.map((img, imgIdx) => {
                                         const src = typeof img === 'string' ? img : (img.url || img.previewUrl || img.dataUrl || img.directUrl || img.fileUrl);
                                         if (!src) return null;
-                                        const resolvedThumb = resolveDriveImageUrl(src, 'w400');
                                         return (
                                           <AttachmentThumbnail
                                             key={imgIdx}
@@ -956,6 +966,12 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
                                   href={finalUrl}
                                   target="_blank"
                                   rel="noopener noreferrer"
+                                  onClick={(e) => {
+                                    // cloudflare mode : a Drive file opens through GET /api/files/:id (driveFileIdOf is null in other modes)
+                                    if (!driveFileIdOf(att)) return;
+                                    e.preventDefault();
+                                    openProxiedFile(att).then((ok) => { if (!ok) window.open(finalUrl, '_blank', 'noopener,noreferrer'); });
+                                  }}
                                   className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 bg-white hover:bg-slate-100 text-slate-700 border border-slate-200 hover:border-slate-300 text-xs font-bold rounded-lg transition-all cursor-pointer shadow-2xs"
                                 >
                                   <ExternalLink className="w-3.5 h-3.5" />

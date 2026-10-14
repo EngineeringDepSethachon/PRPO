@@ -1,0 +1,6 @@
+{
+  "name": "fable-office-exec-hooks",
+  "private": true,
+  "type": "commonjs",
+  "description": "ให้ hooks/exec-guard.js รันเป็น CommonJS (package.json รากโปรเจกต์ตั้ง type=module) — new-exec.js ไม่สร้างไฟล์นี้ ห้ามลบ"
+}

@@ -10,6 +10,10 @@ import { authService, DEFAULT_EMPLOYEE_ACCOUNTS } from '../services/authService.
 import { storageService } from '../services/storageService.js';
 import { auditService } from '../services/auditService.js';
 import { resolveUserPermissions } from '../config/constants.js';
+import { isCloudflareMode, SESSION_INVALID_EVENT, updateStoredSessionToken, storedSessionBelongsToOther, readStoredSession, SESSION_GONE_EVENT, announceSessionGone } from '../config/backendMode.js';
+import { modalService } from '../services/modalService.js';
+import { isAdminUser } from '../utils/adminRule.js';
+import { clearProxiedFileCache } from '../utils/cfAttachments.js';
 
 let _cachedClientIp = null;
 
@@ -60,7 +64,9 @@ export const getClientIp = () => {
 };
 
 export const AUTH_STORAGE_KEY = 'prpo_auth_session';
-export const SESSION_EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 Hours
+export const SESSION_EXPIRATION_MS = 24 * 60 * 60 * 1000; // 24 Hours (mock / gas)
+export const CF_SESSION_EXPIRATION_MS = 8 * 60 * 60 * 1000; // cloudflare : same as the server token TTL (TOKEN_TTL_SECONDS)
+const sessionTtlMs = () => (isCloudflareMode() ? CF_SESSION_EXPIRATION_MS : SESSION_EXPIRATION_MS);
 
 export const CANONICAL_ROLES = {
   REQUESTER: 'REQUESTER',
@@ -102,11 +108,36 @@ export const normalizeRole = (roleOrUser) => {
 };
 
 /**
+ * Reads `exp` (seconds) from a "base64url(payload).signature" token. No signature check.
+ * Returns null when the token cannot be decoded or has no numeric exp.
+ */
+const getTokenExp = (token) => {
+  try {
+    const part = String(token).split('.')[0];
+    if (!part) return null;
+    let b64 = part.replace(/-/g, '+').replace(/_/g, '/');
+    while (b64.length % 4) b64 += '=';
+    const bin = atob(b64);
+    const json = new TextDecoder().decode(Uint8Array.from(bin, (c) => c.charCodeAt(0)));
+    const exp = Number(JSON.parse(json)?.exp);
+    return Number.isFinite(exp) && exp > 0 ? exp : null;
+  } catch {
+    return null;
+  }
+};
+
+/**
  * Validates whether an existing stored session is still valid
  */
 export const isSessionValid = (session) => {
   if (!session) return false;
   if (!session.id && !session.canonicalRole && !session.roleId && !session.employeeId && !session.username) return false;
+  if (isCloudflareMode()) {
+    // Server-issued token is mandatory; check exp (seconds) when the payload is decodable.
+    if (typeof session.token !== 'string' || !session.token) return false;
+    const exp = getTokenExp(session.token);
+    if (exp !== null && Date.now() >= exp * 1000) return false;
+  }
   if (!session.expiresAt) return true; // Legacy session format without expiresAt
   return Date.now() < Number(session.expiresAt);
 };
@@ -126,6 +157,7 @@ export function AuthProvider({ children }) {
       if (!isSessionValid(parsed)) {
         localStorage.removeItem(AUTH_STORAGE_KEY);
         localStorage.removeItem('prpo_auth_session');
+        try { storageService.clearCloudflareDataCache?.(); } catch { /* best effort */ }
         return null;
       }
       return {
@@ -156,10 +188,10 @@ export function AuthProvider({ children }) {
     const userToCheck = originalUser || currentUser;
     if (!userToCheck) return false;
     const roleStr = String(userToCheck.canonicalRole || userToCheck.roleId || userToCheck.role || userToCheck.positionKey || '').toUpperCase();
-    return userToCheck.isAdmin === true || 
-      roleStr.includes('ADMIN') || 
-      Number(userToCheck.level) >= 99 || 
-      userToCheck.username === 'admin';
+    return isAdminUser(userToCheck, userToCheck.isAdmin === true ||
+      roleStr.includes('ADMIN') ||
+      Number(userToCheck.level) >= 99 ||
+      userToCheck.username === 'admin');
   }, [currentUser, originalUser]);
 
   const isSimulating = Boolean(originalUser && originalUser.id !== currentUser?.id);
@@ -190,6 +222,12 @@ export function AuthProvider({ children }) {
   useEffect(() => {
     const handleSync = (event) => {
       try {
+        // cloudflare : another tab removed the session (sign-out) -> this tab signs out too, right away
+        if (isCloudflareMode() && event?.type === 'storage' && (event.key === AUTH_STORAGE_KEY || event.key === null)
+          && typeof localStorage !== 'undefined' && !localStorage.getItem(AUTH_STORAGE_KEY)) {
+          announceSessionGone();
+          return;
+        }
         let session = event?.detail;
         if (!session && typeof localStorage !== 'undefined') {
           const stored = localStorage.getItem(AUTH_STORAGE_KEY) || localStorage.getItem('prpo_auth_session');
@@ -198,7 +236,9 @@ export function AuthProvider({ children }) {
         if (session && isSessionValid(session)) {
           const normalized = normalizeRole(session);
           setCurrentUser(prev => {
-            if (!prev || prev.id !== session.id || prev.username !== session.username || prev.canonicalRole !== normalized) {
+            // same user but a new token / forced-change flag / expiry (another tab signed in again or changed the password) must update this tab too
+            if (!prev || prev.id !== session.id || prev.username !== session.username || prev.canonicalRole !== normalized
+              || prev.token !== session.token || Boolean(prev.mustChangePassword) !== Boolean(session.mustChangePassword) || prev.expiresAt !== session.expiresAt) {
               return {
                 ...session,
                 canonicalRole: normalized
@@ -226,6 +266,7 @@ export function AuthProvider({ children }) {
    * Clear active session and reset credentials
    */
   const logout = useCallback(() => {
+    const foreignSession = storedSessionBelongsToOther(currentUser?.token);
     try {
       if (currentUser) {
         try {
@@ -241,12 +282,15 @@ export function AuthProvider({ children }) {
           console.warn('[AuthContext] Logout audit error:', auditErr);
         }
       }
-      localStorage.removeItem(AUTH_STORAGE_KEY);
-      localStorage.removeItem('prpo_current_user');
-      localStorage.removeItem('currentUser');
-      localStorage.removeItem('prpo_user');
-      localStorage.removeItem('prpo_auth_session');
-      localStorage.removeItem('prpo_original_admin_user');
+      // another tab may already hold a NEWER session (signed in again / changed the password) : this tab only drops its own state
+      if (!foreignSession) {
+        localStorage.removeItem(AUTH_STORAGE_KEY);
+        localStorage.removeItem('prpo_current_user');
+        localStorage.removeItem('currentUser');
+        localStorage.removeItem('prpo_user');
+        localStorage.removeItem('prpo_auth_session');
+        localStorage.removeItem('prpo_original_admin_user');
+      }
       if (typeof sessionStorage !== 'undefined') {
         sessionStorage.clear();
         sessionStorage.setItem('prpo_explicit_signout', 'true');
@@ -254,11 +298,65 @@ export function AuthProvider({ children }) {
     } catch (e) {
       console.warn('[AuthContext] Error clearing session:', e);
     }
-    authService.logout();
+    if (!foreignSession) {
+      authService.logout();
+      // cloudflare : the previous user's real data must not stay in memory / browser storage for the next sign-in
+      try { storageService.clearCloudflareDataCache?.(); } catch (e) { console.warn('[AuthContext] cache clear error:', e); }
+    }
+    clearProxiedFileCache(); // blob: copies of protected files must not outlive the sign-in (this tab's cache is its own even if another tab has a newer session)
     setCurrentUser(null);
     setOriginalUser(null);
     setAuthError(null);
   }, [currentUser]);
+
+  // cloudflare mode : the server rejected our token (password changed / reset, account closed) -> ask for a new sign-in, once
+  const sessionInvalidHandled = React.useRef(false);
+  const ignoreInvalidUntil = React.useRef(0); // requests that were already in flight with the OLD token answer 401 right after a password change
+  useEffect(() => {
+    if (!isCloudflareMode() || !currentUser || typeof window === 'undefined') return undefined;
+    sessionInvalidHandled.current = false;
+    const onInvalid = (ev) => {
+      if (sessionInvalidHandled.current || Date.now() < ignoreInvalidUntil.current) return;
+      const sent = ev && ev.detail ? ev.detail.token : '';
+      const stored = readStoredSession();
+      // Another tab already replaced the token (signed in again / changed the password) : the 401 belongs to the OLD token. Adopt the newer
+      // session from storage instead of signing out.
+      if (sent && stored && typeof stored.token === 'string' && stored.token && stored.token !== sent) {
+        if (isSessionValid(stored)) setCurrentUser({ ...stored, canonicalRole: normalizeRole(stored) });
+        return;
+      }
+      sessionInvalidHandled.current = true;
+      const code = ev && ev.detail ? ev.detail.code : '';
+      try {
+        if (code === 'TOKEN_EXPIRED') modalService.warning('เซสชันหมดอายุ', 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่');
+        else modalService.warning('กรุณาเข้าสู่ระบบใหม่', 'เซสชันของคุณถูกยกเลิก (รหัสผ่านถูกเปลี่ยนหรือบัญชีถูกปิดใช้งาน) กรุณาเข้าสู่ระบบใหม่');
+      } catch { /* UI optional */ }
+      logout();
+    };
+    window.addEventListener(SESSION_INVALID_EVENT, onInvalid);
+    return () => window.removeEventListener(SESSION_INVALID_EVENT, onInvalid);
+  }, [currentUser, logout]);
+
+  // cloudflare mode : another tab signed out (stored session removed) and a revalidation noticed -> drop this tab's state, keep storage as it is
+  useEffect(() => {
+    if (!isCloudflareMode() || typeof window === 'undefined') return undefined;
+    const onGone = () => {
+      if (readStoredSession() !== null) return;
+      // no newer session exists any more : the real data cached by the previous user goes too
+      try { storageService.clearCloudflareDataCache?.(); } catch (e) { console.warn('[AuthContext] cache clear error:', e); }
+      setCurrentUser(null);
+      setOriginalUser(null);
+    };
+    window.addEventListener(SESSION_GONE_EVENT, onGone);
+    return () => window.removeEventListener(SESSION_GONE_EVENT, onGone);
+  }, []);
+
+  /** After POST /api/me/password : keep the fresh token, clear the forced-change flag. */
+  const completePasswordChange = useCallback((newToken) => {
+    ignoreInvalidUntil.current = Date.now() + 5000;
+    const session = updateStoredSessionToken(newToken, false);
+    setCurrentUser((prev) => (prev ? { ...prev, ...(session || {}), token: newToken, mustChangePassword: false, canonicalRole: prev.canonicalRole } : prev));
+  }, []);
 
   // Periodic expiration verification
   useEffect(() => {
@@ -361,7 +459,7 @@ export function AuthProvider({ children }) {
         assignedDepartments: userDepts,
         allowedDepartments: userDepts,
         canonicalRole: normalized,
-        expiresAt: Date.now() + SESSION_EXPIRATION_MS
+        expiresAt: Date.now() + sessionTtlMs()
       };
 
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(sessionPayload));
@@ -426,7 +524,7 @@ export function AuthProvider({ children }) {
         assignedDepartments: userDepts,
         allowedDepartments: userDepts,
         canonicalRole: normalized,
-        expiresAt: Date.now() + SESSION_EXPIRATION_MS
+        expiresAt: Date.now() + sessionTtlMs()
       };
 
       localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(sessionPayload));
@@ -461,6 +559,11 @@ export function AuthProvider({ children }) {
    * Fast Switcher for Development, UAT, and Admin Testing
    */
   const switchRoleDev = useCallback((roleOrUser) => {
+    // Cloudflare mode: never mint a session client-side (no server token).
+    if (isCloudflareMode()) {
+      console.warn('[AuthContext] switchRoleDev ใช้ได้เฉพาะโหมดทดสอบ');
+      return null;
+    }
     let target = null;
     let userPool = DEFAULT_EMPLOYEE_ACCOUNTS;
     try {
@@ -514,7 +617,7 @@ export function AuthProvider({ children }) {
       primaryDepartment: target.primaryDepartment || userDepts[0] || 'PD',
       department: target.department || userDepts[0] || 'PD',
       canonicalRole: normalized,
-      expiresAt: Date.now() + SESSION_EXPIRATION_MS
+      expiresAt: Date.now() + sessionTtlMs()
     };
 
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(sessionPayload));
@@ -540,7 +643,7 @@ export function AuthProvider({ children }) {
     const restoredUser = {
       ...originalUser,
       canonicalRole: normalizeRole(originalUser),
-      expiresAt: Date.now() + SESSION_EXPIRATION_MS
+      expiresAt: Date.now() + sessionTtlMs()
     };
 
     localStorage.setItem(AUTH_STORAGE_KEY, JSON.stringify(restoredUser));
@@ -567,10 +670,12 @@ export function AuthProvider({ children }) {
     logout,
     switchRoleDev,
     revertSimulation,
+    completePasswordChange,
     hasRole,
     canAccess,
     canAccessDepartment
   }), [
+    completePasswordChange,
     currentUser,
     currentRole,
     canonicalRole,
@@ -617,6 +722,7 @@ export const useAuth = () => {
       logout: () => {},
       switchRoleDev: () => ({}),
       revertSimulation: () => ({}),
+      completePasswordChange: () => {},
       hasRole: () => false,
       canAccess: () => false,
       canAccessDepartment: () => false

@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { X, ChevronLeft, ChevronRight, Download, ExternalLink, Image as ImageIcon } from 'lucide-react';
 import { resolveDriveImageUrl, getDriveFileViewUrl, handleDriveImageError } from '../../utils/driveHelper';
+import { pickAttachmentUrl } from '../../utils/attachmentUrls';
+import { useProxiedFileUrl, openProxiedFile, driveFileIdOf } from '../../utils/cfAttachments';
 
 /**
  * ImageLightboxModal
@@ -53,6 +55,16 @@ export default function ImageLightboxModal({
 
   const total = normalizedImages.length;
   const currentImage = normalizedImages[currentIndex] || normalizedImages[0];
+  // cloudflare mode : read the Drive file through GET /api/files/:id (state 'off' in other modes = unchanged behaviour)
+  const proxied = useProxiedFileUrl(currentImage ? proxyTarget(currentImage) : null, { imagesOnly: true, enabled: isOpen });
+  const proxyLoading = proxied.state === 'loading';
+  const openViaProxy = (e, download) => {
+    if (!driveFileIdOf(proxyTarget(currentImage))) return; // not cloudflare mode / not a Drive file : the plain link works as before
+    e.preventDefault();
+    openProxiedFile(proxyTarget(currentImage), { download }).then((ok) => {
+      if (!ok) window.open(download ? currentImage.url : currentImage.driveViewUrl, '_blank', 'noopener,noreferrer');
+    });
+  };
 
   const handlePrev = useCallback(() => {
     if (total <= 1) return;
@@ -124,7 +136,7 @@ export default function ImageLightboxModal({
               rel="noopener noreferrer"
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition-all hover:scale-105 cursor-pointer"
               title="เปิดดูใน Google Drive"
-              onClick={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); openViaProxy(e, false); }}
             >
               <ExternalLink className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">เปิดดูใน Google Drive</span>
@@ -140,7 +152,7 @@ export default function ImageLightboxModal({
               rel="noreferrer"
               className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
               title="ดาวน์โหลดรูปภาพ"
-              onClick={e => e.stopPropagation()}
+              onClick={e => { e.stopPropagation(); openViaProxy(e, true); }}
             >
               <Download className="w-4 h-4" />
             </a>
@@ -189,6 +201,7 @@ export default function ImageLightboxModal({
                     href={currentImage.driveViewUrl}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={e => openViaProxy(e, false)}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg transition-colors"
                   >
                     <ExternalLink className="w-4 h-4" />
@@ -199,6 +212,7 @@ export default function ImageLightboxModal({
                     href={currentImage.url}
                     target="_blank"
                     rel="noopener noreferrer"
+                    onClick={e => openViaProxy(e, false)}
                     className="inline-flex items-center gap-2 px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white rounded-lg transition-colors"
                   >
                     <ExternalLink className="w-4 h-4" />
@@ -209,13 +223,13 @@ export default function ImageLightboxModal({
             </div>
           ) : (
             <>
-              {loadingBase64[currentIndex] && (
+              {(loadingBase64[currentIndex] || proxyLoading) && (
                 <div className="absolute inset-0 z-10 flex items-center justify-center bg-slate-900/50 rounded-2xl backdrop-blur-sm">
                   <div className="w-8 h-8 border-2 border-indigo-500 border-t-transparent rounded-full animate-spin"></div>
                 </div>
               )}
-              <img
-                src={base64Urls[currentIndex] || currentImage.url}
+              {!proxyLoading && <img
+                src={base64Urls[currentIndex] || proxied.url || currentImage.url}
                 alt={currentImage.name || 'preview'}
                 className={`max-h-[70vh] max-w-full object-contain rounded-2xl shadow-2xl border border-slate-800 bg-slate-900/50 transition-all duration-200 ${loadingBase64[currentIndex] ? 'opacity-50' : 'opacity-100'}`}
                 onError={async (e) => {
@@ -254,7 +268,7 @@ export default function ImageLightboxModal({
                     setImageErrors(prev => ({ ...prev, [currentIndex]: true }));
                   }
                 }}
-              />
+              />}
             </>
           )}
         </div>
@@ -289,12 +303,7 @@ export default function ImageLightboxModal({
                   : 'border-slate-700 opacity-60 hover:opacity-100 hover:border-slate-500'
               }`}
             >
-              <img
-                src={img.url}
-                alt={img.name || `thumb-${idx}`}
-                className="w-full h-full object-cover"
-                onError={(e) => handleDriveImageError(e, img.raw || img.url)}
-              />
+              <FilmstripImg img={img} idx={idx} />
             </button>
           ))}
         </div>
@@ -305,6 +314,25 @@ export default function ImageLightboxModal({
   return typeof document !== 'undefined' && document.body
     ? createPortal(modalElement, document.body)
     : modalElement;
+}
+
+// what the proxy needs from a normalized lightbox entry : the Drive id found by useMemoImages + the type of the original item
+function proxyTarget(img) {
+  const raw = img && img.raw && typeof img.raw === 'object' ? img.raw : {};
+  return img && img.fileId ? { ...raw, fileId: img.fileId, localUrl: undefined, previewUrl: undefined, dataUrl: undefined } : null;
+}
+
+function FilmstripImg({ img, idx }) {
+  const proxied = useProxiedFileUrl(proxyTarget(img), { imagesOnly: true });
+  if (proxied.state === 'loading') return <div className="w-full h-full bg-slate-800" />;
+  return (
+    <img
+      src={proxied.url || img.url}
+      alt={img.name || `thumb-${idx}`}
+      className="w-full h-full object-cover"
+      onError={(e) => handleDriveImageError(e, img.raw || img.url)}
+    />
+  );
 }
 
 function useMemoImages(rawImages, defaultTitle) {
@@ -320,7 +348,7 @@ function useMemoImages(rawImages, defaultTitle) {
         resolvedUrl = resolveDriveImageUrl(rawInput, 'w1600');
       }
       
-      const candidateUrl = typeof item === 'string' ? item : (item?.localUrl || item?.previewUrl || item?.dataUrl || item?.url || item?.fileUrl || '');
+      const candidateUrl = pickAttachmentUrl(item, ['localUrl', 'previewUrl', 'dataUrl', 'url', 'fileUrl']);
       const isLocal = typeof candidateUrl === 'string' && (candidateUrl.startsWith('blob:') || candidateUrl.startsWith('data:image/'));
 
       // Extract Google Drive File ID if present

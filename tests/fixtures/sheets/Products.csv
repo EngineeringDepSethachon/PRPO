@@ -1,0 +1,3 @@
+id,code,name,category,department,purchaseUnit,stockUnit,conversionRate,price,avgCost,averageCost,stockBalance,totalValue,reorderPoint,leadTimeDays,locationId,locationName,status,isActive,updatedAt
+P-1,SKU-001,น้ำมัน 5'L,สารหล่อลื่น,PD,ถัง,ลิตร,5,"1,250.50",240.1,,10,2401,2,3,LOC-PD-001,ชั้น A,ACTIVE,TRUE,2026-02-01
+P-2,SKU-002,ของเลิกขาย,อื่นๆ,PD,ชิ้น,ชิ้น,1,10,,8.5,0,0,0,,,,INACTIVE,FALSE,2026-02-01

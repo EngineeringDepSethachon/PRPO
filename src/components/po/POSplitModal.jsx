@@ -1,6 +1,8 @@
 import React from 'react';
 import { createPortal } from 'react-dom';
 import { PO_STATUS } from '../../config/constants';
+import { getCompletedPOStatus } from '../../utils/poCompletedStatus';
+import { formatIsoForDisplay } from '../../utils/timeUtils';
 import { Layers, X, Printer, ExternalLink, Building, DollarSign, Package, Info } from 'lucide-react';
 import { storageService } from '../../services/storageService';
 
@@ -77,7 +79,7 @@ export default function POSplitModal({ pr, pos = [], onClose, onSelectPO }) {
             </div>
           ) : (
             splitPOs.map((po, index) => {
-              const statusConfig = PO_STATUS[po.status] || { label: po.status, color: 'bg-slate-100 text-slate-700 border-slate-200' };
+              const statusConfig = PO_STATUS[po.status] || getCompletedPOStatus(po.status) || { label: po.status, color: 'bg-slate-100 text-slate-700 border-slate-200' };
               
               return (
                 <div key={po.id} className="bg-white border border-slate-200/90 rounded-2xl shadow-2xs overflow-hidden">
@@ -142,7 +144,7 @@ export default function POSplitModal({ pr, pos = [], onClose, onSelectPO }) {
                     </table>
 
                     <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="text-slate-400 font-mono text-[11px]">ออกเมื่อ: {po.issuedDate || po.createdAt || '-'}</span>
+                      <span className="text-slate-400 font-mono text-[11px]">ออกเมื่อ: {formatIsoForDisplay(po.issuedDate || po.createdAt) || '-'}</span>
                       <div className="text-right">
                         <span className="text-slate-500 font-medium">ยอดรวม PO ใบนี้: </span>
                         <span className="font-mono font-bold text-slate-900 text-sm tabular-nums">฿{(po.grandTotal || po.subtotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>

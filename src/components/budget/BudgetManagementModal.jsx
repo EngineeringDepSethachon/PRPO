@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { createPortal } from 'react-dom';
+import { formatIsoForDisplay } from '../../utils/timeUtils';
 import { 
   Wallet, X, Plus, Building2, TrendingUp, 
   History, ArrowRight, Sparkles, CheckCircle2, ShieldCheck
@@ -620,7 +621,7 @@ function BudgetManagementModalContent({
                         {scopedBudgetTransactions.map(tx => (
                           <tr key={tx.id || Math.random()} className="hover:bg-slate-50/70 transition-colors">
                             <td className="py-3 px-4 whitespace-nowrap text-slate-500 font-mono text-[11px]">
-                              {tx.date || tx.createdAt?.slice(0, 19).replace('T', ' ')}
+                              {formatIsoForDisplay(tx.date) || formatIsoForDisplay(tx.createdAt)}
                             </td>
                             <td className="py-3 px-3 whitespace-nowrap font-bold text-slate-800">
                               {tx.dept}

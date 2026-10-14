@@ -9,6 +9,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth, CANONICAL_ROLES } from '../../context/AuthContext';
 import { useAppContext } from '../../context/AppContext';
+import { isCloudflareMode } from '../../config/backendMode';
 
 export default function LoginView() {
   const navigate = useNavigate();
@@ -56,7 +57,8 @@ export default function LoginView() {
       const session = await login(cleanUser, cleanPass);
 
       // Synchronize legacy AppContext state if present
-      if (appContext?.handleSwitchUser && session?.id) {
+      // (cloudflare mode: AppContext already follows AuthContext.currentUser, which holds the token session)
+      if (!isCloudflareMode() && appContext?.handleSwitchUser && session?.id) {
         appContext.handleSwitchUser(session.id);
       }
 
@@ -165,7 +167,7 @@ export default function LoginView() {
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="รหัสผ่าน (เช่น password123)"
+                  placeholder={isCloudflareMode() ? 'รหัสผ่าน' : 'รหัสผ่าน (เช่น password123)'}
                   autoComplete="current-password"
                   className="w-full px-4 py-2.5 text-sm bg-slate-50 border border-slate-200 rounded-xl text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-mono tracking-wide"
                   required

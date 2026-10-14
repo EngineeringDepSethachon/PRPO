@@ -1,0 +1,2 @@
+id,prId,prNo,productId,productCode,name,purchaseUnit,stockUnit,conversionRate,qty,unit,price,totalPrice,department,notes,status,imageUrl,fileId,driveUrl,images,attachments,createdAt,updatedAt
+IT-1,PR-2,QC007/2026,P-1,SKU-001,สารเคมี,ขวด,มล.,1,5,ขวด,10,50,QC,,,,,,,,2026-03-05,2026-03-05

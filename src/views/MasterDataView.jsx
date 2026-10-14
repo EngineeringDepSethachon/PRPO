@@ -1,5 +1,6 @@
 import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
+import { cfBackground } from '../services/cfGuard';
 import { Database, Plus, Edit3, Trash2, Building2, Search, X, MapPin, Boxes, DoorClosed, UserCheck, RotateCcw, Shield } from 'lucide-react';
 import ProductCRUDModal from '../components/admin/ProductCRUDModal';
 import DeactivateItemModal from '../components/admin/DeactivateItemModal';
@@ -300,13 +301,11 @@ function MasterDataContent({
       console.warn('[MasterDataView] Blacklisted/duplicate items detected. Running auto-cleanup migration...');
       storageService.saveProducts(dedupedStored);
       setProductsList(dedupedStored);
-      try {
-        fetch('/api/products/batch', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(dedupedStored)
-        }).catch(() => {});
-      } catch {}
+      cfBackground('master-data cleanup sync', '/api/products/batch', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(dedupedStored)
+      });
     }
   }, []);
 

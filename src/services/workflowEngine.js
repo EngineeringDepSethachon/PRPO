@@ -1,4 +1,6 @@
 import { storageService, callGAS, isGAS } from './storageService.js';
+import { cfBackground } from './cfGuard.js';
+import { isCloudflareMode } from '../config/backendMode.js';
 import { PR_STATUS, PO_STATUS, DEPARTMENTS } from '../config/constants.js';
 import { notificationService } from './notificationService.js';
 import { auditService } from './auditService.js';
@@ -479,13 +481,15 @@ export const workflowEngine = {
     storageService.savePRs(prs);
 
     // Direct Sync to Local Backend File
-    try {
-      fetch(`/api/prs/${pr.id}`, {
+    // (In cloudflare mode apiService.rejectPR performs the checked write; this one is best-effort.)
+    // (Cloudflare : apiService.rejectPR is the only writer - a second PUT of the same transition would double the audit row / notification.)
+    if (!isCloudflareMode()) {
+      cfBackground('PR reject sync', `/api/prs/${pr.id}`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(pr)
-      }).catch(() => {});
-    } catch {}
+      });
+    }
 
     auditService.logAction({
       action: 'PR_REJECTED',
@@ -3467,6 +3471,10 @@ export const workflowEngine = {
       };
     });
 
+    // Cloudflare: the server refunds the budget on the FIRST settlement only (GAS parity) ; editing the actual amount of an already settled PO
+    // overwrites the figures but must not credit the local budget again (mock / gas keep the legacy behaviour of crediting again)
+    const skipLocalRefund = isCloudflareMode() && po.settlementStatus === 'SETTLED';
+
     po.items = items;
     po.actualTotalAmount = actualTotal;
     po.savingsAmount = savings;
@@ -3489,7 +3497,7 @@ export const workflowEngine = {
     });
 
     // Refund department budget if savings > 0
-    if (savings > 0) {
+    if (savings > 0 && !skipLocalRefund) {
       const dept = (po.department || user?.department || 'PD').toUpperCase();
       const budgets = storageService.getBudgets();
       if (!budgets[dept]) budgets[dept] = { monthlyBudget: 0, spent: 0, actualExpense: 0, pending: 0, variance: 0, history: {}, refundCredits: {} };

@@ -1,0 +1,33 @@
+# Copy to .dev.vars for local `wrangler pages dev` (never commit .dev.vars).
+# Production: `wrangler pages secret put AUTH_TOKEN_SECRET` (never put real values in files).
+#
+# BEFORE first run apply the D1 migrations, including 0002 (login_attempts) and 0003 (password hash columns):
+#   wrangler d1 migrations apply <DB_NAME> --local
+# Without them login fails (500).
+
+# REQUIRED. HMAC-SHA256 token signing key, at least 32 chars (the API refuses shorter ones), random (e.g. `openssl rand -base64 48`).
+# The value below is deliberately a short placeholder: the API refuses it (all /api returns 500) until you replace it.
+AUTH_TOKEN_SECRET=REPLACE_ME
+
+# OPTIONAL. CORS allow-list: comma separated EXACT origins that may call /api from another origin, e.g.
+#   ALLOWED_ORIGINS=https://prpo.example.com,https://admin.example.com
+# The request Origin must match exactly -> it is echoed back (+ Vary: Origin) ; "*" is ignored ; no match -> no CORS headers.
+# Not set = same-origin only (the Pages app calling its own /api needs nothing). Dev shortcut: when ALLOW_DEV_SEED=true or
+# ENVIRONMENT=dev and ALLOWED_ORIGINS is not set, http://localhost:5173 and http://localhost:8788 are allowed.
+# ALLOWED_ORIGINS=
+# ENVIRONMENT=dev
+
+# File storage. Default (when unset) = "r2" : bucket binding FILES comes from wrangler.toml (local: `wrangler pages dev --r2 FILES` keeps the
+# objects in .wrangler/state, no remote bucket is touched). "drive" = Google Drive through the Service Account below. No secret is needed for r2.
+# FILE_STORAGE=r2
+
+# Google Drive (Service Account, only for FILE_STORAGE=drive). Production: `wrangler pages secret put GOOGLE_SA_CLIENT_EMAIL` / `GOOGLE_SA_PRIVATE_KEY`.
+# Private key = PEM PKCS8 from the SA JSON key; keep it on ONE line with literal \n between lines. Never commit real values.
+# DRIVE_ROOT_FOLDER_ID is not secret (wrangler.toml [vars]); put it here only for local dev.
+# GOOGLE_SA_CLIENT_EMAIL=your-sa@your-project.iam.gserviceaccount.com
+# GOOGLE_SA_PRIVATE_KEY="-----BEGIN PRIVATE KEY-----\nREPLACE_ME\n-----END PRIVATE KEY-----\n"
+# DRIVE_ROOT_FOLDER_ID=REPLACE_ME
+
+# OPTIONAL, dev only. Seeds demo users into an EMPTY users table (hashed before storing). Never in production.
+# ALLOW_DEV_SEED=true
+# DEV_SEED_PASSWORD=choose-a-dev-password-8+chars

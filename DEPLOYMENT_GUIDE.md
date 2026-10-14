@@ -156,7 +156,7 @@ npm run gas:deploy
    - **ดำเนินการในฐานะ (Execute as):** `ฉัน (Me / tharn.s1999@gmail.com)` — ให้ระบบทำงานภายใต้สิทธิ์ของเจ้าของโปรเจกต์
    - **ผู้ที่มีสิทธิ์เข้าถึง (Who has access):** `ทุกคน (Anyone)` — เพื่อให้ทุกคนสามารถเข้าถึงลิงก์ Web App ได้โดยไม่มีข้อจำกัด Domain
 4. กดปุ่ม **Deploy**
-5. คัดลอก **Web app URL** (เช่น `https://script.google.com/macros/s/AKfycbxqrjcJXtuDntYAd9ixki_f8-V6piifKTLmV9vhqkhgj_bQhX6fqscieLvIrsx2JzeI/exec`) สำหรับส่งให้ทีมงานเข้าใช้งาน
+5. คัดลอก **Web app URL** (เช่น `https://script.google.com/macros/s/<DEPLOYMENT_ID>/exec`) สำหรับส่งให้ทีมงานเข้าใช้งาน
 
 ---
 

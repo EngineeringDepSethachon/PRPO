@@ -2,11 +2,11 @@ import React, { useState, useMemo } from 'react';
 import { workflowEngine } from '../services/workflowEngine';
 import { useAppContext } from '../context/AppContext';
 import { PR_STATUS, PO_STATUS } from '../config/constants';
-import { hasDepartmentAccess } from '../utils/permissions';
 import {
   isCompletedTask as wsIsCompletedTask,
   isInProgressTask as wsIsInProgressTask,
   isToDoTask as wsIsToDoTask,
+  canSeeWorkspaceDocument,
 } from '../services/workspaceService';
 import { 
   AlertCircle, Clock, CheckCircle2, ArrowRight, FileText, 
@@ -58,38 +58,7 @@ export default function WorkspaceView({
     const user = currentUser || currentRole;
 
     // Helper: ตรวจสอบสิทธิ์การเข้าถึงเอกสารตามแผนกและบทบาท (Pre-Filtering RBAC)
-    const canSeeDocument = (doc) => {
-      if (!user) return false;
-      const roleId = String(user.roleId || user.id || '').toUpperCase();
-      const userLevel = Number(user.level || 1);
-      
-      // Admin, Plant Manager, Central Purchaser sees ALL
-      const isAdminOrGlobal = roleId === 'ADMIN' || user.role === 'admin' || userLevel >= 99 || 
-                              roleId === 'PLANT_MANAGER' || userLevel >= 3 || 
-                              roleId === 'PURCHASER' || roleId === 'ONLINE_PURCHASER';
-      if (isAdminOrGlobal) return true;
-
-      // Reviewer / Approver (Asst. Manager) - sees ALL docs in their department(s)
-      const isReviewer = roleId === 'ASST_MANAGER' || roleId === 'REVIEWER' || userLevel === 2;
-      if (isReviewer) {
-        return hasDepartmentAccess(user, doc.department);
-      }
-
-      // Requester - sees ONLY docs they created, OR POs in their dept (since they receive goods)
-      const isCreator = 
-        isUserMatched(doc.requestedBy, user) || 
-        isUserMatched(doc.applicantName1, user) || 
-        isUserMatched(doc.createdBy, user) || 
-        doc.requesterId === user.id;
-      if (isCreator) return true;
-
-      // Requesters can see POs in their department (for receiving goods)
-      if (doc.docType === 'PO' && hasDepartmentAccess(user, doc.department)) {
-         return true;
-      }
-      
-      return false; // Not allowed to see this document (Data Leak Prevention)
-    };
+    const canSeeDocument = (doc) => canSeeWorkspaceDocument(doc, user);
 
     // ใส่ PO ก่อน (PO ถือเป็นสถานะล่าสุดของเอกสาร)
     pos.forEach(po => {

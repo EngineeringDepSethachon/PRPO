@@ -7,6 +7,7 @@ import {
 import { apiService } from '../../services/apiService';
 import { modalService } from '../../services/modalService';
 import { storageService } from '../../services/storageService';
+import { isCloudflareMode } from '../../config/backendMode';
 
 const ROLE_OPTIONS = [
   { id: 'REQUESTER', label: 'Requester - ผู้ขอซื้อ (ตามแผนกที่ได้รับมอบหมาย)', level: 1, defaultDept: null, title: 'Requester' },
@@ -38,7 +39,7 @@ export default function UserCRUDModal({
   const [employeeName, setEmployeeName] = useState(user?.employeeName || user?.name || '');
   const [username, setUsername] = useState(user?.username || '');
   const [position, setPosition] = useState(user?.position || user?.title || '');
-  const [selectedRoleId, setSelectedRoleId] = useState(normalizeRoleId(user?.roleId));
+  const [selectedRoleId, setSelectedRoleId] = useState(isEdit && user?.roleId ? normalizeRoleId(user.roleId) : ''); // a new user must pick a role (no silent default)
   const [primaryDept, setPrimaryDept] = useState(user?.primaryDepartment || user?.department || 'ALL');
   
   // Allowed departments multi-select
@@ -101,6 +102,17 @@ export default function UserCRUDModal({
       return;
     }
 
+    if (!selectedRoleId) {
+      setError('กรุณาเลือกบทบาทหน้าที่ของผู้ใช้งาน');
+      return;
+    }
+
+    // Cloudflare: this form has no password field and there is no default password any more - a new user's password is set on the user management page
+    if (isCloudflareMode() && !user?.id) {
+      setError('การสร้างผู้ใช้ใหม่ต้องตั้งรหัสผ่านที่หน้า "จัดการผู้ใช้" (ระบบไม่มีรหัสผ่านเริ่มต้น)');
+      return;
+    }
+
     if (!username.trim()) {
       setError('กรุณาระบุชื่อผู้ใช้ / Username');
       return;
@@ -132,7 +144,8 @@ export default function UserCRUDModal({
         id: user?.id || undefined,
         employeeId: user?.employeeId || `EMP-${primaryDept !== 'ALL' ? primaryDept : 'SYS'}-${Date.now().toString().slice(-3)}`,
         username: username.trim().toLowerCase(),
-        password: user?.password || 'password123',
+        // Cloudflare: never send a default (an edit must keep the user's current password : omitted = unchanged)
+        password: user?.password || (isCloudflareMode() ? undefined : 'password123'),
         name: name.trim(),
         employeeName: employeeName.trim() || name.trim(),
         displayName: name.trim(),
@@ -308,6 +321,7 @@ export default function UserCRUDModal({
               disabled={isSelf}
               className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 bg-slate-50/50 focus:bg-white disabled:opacity-60 transition-all"
             >
+              {!selectedRoleId && <option value="">-- เลือกบทบาท --</option>}
               {ROLE_OPTIONS.map(role => (
                 <option key={role.id} value={role.id}>
                   {role.label}

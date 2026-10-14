@@ -261,7 +261,10 @@ export function exportAuditLogsToCSV(logsToExport = null) {
 
   const escapeCSV = (str) => {
     if (str === null || str === undefined) return '""';
-    const s = String(str).replace(/"/g, '""');
+    let s = String(str);
+    // spreadsheet formula injection : a cell that starts with = + - @ TAB CR is prefixed with ' so Excel reads it as text
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
+    s = s.replace(/"/g, '""');
     return `"${s}"`;
   };
 

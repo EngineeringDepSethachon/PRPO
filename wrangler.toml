@@ -1,0 +1,50 @@
+# ====================================================================
+# Cloudflare Pages + D1 Database Configuration
+# Project: PRPO_PDQC System
+# ====================================================================
+
+name = "prpo-pdqc"
+pages_build_output_dir = "dist"
+compatibility_date = "2024-09-23"
+compatibility_flags = ["nodejs_compat"]
+
+# Cloudflare D1 SQL Database Binding
+[[d1_databases]]
+binding = "DB"
+database_name = "prpo-db"
+database_id = "c64022bb-88eb-485f-94f7-dd9e9617e44c"
+migrations_dir = "migrations"
+
+# ---------------------------------------------------------------------
+# Preview deployments (every non-production branch / PR of Cloudflare Pages)
+# Pages bindings are NOT inherited by [env.preview] : without this block Preview uses the binding configured in the dashboard,
+# and with a copy of the production binding a Preview would read / WRITE THE PRODUCTION DATABASE.
+# Before the first Preview deployment :
+#   1) create a separate D1 (wrangler d1 create prpo-db-preview), apply the migrations to it
+#   2) replace <PREVIEW_DATABASE_ID> below with its id   (until then a Preview build fails on purpose instead of touching production)
+#   3) set AUTH_TOKEN_SECRET for Preview (a value different from Production) - see docs/DEPLOY_CLOUDFLARE.md
+# ---------------------------------------------------------------------
+[[env.preview.d1_databases]]
+binding = "DB"
+database_name = "prpo-db-preview"
+database_id = "00791d04-880f-4106-a2fc-f3349bcb013f"
+migrations_dir = "migrations"
+
+# ---------------------------------------------------------------------
+# File storage: Cloudflare R2 (private buckets, served only through /api/files/:id)
+# docs/requirements-file-storage.md : FILE_STORAGE = "r2" now, "drive" later (Google Shared Drive) without touching the client.
+# Buckets created 2026-10-13 : prpo-files (production), prpo-files-preview (preview)
+# ---------------------------------------------------------------------
+[[r2_buckets]]
+binding = "FILES"
+bucket_name = "prpo-files"
+
+[[env.preview.r2_buckets]]
+binding = "FILES"
+bucket_name = "prpo-files-preview"
+
+[vars]
+FILE_STORAGE = "r2"
+
+[env.preview.vars]
+FILE_STORAGE = "r2"
