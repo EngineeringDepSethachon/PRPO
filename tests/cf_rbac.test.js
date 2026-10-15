@@ -284,8 +284,9 @@ describe.skipIf(!DatabaseSync)('T4.5 functional (onRequest + migrated sqlite)', 
       ['ORDERED', 'PARTIAL', ALLP],
       ['ORDERED', 'CLOSED', ALLP],
       ['ORDERED', 'CLAIM_REPORTED', ALLP],
-      ['CLAIM_REPORTED', 'COMPLETED', ALLP],
-      ['CLAIM_PENDING', 'COMPLETED', ALLP],
+      // closing a PO with an open claim (decision 2026-10-14) : owner requester (ctx.isOwner, tested below), approver, admin ; online purchaser = online claims
+      ['CLAIM_REPORTED', 'COMPLETED', ['ONLINE', 'L3', 'L4', 'ADMIN']],
+      ['CLAIM_PENDING', 'COMPLETED', ['ONLINE', 'L3', 'L4', 'ADMIN']],
       ['CLAIM_REPORTED', 'WAITING_DELIVERY_ROUND_2', ALLP],
       ['ORDERED', 'CANCELLED', NOT_ONLINE], // canCancelPO: the online purchaser can never cancel a PO
       ['CLAIM_REPORTED', 'CANCELLED', NOT_ONLINE],

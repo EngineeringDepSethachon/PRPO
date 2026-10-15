@@ -14,6 +14,9 @@ const P = {
 const ALL = ['L1', 'L2', 'L3', 'ONLINE', 'ADMIN'];
 const NOT_ONLINE = ['L1', 'L2', 'L3', 'ADMIN'];
 const ONLINE_ONLY = ['ONLINE', 'ADMIN'];
+// closing / completing a PO with an open claim (decision 2026-10-14) : approver, admin, online purchaser (online claims) - and the
+// requester who owns the PR, which the route passes as ctx.isOwner (tested in its own block below ; without ctx L1 / L2 are refused)
+const CLAIM_CLOSE = ['L3', 'ONLINE', 'ADMIN'];
 
 // [from, to, who may do it, where the client does it]
 const CLIENT_MOVES = [
@@ -43,14 +46,14 @@ const CLIENT_MOVES = [
   ['ORDERED', 'COMPLETED_WITH_REFUND', ALL, 'ReceivingModal.jsx:1005 inline REFUND'],
   ['PARTIAL', 'WAITING_DELIVERY_ROUND_2', ALL, 'ReceivingModal.jsx:980'],
   // round 2
-  ['WAITING_DELIVERY_ROUND_2', 'COMPLETED', ALL, 'receive round 2 -> COMPLETED'],
+  ['WAITING_DELIVERY_ROUND_2', 'COMPLETED', CLAIM_CLOSE, 'receive round 2 -> COMPLETED'],
   ['WAITING_DELIVERY_ROUND_2', 'PARTIAL', ALL, 'receive round 2 still short'],
   ['WAITING_DELIVERY_ROUND_2', 'PARTIALLY_RECEIVED_IN_CLAIM', ALL, 'receive round 2 with a new claim'],
-  ['WAITING_DELIVERY_ROUND_2', 'COMPLETED_WITH_REFUND', ALL, 'round 2 inline refund'],
+  ['WAITING_DELIVERY_ROUND_2', 'COMPLETED_WITH_REFUND', CLAIM_CLOSE, 'round 2 inline refund'],
   ['PARTIALLY_RECEIVED_IN_CLAIM', 'PARTIAL', ALL, 'receive next round while in claim'],
-  ['PARTIALLY_RECEIVED_IN_CLAIM', 'COMPLETED', ALL, 'resolveClaim all stores resolved'],
+  ['PARTIALLY_RECEIVED_IN_CLAIM', 'COMPLETED', CLAIM_CLOSE, 'resolveClaim all stores resolved'],
   ['PARTIALLY_RECEIVED_IN_CLAIM', 'WAITING_DELIVERY_ROUND_2', ALL, 'resolveClaim REPLACEMENT workflowEngine:2926/3005/3134'],
-  ['PARTIALLY_RECEIVED_IN_CLAIM', 'COMPLETED_WITH_REFUND', ALL, 'resolveClaim REFUND'],
+  ['PARTIALLY_RECEIVED_IN_CLAIM', 'COMPLETED_WITH_REFUND', CLAIM_CLOSE, 'resolveClaim REFUND'],
   // fileClaim / resolveClaim (workflowEngine:2384, 2827, 2971, 3012, 3144)
   ['ORDERED', 'CLAIM_REPORTED', ALL, 'workflowEngine.js:2384/2827 fileClaim'],
   ['PARTIAL', 'CLAIM_REPORTED', ALL, 'fileClaim'],
@@ -59,7 +62,7 @@ const CLIENT_MOVES = [
   ['COMPLETED', 'CLAIM_PENDING', ALL, 'resolveClaim :2971'],
   ['CLOSED', 'CLAIM_PENDING', ALL, 'resolveClaim :3012'],
   ['CLAIM_REPORTED', 'WAITING_DELIVERY_ROUND_2', ALL, 'resolveClaim REPLACEMENT'],
-  ['CLAIM_REPORTED', 'COMPLETED', ALL, 'resolveClaim :2967'],
+  ['CLAIM_REPORTED', 'COMPLETED', CLAIM_CLOSE, 'resolveClaim :2967'],
   ['CLAIM_PENDING', 'WAITING_DELIVERY_ROUND_2', ALL, 'resolveClaim'],
   ['COMPLETED', 'WAITING_DELIVERY_ROUND_2', ALL, 'resolveClaim REPLACEMENT from COMPLETED'],
   ['COMPLETED', 'COMPLETED_WITH_REFUND', ALL, 'resolveClaim refund'],
@@ -93,6 +96,27 @@ describe('QA r5 : every PO move the web client makes passes canTransitionPO', ()
       });
     }
   }
+});
+
+describe('closing a PO with an open claim : the PR owner passes through ctx.isOwner, nobody else below approver', () => {
+  const CLOSES = [['WAITING_DELIVERY_ROUND_2', 'COMPLETED'], ['WAITING_DELIVERY_ROUND_2', 'COMPLETED_WITH_REFUND'], ['PARTIALLY_RECEIVED_IN_CLAIM', 'COMPLETED'],
+    ['PARTIALLY_RECEIVED_IN_CLAIM', 'COMPLETED_WITH_REFUND'], ['CLAIM_REPORTED', 'COMPLETED'], ['CLAIM_PENDING', 'COMPLETED'], ['CLAIM_IN_PROGRESS', 'CLOSED'], ['CLAIM_REPORTED', 'SETTLED']];
+  for (const [from, to] of CLOSES) {
+    it(`${from} -> ${to}: owner L1 / L2 yes, non-owner no, approver / online / admin yes`, () => {
+      expect(canTransitionPO(P.L1, from, to, { isOwner: true })).toBe(true);
+      expect(canTransitionPO(P.L2, from, to, { isOwner: true })).toBe(true);
+      expect(canTransitionPO(P.L1, from, to, { isOwner: false })).toBe(false);
+      expect(canTransitionPO(P.L2, from, to)).toBe(false);
+      expect(canTransitionPO(P.L3, from, to)).toBe(true);
+      expect(canTransitionPO(P.ONLINE, from, to)).toBe(true);
+      expect(canTransitionPO(P.ADMIN, from, to)).toBe(true);
+    });
+  }
+  it('the restriction does not touch the ordinary receive / settle / short-close moves', () => {
+    for (const [from, to] of [['ORDERED', 'COMPLETED'], ['PARTIAL', 'COMPLETED'], ['ORDERED', 'CLOSED'], ['PARTIAL', 'CLOSED'], ['COMPLETED', 'CLOSED'], ['CLAIM_REPORTED', 'WAITING_DELIVERY_ROUND_2'], ['CLAIM_REPORTED', 'CANCELLED']]) {
+      expect(canTransitionPO(P.L1, from, to), `${from} -> ${to}`).toBe(true);
+    }
+  });
 });
 
 describe('QA r5 : step-back moves stay admin-only', () => {

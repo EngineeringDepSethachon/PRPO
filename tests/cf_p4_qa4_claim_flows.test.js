@@ -122,7 +122,8 @@ describe('P4 round 4 QA : ReceivingModal / OnlineOrderCard / PODetailsModal clai
   });
 
   it('G6 self-buy CLOSE_WITH_REFUND by the requester writes the PO refund ; above the PO value = 400 ; CLOSE_NO_ACTION closes', async () => {
-    const mk = (id) => seedPo({ status: 'CLAIM_REPORTED', channel: 'SELF' }, { claimData: { reason: 'broken', reportedBy: 'Owner' }, requesterId: 'REQUESTER_PD' }, id);
+    // the requester closing the claim must own the PO (decision 2026-10-14) : requesterName = the token user's name (the client stores the role id in requesterId)
+    const mk = (id) => seedPo({ status: 'CLAIM_REPORTED', channel: 'SELF' }, { claimData: { reason: 'broken', reportedBy: 'Owner' }, requesterId: 'REQUESTER_PD', requesterName: 'Pim Requester' }, id);
     mk('PO-G1'); mk('PO-G2'); mk('PO-G3');
     const ok = await call('U-L1', 'PUT', '/api/pos/PO-G1', { status: 'COMPLETED', claimStatus: 'RESOLVED_REFUNDED', refundAmount: 30, totalRefunded: 30, claimData: null, claimResolution: { type: 'CLOSE_WITH_REFUND', refundAmount: 30 } });
     expect(ok.status).toBe(200);

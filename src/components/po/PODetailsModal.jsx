@@ -541,15 +541,20 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
   const canReportClaim = isOperational && isDeliveredOrBeyond && canFileClaim;
 
   // Whether the current user can resolve a Self-buy Claim on this PO
+  // decision 2026-10-14 : only the requester who owns the PO/PR, an approver (level >= 3) and admin may close a claim
+  // (the server enforces the same rule in rbac.canTransitionPO ; other receivers / reviewers of the department no longer see the button)
+  const selfClaimOwnerIds = [selectedPO.requesterId, selectedPO.prData?.requesterId, selectedPO.requestedById].filter(Boolean).map(String);
+  const selfClaimOwnerNames = [selectedPO.requesterName, selectedPO.requestedBy, selectedPO.prData?.requesterName].filter(Boolean).map(v => String(v).trim());
   const canResolveSelfClaim = isClaimStatus &&
     selectedPO.purchaseChannel === 'SELF' &&
     (
       currentRole?.id === 'ADMIN' ||
       currentRole?.roleId === 'ADMIN' ||
-      currentRole?.id === selectedPO.requesterId ||
-      currentRole?.roleId === selectedPO.requesterId ||
-      (currentRole?.canReceiveGoods && currentRole?.department === selectedPO.department) ||
-      (currentRole?.canReview && (currentRole?.department === selectedPO.department || currentRole?.canViewAllDepts))
+      Number(currentRole?.level || 0) >= 3 ||
+      currentRole?.canFinalApprove === true ||
+      selfClaimOwnerIds.includes(String(currentRole?.id || '')) ||
+      selfClaimOwnerIds.includes(String(currentRole?.userId || '')) ||
+      selfClaimOwnerNames.includes(String(currentRole?.name || '').trim())
     );
 
   const _handleResolveSelfClaim = async () => {

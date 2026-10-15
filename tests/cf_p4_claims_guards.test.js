@@ -246,7 +246,7 @@ describe('P4 re-check : claim stamping, upsert guards, caps', () => {
   // ── round 3 ──
   const claimBase = { reason: 'broken', images: ['u1', 'u2'], reportedBy: 'Owner', reportedAt: '1/1/2026' };
   it('R3-1/2 closing a claim needs claim status + a closing status change + the right role ; claimResolution alone does nothing', async () => {
-    seedPo({ status: 'CLAIM_REPORTED' }, { claimData: claimBase });
+    seedPo({ status: 'CLAIM_REPORTED' }, { claimData: claimBase, requesterId: 'U-L1' }); // U-L1 owns the PO : may close its claim (decision 2026-10-14)
     // requester: claimResolution:{} + claimData:null without a status change
     await call('U-L1', 'PUT', '/api/pos/PO-C1', { claimResolution: {}, claimData: null });
     let e = extraOf();
@@ -268,7 +268,7 @@ describe('P4 re-check : claim stamping, upsert guards, caps', () => {
     expect(e.claimHistory.some((h) => h.action === 'CLAIM_DATA_ARCHIVED' && h.claimData.images.length === 2)).toBe(true);
   });
   it('R3-1 online channel claims are closed by the online purchaser (or admin), not by a requester', async () => {
-    seedPo({ status: 'CLAIM_PENDING' }, { claimData: claimBase });
+    seedPo({ status: 'CLAIM_PENDING' }, { claimData: claimBase, requesterId: 'U-L2' }); // U-L2 owns the PO ; a non-owner L1 may not close the claim
     sdb.prepare("UPDATE pos SET purchaseChannel='ONLINE' WHERE id='PO-C1'").run();
     await call('U-L1', 'PUT', '/api/pos/PO-C1', { status: 'COMPLETED', claimData: null });
     expect(extraOf().claimData).toBeDefined();
@@ -374,16 +374,23 @@ describe('P4 re-check : claim stamping, upsert guards, caps', () => {
     // a claim that is no longer open (already resolved) cannot be given a refund figure
     await call('U-L2', 'PUT', '/api/pos/PO-C1', { totalRefunded: 99, storeClaims: { A: { isResolved: true, status: 'RESOLVED', type: 'REFUND', refundAmount: 30 } } });
     expect(extraOf().totalRefunded).toBe(30);
-    seedPo({ status: 'CLAIM_PENDING' }, { claimData: { reason: 'r', reportedBy: 'O' } }, 'PO-C2');
+    seedPo({ status: 'CLAIM_PENDING' }, { claimData: { reason: 'r', reportedBy: 'O' }, requesterId: 'U-L2' }, 'PO-C2');
     expect((await call('U-L2', 'PUT', '/api/pos/PO-C2', { status: 'COMPLETED', claimData: null, totalRefunded: -5 })).status).toBe(400);
     expect((await call('U-L2', 'PUT', '/api/pos/PO-C2', { status: 'COMPLETED', claimData: null, totalRefunded: 100000 })).status).toBe(400);
     expect((await call('U-L2', 'PUT', '/api/pos/PO-C2', { status: 'COMPLETED', claimData: null, refundAmount: 60 })).status).toBe(200);
     expect(extraOf('PO-C2').refundAmount).toBe(60);
   });
-  it('R4-6 self-buy close = PODetailsModal rule : requester / receiver / reviewer of the department, admin ; the online purchaser closes ONLINE claims only', async () => {
-    seedPo({ status: 'CLAIM_REPORTED' }, { claimData: claimBase, requesterId: 'REQUESTER_PD' });
+  it('R4-6 self-buy close (decision 2026-10-14) : the requester who owns the PO, approver, admin ; a non-owner receiver / reviewer is refused ; the online purchaser closes ONLINE claims only', async () => {
+    seedPo({ status: 'CLAIM_REPORTED' }, { claimData: claimBase, requesterId: 'U-L1' });
+    // a reviewer of the department who does not own the PO : 403, the claim stays
+    expect((await call('U-L2', 'PUT', '/api/pos/PO-C1', { status: 'COMPLETED', claimData: null })).status).toBe(403);
+    expect(extraOf().claimData).toBeDefined();
     const r = await call('U-L1', 'PUT', '/api/pos/PO-C1', { status: 'COMPLETED', claimData: null });
     expect(r.status).toBe(200); expect(extraOf().claimData).toBeUndefined();
+    // owner matched by name (PR row) when the PO carries no requesterId
+    sdb.prepare("INSERT INTO prs (id, prNumber, department, requesterId, requesterName, status, totalAmount, itemsJson, extraJson) VALUES ('PR-OWN','PD001/2026','PD','SOMEONE-ELSE','Pim Requester','PO_ISSUED',0,'[]','{}')").run();
+    seedPo({ status: 'CLAIM_PENDING' }, { claimData: claimBase }, 'PO-C4');
+    expect((await call('U-L1', 'PUT', '/api/pos/PO-C4', { status: 'COMPLETED', claimData: null })).status).toBe(200);
     seedPo({ status: 'CLAIM_REPORTED', channel: null }, { claimData: claimBase }, 'PO-C2'); // no channel : not SELF = ONLINE
     await call('U-L1', 'PUT', '/api/pos/PO-C2', { status: 'COMPLETED', claimData: null });
     expect(extraOf('PO-C2').claimData).toBeDefined();
@@ -418,17 +425,17 @@ describe('P4 re-check : claim stamping, upsert guards, caps', () => {
     expect(extraOf('PO-C2').claimData).toBeDefined();
   });
   it('R5-4 refund ceiling : a PO with no grandTotal uses totalAmount, a PO with no value refuses any refund > 0', async () => {
-    seedPo({ status: 'CLAIM_PENDING' }, { claimData: claimBase });
+    seedPo({ status: 'CLAIM_PENDING' }, { claimData: claimBase, requesterId: 'U-L2' }); // U-L2 owns the PO ; a non-owner L1 may not close the claim
     sdb.prepare("UPDATE pos SET grandTotal = 0, totalAmount = 40 WHERE id='PO-C1'").run();
     expect((await call('U-L2', 'PUT', '/api/pos/PO-C1', { status: 'COMPLETED', claimData: null, refundAmount: 41 })).status).toBe(400);
     expect((await call('U-L2', 'PUT', '/api/pos/PO-C1', { status: 'COMPLETED', claimData: null, refundAmount: 40 })).status).toBe(200);
-    seedPo({ status: 'CLAIM_PENDING' }, { claimData: claimBase }, 'PO-C2');
+    seedPo({ status: 'CLAIM_PENDING' }, { claimData: claimBase, requesterId: 'U-L2' }, 'PO-C2');
     sdb.prepare("UPDATE pos SET grandTotal = 0, totalAmount = 0 WHERE id='PO-C2'").run();
     expect((await call('U-L2', 'PUT', '/api/pos/PO-C2', { status: 'COMPLETED', claimData: null, totalRefunded: 1 })).status).toBe(400);
     expect((await call('U-L2', 'PUT', '/api/pos/PO-C2', { status: 'COMPLETED', claimData: null, totalRefunded: 0 })).status).toBe(200);
   });
   it('R5-2 claimResolution gets resolvedBy / resolvedAt from the token even when the client sent none', async () => {
-    seedPo({ status: 'CLAIM_REPORTED' }, { claimData: claimBase });
+    seedPo({ status: 'CLAIM_REPORTED' }, { claimData: claimBase, requesterId: 'U-L1' }); // U-L1 owns the PO : may close its claim (decision 2026-10-14)
     await call('U-L1', 'PUT', '/api/pos/PO-C1', { status: 'COMPLETED', claimData: null, claimResolution: { type: 'WRITE_OFF' } });
     expect(extraOf().claimResolution).toMatchObject({ type: 'WRITE_OFF', resolvedBy: 'Pim Requester' });
     expect(extraOf().claimResolution.resolvedAt).toBeTruthy();

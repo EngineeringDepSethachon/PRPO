@@ -359,13 +359,33 @@ export function normalizePoStatus(v) {
   return v.trim().toUpperCase();
 }
 
-export function canTransitionPO(authUser, fromStatus, toStatus) {
+// Closing / completing a PO whose claim is still open (decision 2026-10-14) : only the requester who owns the PR/PO, an approver
+// (level >= 3, not the online purchaser) and admin ; the online purchaser may close an ONLINE claim (OnlineOrderCard). Settling /
+// closing an ordered PO and the normal receive flow (ORDERED/PARTIAL -> COMPLETED) are unchanged.
+// `ctx` = { isOwner, isOnlinePo } resolved by the route (PR requester looked up from the PO) ; a caller that passes nothing is "not the owner".
+export const PO_CLAIM_OPEN = new Set(['CLAIM_REPORTED', 'CLAIM_IN_PROGRESS', 'CLAIM_PENDING', 'PARTIALLY_RECEIVED_IN_CLAIM', 'WAITING_DELIVERY_ROUND_2']);
+export const PO_FINISH = new Set(['CLOSED', 'COMPLETED', 'COMPLETED_WITH_REFUND', 'SETTLED']);
+export function isRestrictedPoClose(fromStatus, toStatus) {
+  const to = normalizePoStatus(toStatus);
+  const from = normalizePoStatus(fromStatus) || '';
+  return Boolean(from && to && PO_FINISH.has(to) && PO_CLAIM_OPEN.has(from));
+}
+export function canClosePoClaim(authUser, ctx = {}) {
+  const p = resolvePermissions(authUser);
+  if (p.isAdmin) return true;
+  if (isOnlinePurchaser(p) || p.canOnlinePurchase) return true; // online claims (OnlineOrderCard) ; the online purchaser's other PO moves stay limited by PO_RULES
+  if (p.level >= 3) return true;
+  return Boolean(ctx && ctx.isOwner);
+}
+
+export function canTransitionPO(authUser, fromStatus, toStatus, ctx = {}) {
   const to = normalizePoStatus(toStatus);
   const from = normalizePoStatus(fromStatus) || '';
   if (to === null) return false;
   if (!to || from === to) return true;
   const p = resolvePermissions(authUser);
   if (p.isAdmin) return true;
+  if (isRestrictedPoClose(from, to) && !canClosePoClaim(authUser, ctx)) return false;
   if (from) {
     // never back to an earlier stage (the client has no such move ; it would unlock the lines) - admin only
     if (PO_PRE_ORDER.has(to) && !PO_PRE_ORDER.has(from)) return false;                     // past the issue -> a pre-order status

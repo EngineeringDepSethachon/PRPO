@@ -1205,6 +1205,33 @@ const ORDER_FREE_STATUSES = new Set(['', 'DRAFT', 'SUBMITTED', 'APPROVED', 'ISSU
 // (conversionRate / conversionRatio : the stock a receipt adds is received qty x conversion, so it is fixed with the order like the price)
 const LINE_ORDER_KEYS = ['qty', 'purchaseQty', 'orderedQty', 'quantity', 'unitPrice', 'price', 'conversionRate', 'conversionRatio'];
 const LINE_CLAIM_KEYS = ['refundAmount', 'refundedQty', 'claimResolution', 'damagedQty', 'shortageQty', 'unitPrice', 'actualPrice', 'price'];
+
+// ctx for rbac.canTransitionPO (closing a PO with an open claim) : is the caller the requester who owns this PO's PR (by id, else by
+// exact name ; the PO's own requesterId/requesterName in extraJson count too), and is it an online task
+async function poOwnerCtx(db, authUser, poId) {
+  const out = { isOwner: false, isOnlinePo: false };
+  if (!db || !poId) return out;
+  try {
+    const po = await db.prepare('SELECT prId, prNumber, purchaseChannel, extraJson FROM pos WHERE id = ? OR poNumber = ? ORDER BY (id = ?) DESC LIMIT 1').bind(poId, poId, poId).first();
+    if (!po) return out;
+    const extra = parseJsonSafe(po.extraJson, {}) || {};
+    const channel = String(po.purchaseChannel || extra.purchaseChannel || extra.channel || '').toUpperCase();
+    out.isOnlinePo = channel === 'ONLINE' || channel === 'ONLINE_PURCHASE';
+    const ids = new Set(); const names = new Set();
+    const add = (id, name) => { if (id) ids.add(String(id)); if (name) names.add(String(name).trim()); };
+    add(extra.requesterId, extra.requesterName || extra.requestedBy);
+    const refs = [po.prId, po.prNumber].filter(Boolean);
+    if (refs.length) {
+      const pr = await db.prepare('SELECT requesterId, requesterName FROM prs WHERE id = ? OR prNumber = ? OR id = ? OR prNumber = ? LIMIT 1')
+        .bind(refs[0], refs[0], refs[1] || refs[0], refs[1] || refs[0]).first();
+      if (pr) add(pr.requesterId, pr.requesterName);
+    }
+    const myId = String(authUser.userId || authUser.id || '');
+    const myName = String(authUser.name || authUser.username || '').trim();
+    out.isOwner = Boolean((myId && ids.has(myId)) || (myName && names.has(myName)));
+  } catch { /* fail closed : not the owner */ }
+  return out;
+}
 const isFinalLineStatus = (s) => { const u = String(s || '').trim().toUpperCase(); return ['CLOSED', 'SETTLED', 'CANCELLED'].includes(u) || u.startsWith('COMPLETED'); };
 const hasValue = (v) => v !== undefined && v !== null && v !== '' && v !== 0 && v !== false;
 function guardPoItems(stored, client, { admin = false, lockPrice = false, onlineish = false, storedStatus = '', notes = null, grnStarted = false } = {}) {
@@ -3093,7 +3120,7 @@ async function handleRequest(context, state) {
           // existing PO: same department gate as PR (client canAction / list filters by department ; online purchaser, admin, all-dept users pass)
           if (cur && !canAccessDepartment(authUser, cur.department)) return errorResponse(FORBIDDEN_MSG, 403);
           const effective = p.status || (cur ? null : 'ORDERED');
-          if (effective && !canTransitionPO(authUser, cur ? cur.status : undefined, effective)) return errorResponse(FORBIDDEN_MSG, 403);
+          if (effective && !canTransitionPO(authUser, cur ? cur.status : undefined, effective, cur ? await poOwnerCtx(db, authUser, p.id) : {})) return errorResponse(FORBIDDEN_MSG, 403);
           if (!cur) {
             // a new PO's id must not be another PO's number (lookups are "id = ? OR poNumber = ?" - same rule as for PRs)
             if (await lookupStatus(db, 'SELECT id FROM pos WHERE poNumber = ? LIMIT 1', p.id)) return errorResponse('รหัส/เลขที่ PO ซ้ำกับเอกสารที่มีอยู่', 409);
@@ -3328,7 +3355,7 @@ async function handleRequest(context, state) {
         const curPo = await lookupStatus(db, 'SELECT id, poNumber, prId, prNumber, status, department, totalAmount, vatAmount, grandTotal, timelineJson, itemsJson, evidenceJson, purchaseChannel, extraJson FROM pos WHERE id = ? OR poNumber = ? ORDER BY (id = ?) DESC LIMIT 1', subId, subId, subId);
         if (curPo && !canAccessDepartment(authUser, curPo.department)) return errorResponse(FORBIDDEN_MSG, 403);
         if (curPo && poAmountsFrozenAndChanged(authUser, curPo, p)) return errorResponse(FORBIDDEN_MSG, 403);
-        if (p.status && curPo && !canTransitionPO(authUser, curPo.status, p.status)) return errorResponse(FORBIDDEN_MSG, 403);
+        if (p.status && curPo && !canTransitionPO(authUser, curPo.status, p.status, await poOwnerCtx(db, authUser, curPo.id || subId))) return errorResponse(FORBIDDEN_MSG, 403);
         const targetPoRowId = curPo && curPo.id ? curPo.id : subId;
         const vendorId = p.vendorId || p.supplierId || null;
         const vendorName = p.vendorName || p.supplierName || null;

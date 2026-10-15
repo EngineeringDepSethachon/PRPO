@@ -46,8 +46,9 @@ d('S4 PR cascade on PO close', () => {
   const po = (id = 'PO-S1') => ({ ...sdb.prepare('SELECT * FROM pos WHERE id = ?').get(id) });
   const LINE = { productId: 'P1', code: 'C1', name: 'Item', qty: 5, purchaseQty: 5, price: 100 };
   const seedPr = (over = {}) => {
-    const r = { id: 'PR-1', prNumber: 'PD001/2026', department: 'PD', status: 'IN_PROGRESS_ONLINE', ...over };
-    sdb.prepare("INSERT INTO prs (id, prNumber, department, status, totalAmount, itemsJson, timelineJson, extraJson) VALUES (?,?,?,?,500,'[]','[]','{}')").run(r.id, r.prNumber, r.department, r.status);
+    // requester = U1 ('wh') : closing a PO with an open claim (S4d, WAITING_DELIVERY_ROUND_2 -> COMPLETED) is reserved to the PR owner / approver / admin
+    const r = { id: 'PR-1', prNumber: 'PD001/2026', department: 'PD', status: 'IN_PROGRESS_ONLINE', requesterId: 'U1', requesterName: 'Warehouse', ...over };
+    sdb.prepare("INSERT INTO prs (id, prNumber, department, status, requesterId, requesterName, totalAmount, itemsJson, timelineJson, extraJson) VALUES (?,?,?,?,?,?,500,'[]','[]','{}')").run(r.id, r.prNumber, r.department, r.status, r.requesterId, r.requesterName);
   };
   const seedPo = (id = 'PO-S1', over = {}) => {
     const r = { poNumber: 'PO-PD-2026-001', prNumber: 'PD001/2026', department: 'PD', status: 'ORDERED', ...over };
