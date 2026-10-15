@@ -76,6 +76,38 @@ function shapeNotification(n, read = false) {
   return { ...rest, status: read ? 'read' : 'unread', isRead: read, read, createdAt: sqliteUtcToIso(n.timestamp) };
 }
 
+// rows this user is a recipient of (GAS rule), newest first, examined page by page (500 rows, at most 2000) until 200 are found.
+// The table grows forever but the client only keeps the latest 100 (notificationService). Optional `since` (ISO) narrows it in SQL.
+// (GAS apiGetNotifications reads and filters the whole sheet ; this is the one deliberate difference.)
+async function scanVisibleNotifications(db, viewer, since = null) {
+  const out = [];
+  for (let offset = 0; offset < NOTIFY_SCAN_MAX && out.length < NOTIFY_RETURN_MAX; offset += NOTIFY_SCAN_PAGE) {
+    const res = await db.prepare(`SELECT * FROM notifications ${since ? 'WHERE timestamp >= ?' : ''} ORDER BY timestamp DESC, rowid DESC LIMIT ? OFFSET ?`)
+      .bind(...(since ? [since] : []), NOTIFY_SCAN_PAGE, offset).all();
+    const page = res.results || [];
+    for (const n of page) {
+      if (out.length < NOTIFY_RETURN_MAX && isUserTargetOfNotification(n, viewer)) out.push(n);
+    }
+    if (page.length < NOTIFY_SCAN_PAGE) break;
+  }
+  return out;
+}
+
+// What GET /api/notifications returns, also carried by /api/bootstrap (GAS apiGetBootstrapData `notifications`, filtered with the same rule) :
+// the rows this user is a recipient of, shaped for the client, with THIS user's read marks only (one query, ids as one JSON parameter).
+// A row an older version marked read in the shared column (status = 'read') stays read for everybody (the behaviour before per-user read state).
+export async function listNotificationsFor(db, authUser, viewer, since = null) {
+  const out = await scanVisibleNotifications(db, viewer, since);
+  const readSet = new Set();
+  if (out.length) {
+    try {
+      const rr = await db.prepare('SELECT notificationId FROM notification_reads WHERE userId = ? AND notificationId IN (SELECT value FROM json_each(?))').bind(authUser.userId, JSON.stringify(out.map((n) => n.id))).all();
+      for (const r of rr.results || []) readSet.add(r.notificationId);
+    } catch (e) { console.error('[notifications] read marks failed', e && e.message); }
+  }
+  return out.map((n) => shapeNotification(n, readSet.has(n.id) || String(n.status || '').toLowerCase() === 'read'));
+}
+
 // ───────────── MAC : port of gas/Code.gs apiRecalculateProductMAC (:790-879) ─────────────
 const round2 = (x) => Math.round((x + Number.EPSILON) * 100) / 100;
 
@@ -270,38 +302,13 @@ export async function handleExtraRoutes(ctx) {
     if (path !== '/api/notifications' && !oneSeg(id)) return null;
     if (!db) return noDb();
 
-    // rows this user is a recipient of (GAS rule), newest first, examined page by page (500 rows, at most 2000) until 200 are found
-    const visibleNotifications = async (since) => {
-      const out = [];
-      for (let offset = 0; offset < NOTIFY_SCAN_MAX && out.length < NOTIFY_RETURN_MAX; offset += NOTIFY_SCAN_PAGE) {
-        const res = await db.prepare(`SELECT * FROM notifications ${since ? 'WHERE timestamp >= ?' : ''} ORDER BY timestamp DESC, rowid DESC LIMIT ? OFFSET ?`)
-          .bind(...(since ? [since] : []), NOTIFY_SCAN_PAGE, offset).all();
-        const page = res.results || [];
-        for (const n of page) {
-          if (out.length < NOTIFY_RETURN_MAX && isUserTargetOfNotification(n, viewer)) out.push(n);
-        }
-        if (page.length < NOTIFY_SCAN_PAGE) break;
-      }
-      return out;
-    };
+    const visibleNotifications = (since) => scanVisibleNotifications(db, viewer, since);
 
     if (method === 'GET' && !id) {
-      // Newest first, examined page by page (500 rows, at most 2000 rows) and filtered with the GAS recipient rule until 200 are found :
-      // the table grows forever but the client only keeps the latest 100 (notificationService). Optional ?since=<ISO> narrows it in SQL.
-      // (GAS apiGetNotifications reads and filters the whole sheet ; this is the one deliberate difference.)
+      // the same list /api/bootstrap carries (listNotificationsFor) ; optional ?since=<ISO> narrows it in SQL
       const sinceRaw = new URL(request.url).searchParams.get('since');
       const since = sinceRaw && !Number.isNaN(Date.parse(sinceRaw)) ? new Date(sinceRaw).toISOString() : null;
-      const out = await visibleNotifications(since);
-      // this user's own read marks only (one query, ids as one JSON parameter) ; a row an older version marked read in the shared column (status = 'read')
-      // stays read for everybody (the behaviour before per-user read state)
-      const readSet = new Set();
-      if (out.length) {
-        try {
-          const rr = await db.prepare('SELECT notificationId FROM notification_reads WHERE userId = ? AND notificationId IN (SELECT value FROM json_each(?))').bind(authUser.userId, JSON.stringify(out.map((n) => n.id))).all();
-          for (const r of rr.results || []) readSet.add(r.notificationId);
-        } catch (e) { console.error('[notifications] read marks failed', e && e.message); }
-      }
-      return jsonResponse(out.map((n) => shapeNotification(n, readSet.has(n.id) || String(n.status || '').toLowerCase() === 'read')));
+      return jsonResponse(await listNotificationsFor(db, authUser, viewer, since));
     }
 
     // mark many as read in one call : body { ids?: [...] } (at most 200) or nothing = every notification this user can see. Only notifications the user is a

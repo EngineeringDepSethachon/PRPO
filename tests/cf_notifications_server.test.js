@@ -106,6 +106,25 @@ d('server notifications (M7-2)', () => {
     expect(seen.reqqc).toBe(false); // other department
   });
 
+  it('TC-005 follow-up : /api/bootstrap carries `notifications` = the same filtered, shaped list as GET /api/notifications (GAS apiGetBootstrapData parity)', async () => {
+    await call('req', 'POST', '/api/prs', newPr());
+    const row = allNotifs()[0];
+    for (const u of ['asst', 'pm', 'adm', 'req', 'reqqc']) {
+      const boot = (await call(u, 'GET', '/api/bootstrap')).json;
+      expect(Array.isArray(boot.notifications), u).toBe(true);
+      expect(boot.notifications, u).toEqual(await seenBy(u));
+      expect(boot.notifications.some((x) => x.id === row.id), u).toBe(isUserTargetOfNotification(row, safe[u]));
+    }
+    const admBoot = (await call('adm', 'GET', '/api/bootstrap')).json.notifications;
+    expect(admBoot).toHaveLength(1);
+    expect(admBoot[0]).toMatchObject({ id: row.id, status: 'unread', isRead: false, read: false, targetRole: 'Approver', targetDepartment: 'PD' });
+    expect(admBoot[0].createdBy).toBeUndefined(); // shaped like GET (server bookkeeping never sent)
+    // this user's read mark shows in the bootstrap too, and only for this user
+    expect((await call('adm', 'PUT', `/api/notifications/${row.id}`, { isRead: true })).status).toBe(200);
+    expect((await call('adm', 'GET', '/api/bootstrap')).json.notifications[0].isRead).toBe(true);
+    expect((await call('pm', 'GET', '/api/bootstrap')).json.notifications[0].isRead).toBe(false);
+  });
+
   it('review sends nothing ; approve -> 2 PR_APPROVED rows (Requester + Purchaser) ; the PR department comes from the row, not the body', async () => {
     await call('req', 'POST', '/api/prs', newPr());
     await call('asst', 'PUT', '/api/prs/PR-N1', { status: 'REVIEWED' });

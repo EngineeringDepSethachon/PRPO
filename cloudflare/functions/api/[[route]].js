@@ -7,7 +7,7 @@ import { buildCorsHeaders } from '../_lib/cors.js';
 import { authorize, canWriteBudget, resolvePermissions, canAdjustBudget, canTransitionPR, canTransitionPO, PO_CLIENT_STATUSES, PO_PRE_ORDER, normalizePoStatus, canAccessDepartment, clientCanAccessDepartmentData, clientViewOfUser, canEditPrContent, normalizeUser, normalizeDeptCode, ledgerDeptCode, isWildcardDept } from '../_lib/rbac.js';
 import { issueDocNumber, issueGrnNumber, bangkokYear, bangkokMonth } from '../_lib/docnum.js';
 import { classifyUnhandled } from '../_lib/routes.js';
-import { handleExtraRoutes } from '../_lib/extra.js';
+import { handleExtraRoutes, listNotificationsFor } from '../_lib/extra.js';
 import { utcIsoRow, utcIsoRows } from '../_lib/timefmt.js';
 import { productView, productViews } from '../_lib/products.js';
 import { stockLogViews } from '../_lib/stocklogs.js';
@@ -2095,10 +2095,14 @@ async function handleRequest(context, state) {
       }
 
       const productList = await productViews(db, productsRes.results || []);
+      // GAS apiGetBootstrapData carried `notifications` (filtered with isUserTargetOfNotification) ; the client never calls GET /api/notifications
+      // on its own, so without this the bell popover stays empty on a fresh device (TC-005 follow-up, 2026-10-15)
+      const notifications = await listNotificationsFor(db, authUser, formatSafeUser(authUser)).catch((e) => { console.error('[bootstrap] notifications failed', e && e.message); return []; });
       return jsonResponse({
         success: true,
         prs,
         pos,
+        notifications,
         products: productList,
         inventory: productList,
         vendors: utcIsoRows(vendorsRes.results || []),
