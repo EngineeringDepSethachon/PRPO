@@ -22,7 +22,7 @@ import { getDriveFileViewUrl } from '../utils/driveHelper';
 import ProxiedImg from '../components/common/ProxiedImg';
 import { driveFileIdOf, openProxiedFile, isProxyFileUrl } from '../utils/cfAttachments';
 import { compressImage, compressImageFile, getBase64SizeBytes, MAX_IMAGE_SIZE_BYTES } from '../utils/fileUtils';
-import { isDepartmentMatch } from '../utils/permissions';
+import { isDepartmentMatch, getUserDepartments } from '../utils/permissions';
 
 /**
  * Deduplicate Master Data & Inventory list for product dropdowns/comboboxes
@@ -169,16 +169,30 @@ export default function PRCreateView({
     }, {});
   }, [deptList]);
 
-  // Determine effective department (locked for dept-specific users, selectable for ALL)
-  const defaultCode = activeDepartments[0]?.code || 'PD';
-  const preselectedDept = Array.isArray(preselectedProduct) 
-    ? (preselectedProduct[0]?.category || preselectedProduct[0]?.department) 
+  // Departments this user may open a PR for (TC-011, 2026-10-15) : every department they are assigned to / allowed
+  // (allowedDepartments, assignedDepartments, departments, primary) - not only the primary one. 'ALL' / '*' = every active department.
+  const userDeptCodes = useMemo(() => getUserDepartments(currentRole).map(c => String(c).toUpperCase()), [currentRole]);
+  const canPickAnyDept = currentRole?.department === 'ALL' || currentRole?.canViewAllDepts === true ||
+    userDeptCodes.includes('ALL') || userDeptCodes.includes('*');
+  const selectableDepartments = useMemo(() => {
+    if (canPickAnyDept) return activeDepartments;
+    const mine = activeDepartments.filter(d => userDeptCodes.includes(String(d.code || '').toUpperCase()));
+    return mine;
+  }, [canPickAnyDept, activeDepartments, userDeptCodes]);
+  // the selector shows when the user may choose between 2+ departments (the server checks the department of the PR again : canAccessDepartment)
+  const canChooseDepartment = canPickAnyDept || selectableDepartments.length > 1;
+
+  // Determine effective department (locked for single-department users, selectable for ALL / multi-department users)
+  const defaultCode = (selectableDepartments[0] || activeDepartments[0])?.code || 'PD';
+  const preselectedDept = Array.isArray(preselectedProduct)
+    ? (preselectedProduct[0]?.category || preselectedProduct[0]?.department)
     : (preselectedProduct?.category || preselectedProduct?.department);
-  const initialDept = editingPR 
-    ? editingPR.department 
-    : (currentRole?.department === 'ALL' 
-        ? (preselectedDept || defaultCode) 
-        : (currentRole?.department || defaultCode));
+  const isSelectable = (code) => Boolean(code) && (canPickAnyDept || selectableDepartments.some(d => String(d.code || '').toUpperCase() === String(code).toUpperCase()));
+  const initialDept = editingPR
+    ? editingPR.department
+    : (canPickAnyDept
+        ? (preselectedDept || defaultCode)
+        : ((isSelectable(preselectedDept) && preselectedDept) || (isSelectable(currentRole?.department) && currentRole?.department) || currentRole?.department || defaultCode));
 
   const [department, setDepartment] = useState(initialDept);
 
@@ -1348,21 +1362,22 @@ export default function PRCreateView({
                 <label className="text-xs font-bold text-slate-700 block">
                   ฝ่ายผู้ขอซื้อ (Department) <span className="text-rose-500">*</span>
                 </label>
-                {currentRole?.department !== 'ALL' ? (
+                {!canChooseDepartment || Boolean(editingPR) ? (
                   <div className="w-full border border-slate-200/80 bg-slate-50/60 rounded-xl px-3.5 py-2 text-xs font-semibold flex items-center justify-between gap-2 text-slate-800">
                     <div className="flex items-center gap-2">
                       <Building2 className="w-3.5 h-3.5 text-slate-500" />
                       <span>{deptMap[department]?.name ? `${deptMap[department].name} (${department})` : department}</span>
                     </div>
-                    <span className="text-[10px] font-normal text-slate-400">(ตามสิทธิ์)</span>
+                    <span className="text-[10px] font-normal text-slate-400">{editingPR ? '(ตามเอกสาร)' : '(ตามสิทธิ์)'}</span>
                   </div>
                 ) : (
                   <select
                     value={department}
                     onChange={e => setDepartment(e.target.value)}
+                    aria-label="ฝ่ายผู้ขอซื้อ"
                     className="w-full bg-slate-50/50 border border-slate-300 rounded-xl px-3 py-2 text-xs font-semibold text-slate-800 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all cursor-pointer"
                   >
-                    {activeDepartments.map(d => (
+                    {selectableDepartments.map(d => (
                       <option key={d.code} value={d.code}>
                         {d.name} ({d.code})
                       </option>

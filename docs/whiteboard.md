@@ -6,9 +6,11 @@
 - progress = จำนวน [x] / ทั้งหมด (server คำนวณ)
 -->
 # ไวท์บอร์ด Migrate Team
-อัปเดต: 2026-10-15 11:00
+อัปเดต: 2026-10-15 11:30
 
 ## ✅ ตัดสินใจแล้ว
+
+- [2026-10-15] TC-011 ปิด: หน้าเปิด PR ให้เลือกแผนกได้ทุกแผนกที่ผู้ใช้ดูแล (getUserDepartments: allowedDepartments/assignedDepartments/primary) ไม่ล็อกแค่แผนกหลัก ; 'ALL'/'*' = ทุกแผนก active ; แผนกเดียว/โหมดแก้ไขยังล็อก ; deploy prod แล้ว
 
 - [2026-10-15] TC-010 ปิด: WAITING_DELIVERY_ROUND_2 ไม่ใช่ "เคลมค้าง" (เคลมจบแล้ว รอของทดแทน) ถอดออกจาก rbac.PO_CLAIM_OPEN → Requester ทุกคนที่รับของได้ ยืนยันตรวจรับรอบ 2 (→ COMPLETED) ได้ ; กฎจำกัดปิดเคลมยังคงใช้กับ CLAIM_REPORTED/CLAIM_IN_PROGRESS/CLAIM_PENDING/PARTIALLY_RECEIVED_IN_CLAIM ; deploy prod แล้ว
 

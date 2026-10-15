@@ -18,6 +18,8 @@
 
 | TC-010 | Critical | รับของเพิ่มจากการเคลม (ออนไลน์) | หลังจัดซื้อออนไลน์จัดการเคลมเสร็จ (ส่งทดแทน) Requester กดตรวจรับรอบ 2 ไม่ได้ (Bug_log_PRPO (2).xlsx, 2026-10-15) | ฟอร์มเปิดได้ แต่ตอนยืนยัน `ReceivingModal` ส่ง PUT status `WAITING_DELIVERY_ROUND_2 → COMPLETED` ถูก `rbac.PO_CLAIM_OPEN` (กฎปิดเคลม 03a483c) ปฏิเสธ 403 สำหรับ Requester ที่ไม่ใช่เจ้าของ PR **→ แก้แล้ว: ถอด ROUND_2 ออกจากชุดเคลมค้าง deploy prod 2026-10-15** |
 
+| TC-011 | High | เปิด PR | ผู้ใช้ที่ดูแล 2 แผนกขึ้นไป (Asst. Manager ขึ้นไป) เปิด PR ได้แค่แผนกเดียว (Bug_log_PRPO (3).xlsx, 2026-10-15) | `PRCreateView` ล็อกแผนกเป็น `currentRole.department` เว้นแต่ 'ALL' **→ แก้แล้ว: dropdown จากแผนกที่ผู้ใช้ดูแล (getUserDepartments) deploy prod 2026-10-15** |
+
 ## ลำดับที่แนะนำ
 1. TC-008 + TC-007 (ตัวเลขสต็อก/ต้นทุนผิด = ข้อมูลเสีย) และ TC-004 (บันทึกหาย)
 2. TC-003, TC-006, TC-009 (สายเคลมค้างกลางทาง ทั้งภายในและออนไลน์ ควรแก้เป็นชุดเดียวใน workspaceService + PODetailsModal + OnlineProcurementHub)
