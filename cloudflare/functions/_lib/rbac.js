@@ -363,7 +363,10 @@ export function normalizePoStatus(v) {
 // (level >= 3, not the online purchaser) and admin ; the online purchaser may close an ONLINE claim (OnlineOrderCard). Settling /
 // closing an ordered PO and the normal receive flow (ORDERED/PARTIAL -> COMPLETED) are unchanged.
 // `ctx` = { isOwner, isOnlinePo } resolved by the route (PR requester looked up from the PO) ; a caller that passes nothing is "not the owner".
-export const PO_CLAIM_OPEN = new Set(['CLAIM_REPORTED', 'CLAIM_IN_PROGRESS', 'CLAIM_PENDING', 'PARTIALLY_RECEIVED_IN_CLAIM', 'WAITING_DELIVERY_ROUND_2']);
+// WAITING_DELIVERY_ROUND_2 is NOT an open claim : the claim was already resolved (replacement on its way) and the round-2 goods receipt by the
+// requester completes the PO (ReceivingModal -> PUT status COMPLETED) - TC-010 (2026-10-15) : that receipt answered 403 for a requester who did
+// not own the PR
+export const PO_CLAIM_OPEN = new Set(['CLAIM_REPORTED', 'CLAIM_IN_PROGRESS', 'CLAIM_PENDING', 'PARTIALLY_RECEIVED_IN_CLAIM']);
 export const PO_FINISH = new Set(['CLOSED', 'COMPLETED', 'COMPLETED_WITH_REFUND', 'SETTLED']);
 export function isRestrictedPoClose(fromStatus, toStatus) {
   const to = normalizePoStatus(toStatus);

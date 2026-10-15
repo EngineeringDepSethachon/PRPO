@@ -46,10 +46,10 @@ const CLIENT_MOVES = [
   ['ORDERED', 'COMPLETED_WITH_REFUND', ALL, 'ReceivingModal.jsx:1005 inline REFUND'],
   ['PARTIAL', 'WAITING_DELIVERY_ROUND_2', ALL, 'ReceivingModal.jsx:980'],
   // round 2
-  ['WAITING_DELIVERY_ROUND_2', 'COMPLETED', CLAIM_CLOSE, 'receive round 2 -> COMPLETED'],
+  ['WAITING_DELIVERY_ROUND_2', 'COMPLETED', ALL, 'receive round 2 -> COMPLETED (TC-010 : the claim is already resolved, any receiver completes it)'],
   ['WAITING_DELIVERY_ROUND_2', 'PARTIAL', ALL, 'receive round 2 still short'],
   ['WAITING_DELIVERY_ROUND_2', 'PARTIALLY_RECEIVED_IN_CLAIM', ALL, 'receive round 2 with a new claim'],
-  ['WAITING_DELIVERY_ROUND_2', 'COMPLETED_WITH_REFUND', CLAIM_CLOSE, 'round 2 inline refund'],
+  ['WAITING_DELIVERY_ROUND_2', 'COMPLETED_WITH_REFUND', ALL, 'round 2 inline refund (TC-010 : ROUND_2 is not an open claim)'],
   ['PARTIALLY_RECEIVED_IN_CLAIM', 'PARTIAL', ALL, 'receive next round while in claim'],
   ['PARTIALLY_RECEIVED_IN_CLAIM', 'COMPLETED', CLAIM_CLOSE, 'resolveClaim all stores resolved'],
   ['PARTIALLY_RECEIVED_IN_CLAIM', 'WAITING_DELIVERY_ROUND_2', ALL, 'resolveClaim REPLACEMENT workflowEngine:2926/3005/3134'],
@@ -99,8 +99,14 @@ describe('QA r5 : every PO move the web client makes passes canTransitionPO', ()
 });
 
 describe('closing a PO with an open claim : the PR owner passes through ctx.isOwner, nobody else below approver', () => {
-  const CLOSES = [['WAITING_DELIVERY_ROUND_2', 'COMPLETED'], ['WAITING_DELIVERY_ROUND_2', 'COMPLETED_WITH_REFUND'], ['PARTIALLY_RECEIVED_IN_CLAIM', 'COMPLETED'],
+  const CLOSES = [['PARTIALLY_RECEIVED_IN_CLAIM', 'COMPLETED'],
     ['PARTIALLY_RECEIVED_IN_CLAIM', 'COMPLETED_WITH_REFUND'], ['CLAIM_REPORTED', 'COMPLETED'], ['CLAIM_PENDING', 'COMPLETED'], ['CLAIM_IN_PROGRESS', 'CLOSED'], ['CLAIM_REPORTED', 'SETTLED']];
+  it('TC-010 (2026-10-15) : WAITING_DELIVERY_ROUND_2 is not an open claim - the round-2 receipt (-> COMPLETED) and an inline refund close are open to every receiver, owner or not', () => {
+    for (const to of ['COMPLETED', 'COMPLETED_WITH_REFUND', 'CLOSED']) {
+      expect(canTransitionPO(P.L1, 'WAITING_DELIVERY_ROUND_2', to, { isOwner: false }), to).toBe(true);
+      expect(canTransitionPO(P.L2, 'WAITING_DELIVERY_ROUND_2', to), to).toBe(true);
+    }
+  });
   for (const [from, to] of CLOSES) {
     it(`${from} -> ${to}: owner L1 / L2 yes, non-owner no, approver / online / admin yes`, () => {
       expect(canTransitionPO(P.L1, from, to, { isOwner: true })).toBe(true);

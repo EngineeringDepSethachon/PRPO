@@ -396,6 +396,18 @@ describe('P4 re-check : claim stamping, upsert guards, caps', () => {
     expect(extraOf('PO-C2').claimData).toBeDefined();
   });
 
+  it('TC-010 (2026-10-15) round-2 receipt of an ONLINE PO : a requester who does not own the PR completes WAITING_DELIVERY_ROUND_2 -> COMPLETED (PO-PD-2026-004)', async () => {
+    // PR / PO owned by the reviewer (U-L2) ; the online purchaser already resolved the claim (RESEND) ; U-L1 receives the replacement
+    seedPo({ status: 'WAITING_DELIVERY_ROUND_2', channel: 'ONLINE', items: [{ productId: 'P1', code: 'C1', name: 'Item', qty: 10, orderedQty: 10, receivedQty: 9, remainingQty: 1, price: 10, claimResolution: 'REPLACEMENT', replacementPendingQty: 1 }] },
+      { requesterId: 'U-L2', requestedBy: 'Asst Manager', claimStatus: 'REPLACEMENT_PENDING', claimResolution: { type: 'RESEND', resolvedBy: 'Online Buyer' } }, 'PO-R2');
+    const r = await call('U-L1', 'PUT', '/api/pos/PO-R2', { status: 'COMPLETED', claimStatus: 'RESOLVED', isInClaim: false, hasUnresolvedClaim: false, items: [{ productId: 'P1', code: 'C1', name: 'Item', qty: 10, orderedQty: 10, receivedQty: 10, remainingQty: 0, price: 10 }] });
+    expect(r.status).toBe(200);
+    expect(rowOf('PO-R2').status).toBe('COMPLETED');
+    // a claim that is really still open stays restricted for the same non-owner
+    seedPo({ status: 'CLAIM_PENDING', channel: 'ONLINE' }, { claimData: claimBase, requesterId: 'U-L2' }, 'PO-R3');
+    expect((await call('U-L1', 'PUT', '/api/pos/PO-R3', { status: 'COMPLETED', claimData: null })).status).toBe(403);
+  });
+
   it('R4-6b (2026-10-15) the requester who RECEIVED the goods and reported the claim closes it even when somebody else owns the PR (PO-PD-2026-003)', async () => {
     // PR / PO owned by the reviewer (U-L2) ; the claim was filed by U-L1 (name stamp as ReceivingModal writes it)
     seedPo({ status: 'PARTIALLY_RECEIVED_IN_CLAIM' }, { claimData: { ...claimBase, reportedBy: 'Pim Requester' }, requesterId: 'U-L2', requestedBy: 'Asst Manager' }, 'PO-C5');

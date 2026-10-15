@@ -6,9 +6,11 @@
 - progress = จำนวน [x] / ทั้งหมด (server คำนวณ)
 -->
 # ไวท์บอร์ด Migrate Team
-อัปเดต: 2026-10-15 10:30
+อัปเดต: 2026-10-15 11:00
 
 ## ✅ ตัดสินใจแล้ว
+
+- [2026-10-15] TC-010 ปิด: WAITING_DELIVERY_ROUND_2 ไม่ใช่ "เคลมค้าง" (เคลมจบแล้ว รอของทดแทน) ถอดออกจาก rbac.PO_CLAIM_OPEN → Requester ทุกคนที่รับของได้ ยืนยันตรวจรับรอบ 2 (→ COMPLETED) ได้ ; กฎจำกัดปิดเคลมยังคงใช้กับ CLAIM_REPORTED/CLAIM_IN_PROGRESS/CLAIM_PENDING/PARTIALLY_RECEIVED_IN_CLAIM ; deploy prod แล้ว
 
 - [2026-10-15] ขยาย "เจ้าของเคลม" (กฎปิด PO ที่ติดเคลม 2026-10-14): ผู้ที่ตรวจรับและแจ้งเคลม (reportedBy/reportedById ใน claimData/claimDetails/storeClaims) นับเป็นเจ้าของด้วย นอกจากผู้ขอซื้อของ PR — เคส PO-PD-2026-003 (PR โดยกัลยาณี, เคลมโดยสิรภัทร) ; ทำทั้ง server poOwnerCtx และ PODetailsModal ; deploy prod แล้ว
 

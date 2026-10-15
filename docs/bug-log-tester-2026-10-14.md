@@ -16,6 +16,8 @@
 | TC-008 | Critical | เบิกจ่ายด่วน: ต้นทุนเฉลี่ย | หน้าจอโชว์ต้นทุนเฉลี่ย 134.29 แต่ตัดสต็อกจริงที่ 100/หน่วย (ราคาตั้งต้น) และไม่แสดงวันเวลา | server `/api/stock/issue` (`[[route]].js:4384`) ใช้ `products.avgCost || standardPrice` ; ปุ่ม "คำนวณต้นทุนเฉลี่ยใหม่" คำนวณฝั่ง client จาก log แล้ว**ไม่บันทึกลง D1** → server ยังเห็น avgCost เดิม ; แนวแก้: ให้ server คำนวณ MAC จาก stock_logs ตอนเบิก หรือให้ปุ่มคำนวณบันทึก avgCost ผ่าน API (และตรวจว่า GRN อัปเดต avgCost ครบทุกเส้นทาง) |
 | TC-009 | Critical | จัดซื้อออนไลน์: ปิดงานหลังเคลม | PO ออนไลน์ที่มีเคลม เมื่อ Requester รับของเสร็จและ PO เป็นสำเร็จ แต่การ์ดใน Online Hub ไม่ย้ายไปแท็บ "ปิดงานสำเร็จ" | `OnlineProcurementHub.jsx` จัดแท็บจากสถานะ PO/claimStatus ; สถานะหลังเคลมจบ (เช่น `COMPLETED` + claimStatus ค้าง `REPLACEMENT_PENDING/RESOLVED`) ไม่เข้าเงื่อนไขแท็บปิดงาน |
 
+| TC-010 | Critical | รับของเพิ่มจากการเคลม (ออนไลน์) | หลังจัดซื้อออนไลน์จัดการเคลมเสร็จ (ส่งทดแทน) Requester กดตรวจรับรอบ 2 ไม่ได้ (Bug_log_PRPO (2).xlsx, 2026-10-15) | ฟอร์มเปิดได้ แต่ตอนยืนยัน `ReceivingModal` ส่ง PUT status `WAITING_DELIVERY_ROUND_2 → COMPLETED` ถูก `rbac.PO_CLAIM_OPEN` (กฎปิดเคลม 03a483c) ปฏิเสธ 403 สำหรับ Requester ที่ไม่ใช่เจ้าของ PR **→ แก้แล้ว: ถอด ROUND_2 ออกจากชุดเคลมค้าง deploy prod 2026-10-15** |
+
 ## ลำดับที่แนะนำ
 1. TC-008 + TC-007 (ตัวเลขสต็อก/ต้นทุนผิด = ข้อมูลเสีย) และ TC-004 (บันทึกหาย)
 2. TC-003, TC-006, TC-009 (สายเคลมค้างกลางทาง ทั้งภายในและออนไลน์ ควรแก้เป็นชุดเดียวใน workspaceService + PODetailsModal + OnlineProcurementHub)

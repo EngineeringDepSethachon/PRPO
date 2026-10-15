@@ -288,6 +288,7 @@ describe.skipIf(!DatabaseSync)('T4.5 functional (onRequest + migrated sqlite)', 
       ['CLAIM_REPORTED', 'COMPLETED', ['ONLINE', 'L3', 'L4', 'ADMIN']],
       ['CLAIM_PENDING', 'COMPLETED', ['ONLINE', 'L3', 'L4', 'ADMIN']],
       ['CLAIM_REPORTED', 'WAITING_DELIVERY_ROUND_2', ALLP],
+      ['WAITING_DELIVERY_ROUND_2', 'COMPLETED', ALLP], // TC-010 : the round-2 receipt completes the PO ; the claim was already resolved
       ['ORDERED', 'CANCELLED', NOT_ONLINE], // canCancelPO: the online purchaser can never cancel a PO
       ['CLAIM_REPORTED', 'CANCELLED', NOT_ONLINE],
       ['ORDERED', 'RECEIVED', ['L1', 'ADMIN']],
