@@ -546,8 +546,12 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
   // Whether the current user can resolve a Self-buy Claim on this PO
   // decision 2026-10-14 : only the requester who owns the PO/PR, an approver (level >= 3) and admin may close a claim
   // (the server enforces the same rule in rbac.canTransitionPO ; other receivers / reviewers of the department no longer see the button)
-  const selfClaimOwnerIds = [selectedPO.requesterId, selectedPO.prData?.requesterId, selectedPO.requestedById].filter(Boolean).map(String);
-  const selfClaimOwnerNames = [selectedPO.requesterName, selectedPO.requestedBy, selectedPO.prData?.requesterName].filter(Boolean).map(v => String(v).trim());
+  // + the person who received the goods and reported the claim (same rule as the server's poOwnerCtx, 2026-10-15)
+  const claimReporters = [selectedPO.claimData, selectedPO.claimDetails, ...Object.values(selectedPO.storeClaims && typeof selectedPO.storeClaims === 'object' ? selectedPO.storeClaims : {})]
+    .filter(c => c && typeof c === 'object');
+  const plainName = (v) => String(v || '').split(' (')[0].trim();
+  const selfClaimOwnerIds = [selectedPO.requesterId, selectedPO.prData?.requesterId, selectedPO.requestedById, ...claimReporters.map(c => c.reportedById || c.reportedByUserId)].filter(Boolean).map(String);
+  const selfClaimOwnerNames = [selectedPO.requesterName, selectedPO.requestedBy, selectedPO.prData?.requesterName, ...claimReporters.map(c => plainName(c.reportedBy || c.reporterName))].filter(Boolean).map(v => String(v).trim());
   const canResolveSelfClaim = isClaimStatus &&
     selectedPO.purchaseChannel === 'SELF' &&
     (
@@ -557,7 +561,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
       currentRole?.canFinalApprove === true ||
       selfClaimOwnerIds.includes(String(currentRole?.id || '')) ||
       selfClaimOwnerIds.includes(String(currentRole?.userId || '')) ||
-      selfClaimOwnerNames.includes(String(currentRole?.name || '').trim())
+      selfClaimOwnerNames.includes(plainName(currentRole?.name))
     );
 
   const _handleResolveSelfClaim = async () => {

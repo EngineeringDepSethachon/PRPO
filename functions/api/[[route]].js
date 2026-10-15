@@ -1220,6 +1220,13 @@ async function poOwnerCtx(db, authUser, poId) {
     const ids = new Set(); const names = new Set();
     const add = (id, name) => { if (id) ids.add(String(id)); if (name) names.add(String(name).trim()); };
     add(extra.requesterId, extra.requesterName || extra.requestedBy);
+    // the person who received the goods and reported the claim is an owner of that claim too (2026-10-15 : the PR of PO-PD-2026-003 was
+    // made by a reviewer, the requester who filed the claim could not continue it) ; "name (position)" stamps count by their name part
+    const plainName = (v) => String(v || '').split(' (')[0].trim();
+    const addReporter = (c) => { if (c && typeof c === 'object') add(c.reportedById || c.reportedByUserId, plainName(c.reportedBy || c.reporterName)); };
+    addReporter(extra.claimData); addReporter(extra.claimDetails);
+    const stores = extra.storeClaims && typeof extra.storeClaims === 'object' ? Object.values(extra.storeClaims) : [];
+    for (const s of stores) addReporter(s);
     const refs = [po.prId, po.prNumber].filter(Boolean);
     if (refs.length) {
       const pr = await db.prepare('SELECT requesterId, requesterName FROM prs WHERE id = ? OR prNumber = ? OR id = ? OR prNumber = ? LIMIT 1')

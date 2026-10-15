@@ -395,6 +395,23 @@ describe('P4 re-check : claim stamping, upsert guards, caps', () => {
     await call('U-L1', 'PUT', '/api/pos/PO-C2', { status: 'COMPLETED', claimData: null });
     expect(extraOf('PO-C2').claimData).toBeDefined();
   });
+
+  it('R4-6b (2026-10-15) the requester who RECEIVED the goods and reported the claim closes it even when somebody else owns the PR (PO-PD-2026-003)', async () => {
+    // PR / PO owned by the reviewer (U-L2) ; the claim was filed by U-L1 (name stamp as ReceivingModal writes it)
+    seedPo({ status: 'PARTIALLY_RECEIVED_IN_CLAIM' }, { claimData: { ...claimBase, reportedBy: 'Pim Requester' }, requesterId: 'U-L2', requestedBy: 'Asst Manager' }, 'PO-C5');
+    expect((await call('U-L1', 'PUT', '/api/pos/PO-C5', { status: 'COMPLETED', claimData: null })).status).toBe(200);
+    // a "name (position)" stamp counts by its name part ; a store claim entry counts too ; an id stamp counts
+    seedPo({ status: 'CLAIM_PENDING' }, { claimData: { ...claimBase, reportedBy: 'Pim Requester (Requester)' }, requesterId: 'U-L2' }, 'PO-C6');
+    expect((await call('U-L1', 'PUT', '/api/pos/PO-C6', { status: 'COMPLETED', claimData: null })).status).toBe(200);
+    seedPo({ status: 'CLAIM_PENDING' }, { claimData: claimBase, storeClaims: { s1: { isResolved: false, reportedBy: 'Pim Requester' } }, requesterId: 'U-L2' }, 'PO-C7');
+    expect((await call('U-L1', 'PUT', '/api/pos/PO-C7', { status: 'COMPLETED', claimData: null })).status).toBe(200);
+    seedPo({ status: 'CLAIM_PENDING' }, { claimData: { ...claimBase, reportedById: 'U-L1' }, requesterId: 'U-L2' }, 'PO-C8');
+    expect((await call('U-L1', 'PUT', '/api/pos/PO-C8', { status: 'COMPLETED', claimData: null })).status).toBe(200);
+    // somebody who neither owns the PR nor reported the claim is still refused
+    seedPo({ status: 'CLAIM_PENDING' }, { claimData: { ...claimBase, reportedBy: 'Owner' }, requesterId: 'U-L2' }, 'PO-C9');
+    expect((await call('U-L1', 'PUT', '/api/pos/PO-C9', { status: 'COMPLETED', claimData: null })).status).toBe(403);
+    expect(extraOf('PO-C9').claimData).toBeDefined();
+  });
   it('R4-A/B last store resolved at WAITING_DELIVERY_ROUND_2 closes the claim ; a re-opened store entry loses the old resolution and is not stamped as resolved', async () => {
     seedPo({ status: 'WAITING_DELIVERY_ROUND_2', channel: 'ONLINE' }, { claimStatus: 'IN_CLAIM', claimData: claimBase, storeClaims: { A: { isResolved: true, type: 'RESEND', resolvedBy: 'X' }, B: { isResolved: false, status: 'PENDING_CLAIM' } } });
     await call('U-ON', 'PUT', '/api/pos/PO-C1', { status: 'WAITING_DELIVERY_ROUND_2', claimData: null, storeClaims: { B: { isResolved: true, status: 'RESOLVED', type: 'REFUND' } } });

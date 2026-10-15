@@ -54,6 +54,20 @@ describe('PODetailsModal : self-claim actions of the admin (PO-PD-2026-003)', ()
     expect(screen.getByText(FOOTER_BTN)).toBeTruthy();
   });
 
+  it('the requester who received the goods and reported the claim resolves it even though the PR belongs to somebody else (PO-PD-2026-003, 2026-10-15)', () => {
+    const receiver = { id: 'REQUESTER', userId: 'USR-0894', roleId: 'REQUESTER', role: 'requester', name: 'สิรภัทร แจ่มมิน', level: 1, department: 'PD', canReceiveGoods: true };
+    open(claimPo({ claimData: { reason: 'short', description: 'x', reportedBy: 'สิรภัทร แจ่มมิน' } }), receiver);
+    expect(screen.getByText(RESOLVE_BTN)).toBeTruthy();
+    cleanup();
+    // "name (position)" stamp counts by its name part
+    open(claimPo({ claimData: { reason: 'short', description: 'x', reportedBy: 'สิรภัทร แจ่มมิน (Requester)' } }), receiver);
+    expect(screen.getByText(RESOLVE_BTN)).toBeTruthy();
+    cleanup();
+    // a requester who neither owns the PR nor reported the claim still gets the waiting notice
+    open(claimPo(), receiver);
+    expect(screen.getByText('อยู่ระหว่างผู้จัดซื้อดำเนินการแก้ไข')).toBeTruthy();
+  });
+
   it('a Reviewer who is not the owner only sees the waiting notice, never the resolve options nor the footer button (decision 2026-10-14)', () => {
     const { container } = open(claimPo(), reviewer);
     expect(screen.getByText('อยู่ระหว่างผู้จัดซื้อดำเนินการแก้ไข')).toBeTruthy();
