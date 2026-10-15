@@ -6,9 +6,11 @@
 - progress = จำนวน [x] / ทั้งหมด (server คำนวณ)
 -->
 # ไวท์บอร์ด Migrate Team
-อัปเดต: 2026-10-14 21:30
+อัปเดต: 2026-10-15 09:30
 
 ## ✅ ตัดสินใจแล้ว
+
+- [2026-10-15] TC-005 follow-up ปิด: /api/bootstrap (CF) ต้องส่ง `notifications` เหมือน GAS (ใช้ extra.js listNotificationsFor ร่วมกับ GET /api/notifications) ; client ไม่เรียก GET เอง → ถ้า bootstrap ไม่ส่ง รายการกระดิ่งจะว่างบนเครื่องใหม่ ; deploy prod แล้ว (commit 8223212, npm test 2235/2235)
 
 - [2026-10-14] **ผู้ใช้ตัดสิน (ผ่าน Claude):** (1) TC-001 ลายเซ็น "ผู้ขอซื้อ" ใน PDF PO ให้ใช้ลายเซ็นของ**ผู้ขอซื้อตัวจริงของ PR นั้น** (pr.requesterId/requesterName) ไม่ใช่เลือกตาม role/users[0] ; ถ้าผู้ขอซื้อยังไม่มีลายเซ็น ให้เว้นช่องว่างพร้อมชื่อ ไม่ fallback เป็นคนอื่น (2) ช่องโหว่กลางของกล้า: การเปลี่ยน PO ที่ค้างเคลมเป็น COMPLETED/CLOSED (และ short-close S4) ให้**จำกัดฝั่ง server** เหลือ Requester เจ้าของ PO/PR, Approver (level>=3) และ Admin เท่านั้น (`rbac.js canTransitionPO`) — Neo แตกงานให้ malee → QA → kla (แก้บั๊ก/ปิดช่องโหว่ ไม่ต้อง consult) ; deploy รอบล่าสุด 53b4af21 + migration 0017 แล้ว (commit eeb0902)
 
