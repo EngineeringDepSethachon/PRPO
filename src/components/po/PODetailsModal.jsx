@@ -47,7 +47,10 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
     : (currentUser?.role || currentRole?.roleId || currentRole?.id || '');
   const role = String(rawRole).toLowerCase();
 
-  const isOperational = ['requester', 'asst_mgr', 'supervisor'].some(r => role.includes(r));
+  // admin counts as operational for the footer actions (receive / report / resolve a self-buy claim) : canReceiveGoods and
+  // canResolveSelfClaim already allow ADMIN, but this gate hid every button from the admin (tester 2026-10-15, PO-PD-2026-003)
+  const isAdminRole = role === 'admin' || String(currentRole?.roleId || currentRole?.id || '').toUpperCase() === 'ADMIN' || Number(currentRole?.level || 0) >= 99;
+  const isOperational = isAdminRole || ['requester', 'asst_mgr', 'supervisor'].some(r => role.includes(r));
   const isPlantManager = role.includes('plant_mgr') || role.includes('plant manager');
   const isPurchaser = role.includes('purchaser');
 
