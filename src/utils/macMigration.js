@@ -155,7 +155,3 @@ export const healMACForProduct = async (targetSkuOrName) => {
     return null;
   }
 };
-
-export const runMacMigration = async () => {
-  return await healMACForProduct('ถุงมือกันร้อน');
-};

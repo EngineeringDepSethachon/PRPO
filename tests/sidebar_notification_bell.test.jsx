@@ -19,7 +19,9 @@ vi.mock('../src/config/backendMode', async (importOriginal) => {
   };
 });
 
-// S5: bell + popover restored in Sidebar as in v1.0.1 (c12ce08). Bell badge = taskCounts.total (pending tasks).
+// S5: bell + popover restored in Sidebar as in v1.0.1 (c12ce08).
+// 2026-10-15 : bell badge = UNREAD notifications shown in the popover (was taskCounts.total : the tester saw "1" on the bell with 13 rows inside).
+// Pending tasks keep their own badge on "งานของฉัน".
 const admin = { id: 'ADMIN', roleId: 'ADMIN', role: 'admin', name: 'Admin', level: 99, assignedDepartments: ['ALL'] };
 const NOTIFS = [
   { id: 'n1', type: 'PR_SUBMITTED', title: 'PR รอตรวจสอบ', message: 'PR-1', targetRole: 'ALL', targetDepartment: 'ALL', timestamp: '2026-10-01T00:00:00Z' },
@@ -43,12 +45,21 @@ describe('Sidebar notification bell (S5)', () => {
     vi.restoreAllMocks();
   });
 
-  it('renders the bell next to the refresh button with badge = pending task count', () => {
+  it('renders the bell next to the refresh button with badge = unread notifications (not the 3 pending tasks)', () => {
     renderSidebar();
-    const bell = screen.getAllByTitle('การแจ้งเตือน (3 รายการใหม่)')[0];
+    const bell = screen.getAllByTitle('การแจ้งเตือน (2 รายการใหม่)')[0];
     expect(bell).toBeTruthy();
-    expect(bell.textContent).toContain('3');
+    expect(bell.textContent).toContain('2');
+    expect(screen.queryByTitle('การแจ้งเตือน (3 รายการใหม่)')).toBeNull();
     expect(screen.getAllByLabelText('รีเฟรชข้อมูลล่าสุด').length).toBeGreaterThan(0);
+  });
+
+  it('badge equals the popover "ยังไม่อ่าน" count and drops when one row is read', async () => {
+    notificationService.saveAll([...NOTIFS, { id: 'n3', title: 'อ่านแล้ว', targetRole: 'ALL', targetDepartment: 'ALL', timestamp: '2026-10-03T00:00:00Z', status: 'read' }]);
+    renderSidebar();
+    expect(screen.getAllByTitle('การแจ้งเตือน (2 รายการใหม่)').length).toBeGreaterThan(0);
+    notificationService.markNotificationAsReadForUser('Admin', 'n1');
+    await waitFor(() => expect(screen.getAllByTitle('การแจ้งเตือน (1 รายการใหม่)').length).toBeGreaterThan(0));
   });
 
   it('opens the popover with notifications when the bell is clicked', () => {

@@ -405,9 +405,11 @@ export default function Sidebar({
 
           {/* Top Actions: Notification Bell & Mobile Close Button */}
           <div className="flex items-center gap-1.5 shrink-0 ml-1">
+            {/* badge = unread notifications of THIS popover (2026-10-15 : the tester saw "1" on the bell with 13 unread rows inside ;
+                pending tasks keep their own badge on "งานของฉัน") */}
             <NotificationBell
               currentRole={currentRole}
-              count={taskCounts.total}
+              count={unreadBadgeCount}
               onClick={() => setShowNotiDrawer(true)}
             />
             <button

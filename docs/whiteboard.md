@@ -6,9 +6,11 @@
 - progress = จำนวน [x] / ทั้งหมด (server คำนวณ)
 -->
 # ไวท์บอร์ด Migrate Team
-อัปเดต: 2026-10-15 09:30
+อัปเดต: 2026-10-15 09:40
 
 ## ✅ ตัดสินใจแล้ว
+
+- [2026-10-15] กระดิ่ง badge = จำนวนแจ้งเตือนยังไม่อ่าน (unreadBadgeCount) แทน taskCounts.total — กลับคำตัดสิน S5 ข้อ A เพราะผู้ใช้แจ้งว่า badge 1 กับรายการ 13 ไม่สอดคล้อง ; งานค้างยังมี badge ที่ "งานของฉัน" ; ถอด runMacMigration('ถุงมือกันร้อน') ที่ App.jsx เรียกทุกครั้งตอนเปิดแอป (เด้ง NOT_FOUND บน CF) ; deploy prod แล้ว
 
 - [2026-10-15] TC-005 follow-up ปิด: /api/bootstrap (CF) ต้องส่ง `notifications` เหมือน GAS (ใช้ extra.js listNotificationsFor ร่วมกับ GET /api/notifications) ; client ไม่เรียก GET เอง → ถ้า bootstrap ไม่ส่ง รายการกระดิ่งจะว่างบนเครื่องใหม่ ; deploy prod แล้ว (commit 8223212, npm test 2235/2235)
 
