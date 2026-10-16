@@ -121,6 +121,7 @@
 
 ## ⛔ ห้ามทำ
 
+- [2026-10-16] ห้าม deploy main (production) โดยไม่ทำครบ: backup D1 prpo-db → bump เวอร์ชัน package.json → เพิ่มหัวข้อใน docs/CHANGELOG.md → commit + git tag vX.Y.Z (กติกาใน CHANGELOG.md) ; deploy preview ก่อนเสมอ
 - ห้าม push ขึ้น git / ลบไฟล์ / ติดตั้งแพ็กเกจใหม่ โดยไม่ถามผู้ใช้ก่อน
 - ห้าม commit key Service Account หรือ secret ใด ๆ ; ห้ามรัน d1 --remote
 
