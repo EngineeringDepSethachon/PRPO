@@ -6,9 +6,11 @@
 - progress = จำนวน [x] / ทั้งหมด (server คำนวณ)
 -->
 # ไวท์บอร์ด Migrate Team
-อัปเดต: 2026-10-15 11:30
+อัปเดต: 2026-10-16 09:00
 
 ## ✅ ตัดสินใจแล้ว
+
+- [2026-10-16] ผู้ใช้สั่งปล่อยใช้งานจริงที่ https://prpo-pdqc.pages.dev และล้างข้อมูลทดสอบ (Neo ทำแล้ว): backup C:\Users\Admin\prpo-backups\prpo-db-20261015-pre-reset.sql ; ลบ PR/PO/สต็อก/งบ/แจ้งเตือน/audit/ไฟล์แนบ+R2 8 ไฟล์/ตัวนับ/สินค้า/ผู้ขาย/ลายเซ็น และผู้ใช้ทุกคนยกเว้น admin ; เก็บแผนก (PD, QC) สถานที่เก็บ 1 หน่วยนับ 4 ; admin ได้รหัสชั่วคราว (ไฟล์นอก repo, mustChangePassword=1, token เก่าใช้ไม่ได้) ; แนวทางพัฒนาต่อ: แก้ → npm test → deploy preview (prpo-db-preview) → ทดสอบ → deploy main
 
 - [2026-10-15] TC-011 ปิด: หน้าเปิด PR ให้เลือกแผนกได้ทุกแผนกที่ผู้ใช้ดูแล (getUserDepartments: allowedDepartments/assignedDepartments/primary) ไม่ล็อกแค่แผนกหลัก ; 'ALL'/'*' = ทุกแผนก active ; แผนกเดียว/โหมดแก้ไขยังล็อก ; deploy prod แล้ว
 
