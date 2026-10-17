@@ -531,4 +531,250 @@ d('PR write hardening (kla round 2)', () => {
       expect(bad.status).toBe(400);
     });
   });
+
+  // ───────────── 8. kla round 3 : normalizeLine (one function for every write of PR lines) ─────────────
+  describe('normalizeLine (kla round 3)', () => {
+    const one = (over = {}) => [LINE({ productUrl: '', ...over })]; // 2 x 100 = 200 unless overridden
+    const fin = (sub, over = {}) => FIN({ subtotal: sub, grandTotal: sub, ...over });
+    const auditRows = (action) => sdb.prepare('SELECT * FROM audit_logs WHERE action = ?').all(action).map((r) => ({ ...r, details: JSON.parse(r.details || '{}') }));
+    const count = () => sdb.prepare('SELECT COUNT(*) AS c FROM prs').get().c;
+    const draft = (over = {}) => create({ status: 'DRAFT', items: one(), totalAmount: 200, financials: fin(200), ...over });
+    const snap = (id) => { const r = row(id); return JSON.stringify([r.itemsJson, r.totalAmount, r.extraJson, r.status]); };
+
+    it('1. names of ONE figure that disagree are a 400 (qty : purchaseQty / qty / quantity / orderedQty ; price : price / unitPrice / estimatedPrice) - new PR, PUT, POST upsert, requester and admin - nothing written', async () => {
+      const bad = [
+        ['quantity 1000', { purchaseQty: 1, qty: 1, quantity: 1000 }],
+        ['orderedQty 3', { purchaseQty: 2, qty: 2, orderedQty: 3 }],
+        ['purchaseQty vs qty', { purchaseQty: 1, qty: 2 }],
+        ['text vs number', { purchaseQty: 2, qty: '3' }],
+        ['unitPrice', { unitPrice: 1 }],
+        ['estimatedPrice', { estimatedPrice: 99 }]
+      ];
+      const id = await draft();
+      const before = snap(id);
+      for (const [label, over] of bad) {
+        const items = one(over);
+        expect((await call('req', 'POST', '/api/prs', body({ id: `PR-NEW-${n}`, items, totalAmount: 200, financials: fin(200) }))).status, `new ${label}`).toBe(400);
+        for (const who of ['req', 'adm']) {
+          expect((await call(who, 'PUT', `/api/prs/${id}`, { items })).status, `PUT ${who} ${label}`).toBe(400);
+          expect((await call(who, 'POST', '/api/prs', { id, department: 'PD', items })).status, `POST ${who} ${label}`).toBe(400);
+        }
+      }
+      expect(count()).toBe(1);
+      expect(snap(id)).toBe(before);
+      // the attack of the finding : {purchaseQty 1, qty 1, quantity 1000} used to give an amount of 100 and a PO ceiling of 1000
+      expect((await call('req', 'POST', '/api/prs', body({ items: one({ purchaseQty: 1, qty: 1, quantity: 1000, price: 100 }), totalAmount: 100 }))).status).toBe(400);
+    });
+
+    it('2. names that agree : the server writes ONE number over every name (qty x4, price x3), stockQty = qty x conversionRate, text numbers become numbers, total is the server\'s', async () => {
+      const id = await create({
+        items: [LINE({ purchaseQty: '3', qty: 3, price: ' 100.50 ', unitPrice: 100.5, conversionRate: '12', stockQty: 999, total: 1, productUrl: '' })],
+        totalAmount: 301.5, financials: fin(301.5)
+      });
+      const l = itemsOf(id)[0];
+      expect([l.purchaseQty, l.qty, l.quantity, l.orderedQty]).toEqual([3, 3, 3, 3]);
+      expect([l.price, l.unitPrice, l.estimatedPrice]).toEqual([100.5, 100.5, 100.5]);
+      expect(l).toMatchObject({ conversionRate: 12, stockQty: 36, total: 301.5 });
+      expect(row(id).totalAmount).toBe(301.5);
+      // an admin edit goes through the same function : every name follows
+      expect((await call('adm', 'PUT', `/api/prs/${id}`, { items: [{ ...l, qty: 5, purchaseQty: 5, quantity: 5, orderedQty: 5 }], totalAmount: 502.5 })).status).toBe(200);
+      const m = itemsOf(id)[0];
+      expect([m.purchaseQty, m.qty, m.quantity, m.orderedQty]).toEqual([5, 5, 5, 5]);
+      expect(m).toMatchObject({ stockQty: 60, total: 502.5 });
+    });
+
+    it('3. qty must be > 0 and <= 1e7 : 0 / -1 / "0" / 1e8 / text / empty are a 400 (new PR, PUT by the requester and by the admin)', async () => {
+      const id = await draft();
+      const before = snap(id);
+      for (const v of [0, -1, '0', 1e8, 10000001, 'abc', '', '1e3', '0x10']) {
+        const items = one({ purchaseQty: v, qty: v });
+        expect((await call('req', 'POST', '/api/prs', body({ id: `PR-Q-${n}`, items, totalAmount: 0 }))).status, `new ${JSON.stringify(v)}`).toBe(400);
+        expect((await call('req', 'PUT', `/api/prs/${id}`, { items, totalAmount: 0 })).status, `PUT req ${JSON.stringify(v)}`).toBe(400);
+        expect((await call('adm', 'PUT', `/api/prs/${id}`, { items })).status, `PUT adm ${JSON.stringify(v)}`).toBe(400);
+      }
+      expect(snap(id)).toBe(before);
+      expect(count()).toBe(1);
+      // the limits themselves are fine
+      expect((await call('req', 'PUT', `/api/prs/${id}`, { items: one({ purchaseQty: 1e7, qty: 1e7, price: 0 }), totalAmount: 0 })).status).toBe(200);
+    });
+
+    it('4. PR -> PO : the PO line gets the quantity the amounts used ; the PO ceiling reads the qty names in the same order (never the highest)', async () => {
+      const mkApproved = async () => { const id = await create(); setStatus(id, 'APPROVED'); return id; }; // 2 x Pen + 1 x Ink
+      const po = (prId, n2, lines) => ({ id: `PO-W-${n2}`, poNo: `PO-PD-${YEAR}-9${String(n2).padStart(2, '0')}`, prId, prNo: row(prId).prNumber, department: 'PD', status: 'ISSUED', vendorName: 'V', totalAmount: 250, grandTotal: 250, purchaseChannel: 'SELF', items: lines });
+      const pen = (over = {}) => ({ productId: 'P1', code: 'C1', name: 'Pen', price: 100, ...over });
+      const ink = (over = {}) => ({ productId: 'P2', code: 'C2', name: 'Ink', price: 50, qty: 1, purchaseQty: 1, ...over });
+      // honest
+      const a = await mkApproved();
+      expect((await call('pm', 'POST', '/api/pos', po(a, 1, [pen({ qty: 2, purchaseQty: 2 }), ink()]))).status).toBe(200);
+      expect(JSON.parse(sdb.prepare('SELECT itemsJson FROM pos WHERE id = ?').get('PO-W-1').itemsJson).map((x) => x.qty)).toEqual([2, 1]);
+      // over the PR's qty (3 > 2) : 400
+      const b = await mkApproved();
+      expect((await call('pm', 'POST', '/api/pos', po(b, 2, [pen({ qty: 3, purchaseQty: 3 }), ink()]))).status).toBe(400);
+      // a PO line whose names disagree : read as the PR reads it (purchaseQty first = 1, not the 1000 of another name) and written with that one figure
+      const c = await mkApproved();
+      expect((await call('pm', 'POST', '/api/pos', po(c, 3, [pen({ purchaseQty: 1, qty: 1, quantity: 1000, orderedQty: 1000 }), ink()]))).status).toBe(200);
+      const pl = JSON.parse(sdb.prepare('SELECT itemsJson FROM pos WHERE id = ?').get('PO-W-3').itemsJson)[0];
+      expect([pl.purchaseQty, pl.qty, pl.quantity, pl.orderedQty]).toEqual([1, 1, 1, 1]);
+      // and the PR line itself : the 1000 can no longer be stored on the PR side
+      expect((await call('req', 'POST', '/api/prs', body({ items: [LINE({ purchaseQty: 1, qty: 1, quantity: 1000, productUrl: '' })], totalAmount: 100 }))).status).toBe(400);
+    });
+
+    it('5. a discount key cut out of the lines is a change : amounts are recomputed from the lines (editor), or the write is a 403 (a role that cannot edit)', async () => {
+      const disc = () => [LINE({ qty: 1, purchaseQty: 1, price: 1000, discountAmount: 900, productUrl: '' })]; // total 100
+      const stripped = () => [LINE({ qty: 1, purchaseQty: 1, price: 1000, productUrl: '' })]; // 1000 without the discount keys
+      const mk = (status) => create({ status, items: disc(), totalAmount: 100, financials: fin(1000, { itemDiscountTotal: 900, totalDiscount: 900, grandTotal: 100 }) });
+      // L1 at DRAFT (PUT and POST upsert), the total is not sent : recomputed to 1000
+      for (const via of ['PUT', 'POST']) {
+        const id = await mk('DRAFT');
+        expect(row(id).totalAmount).toBe(100);
+        const r = via === 'PUT' ? await call('req', 'PUT', `/api/prs/${id}`, { items: stripped() }) : await call('req', 'POST', '/api/prs', { id, department: 'PD', items: stripped() });
+        expect(r.status, `${via} ${JSON.stringify(r.json)}`).toBe(200);
+        expect(row(id).totalAmount).toBe(1000);
+        expect(itemsOf(id)[0].discountAmount).toBeUndefined();
+        expect(itemsOf(id)[0].total).toBe(1000);
+        expect(extraOf(id).financials).toMatchObject({ subtotal: 1000, itemDiscountTotal: 0, grandTotal: 1000 });
+      }
+      // the old total sent along with the stripped lines is a mismatch (400)
+      const id2 = await mk('DRAFT');
+      expect((await call('req', 'PUT', `/api/prs/${id2}`, { items: stripped(), totalAmount: 100 })).status).toBe(400);
+      expect(row(id2).totalAmount).toBe(100);
+      // the reviewer at REVIEWED : the new amount
+      const id3 = await mk('SUBMITTED'); setStatus(id3, 'REVIEWED');
+      expect((await call('asst', 'PUT', `/api/prs/${id3}`, { items: stripped() })).status).toBe(200);
+      expect(row(id3).totalAmount).toBe(1000);
+      // a role that cannot edit the lines (requester at SUBMITTED, reviewer / approver at APPROVED) : 403, nothing written
+      const id4 = await mk('SUBMITTED');
+      const s4 = snap(id4);
+      expect((await call('req', 'PUT', `/api/prs/${id4}`, { items: stripped() })).status).toBe(403);
+      expect((await call('req', 'POST', '/api/prs', { id: id4, department: 'PD', items: stripped() })).status).toBe(403);
+      expect(snap(id4)).toBe(s4);
+      setStatus(id4, 'APPROVED');
+      const s5 = snap(id4);
+      for (const who of ['req', 'asst', 'pm']) expect((await call(who, 'PUT', `/api/prs/${id4}`, { items: stripped() })).status, who).toBe(403);
+      expect(snap(id4)).toBe(s5);
+      // ... and the plain echo of the stored PR is still fine for them
+      const view = (await call('pm', 'GET', '/api/prs')).json.find((x) => x.id === id4);
+      expect((await call('pm', 'PUT', `/api/prs/${id4}`, { items: view.items, status: 'APPROVED' })).status).toBe(200);
+      expect(row(id4).totalAmount).toBe(100);
+    });
+
+    it('6. the line discount has ONE rule : percent gives the amount ; percent + an amount that disagrees is a 400 ; consistent or single -> both written', async () => {
+      const mk = async (over, ok = 200) => {
+        const r = await call('req', 'POST', '/api/prs', body({ status: 'DRAFT', items: [LINE({ productUrl: '', ...over })], totalAmount: undefined, financials: undefined }));
+        expect(r.status, JSON.stringify(over)).toBe(ok);
+        return ok === 200 ? itemsOf(`PR-W${n}`)[0] : null;
+      };
+      expect(await mk({ discountPercent: 10, discountAmount: 20 })).toMatchObject({ discountPercent: 10, discountAmount: 20, total: 180 });
+      expect(await mk({ discountPercent: 10 })).toMatchObject({ discountPercent: 10, discountAmount: 20, total: 180 }); // the amount comes from the percent
+      expect(await mk({ discountPercent: 10, discountAmount: 20.01 })).toMatchObject({ discountPercent: 10, discountAmount: 20 }); // a cent apart : the percent's figure is written
+      const only = await mk({ discountAmount: 20 });
+      expect(only).toMatchObject({ discountAmount: 20, total: 180 });
+      expect(only.discountPercent).toBeUndefined();
+      expect(await mk({ discountPercent: 0, discountAmount: 10 })).toMatchObject({ discountAmount: 10, total: 190 }); // what PRCreateView sends for an amount typed by hand
+      for (const over of [{ discountPercent: 10, discountAmount: 50 }, { discountPercent: 10, discountAmount: 20.02 }, { discountPercent: 50, discountAmount: 0.5 }, { discountAmount: 200.02 }, { discountPercent: 100.5 }]) {
+        await mk(over, 400);
+      }
+      expect(await mk({ discountAmount: 200 })).toMatchObject({ discountAmount: 200, total: 0 }); // the whole line
+      // the PR total follows the server's amounts : 200 - 20 = 180, VAT off
+      const id = await create({ status: 'DRAFT', items: [LINE({ discountPercent: 10, discountAmount: 20, productUrl: '' })], totalAmount: undefined, financials: undefined });
+      expect(row(id).totalAmount).toBe(180);
+    });
+
+    it('7. a NEW PR whose settings come as top-level keys (no financials) : the amounts use them AND financials are written (the used values leave a trace)', async () => {
+      const top = { financials: undefined, totalAmount: undefined, combinedDiscountType: 'percent', combinedDiscountValue: 10, shippingCost: 30, roundingAdj: '0.5' };
+      const id = await create({ ...top }); // 250 - 10% = 225 + 30 + 0.5
+      expect(row(id).totalAmount).toBe(255.5);
+      expect(extraOf(id).financials).toMatchObject({ combinedDiscountType: 'percent', combinedDiscountValue: 10, combinedDiscountAmount: 25, shippingCost: 30, roundingAdj: 0.5, grandTotal: 255.5 });
+      for (const k of ['combinedDiscountType', 'combinedDiscountValue', 'shippingCost', 'roundingAdj']) expect(extraOf(id)[k], k).toBeUndefined();
+      // a total that ignores the settings is a mismatch
+      expect((await call('req', 'POST', '/api/prs', body({ ...top, totalAmount: 250 }))).status).toBe(400);
+      expect((await call('req', 'POST', '/api/prs', body({ ...top, totalAmount: 255.5 }))).status).toBe(200);
+      // no settings at all and no financials : still no financials (nothing was used)
+      const plain = await create({ financials: undefined, totalAmount: undefined });
+      expect(extraOf(plain).financials).toBeUndefined();
+      expect(row(plain).totalAmount).toBe(250);
+    });
+
+    it('8. figures are read one way : only a number or a plain decimal text ("0x3E8", "1000abc", "", "1e3", "1,000", "-5" are a 400) - line figures, financials, totals', async () => {
+      const id = await draft();
+      const before = snap(id);
+      for (const v of ['0x3E8', '1000abc', '', '1e3', '1,000', '-5', ' ', 'Infinity', 'NaN', '.5', '5.', {}, [3], true]) {
+        const s = JSON.stringify(v);
+        for (const patch of [{ price: v }, { purchaseQty: v, qty: v }, { discountPercent: v }, { discountAmount: v }, { conversionRate: v }]) {
+          expect((await call('req', 'PUT', `/api/prs/${id}`, { items: one(patch), totalAmount: 200 })).status, `PUT ${Object.keys(patch)[0]} ${s}`).toBe(400);
+        }
+        expect((await call('req', 'POST', '/api/prs', body({ id: `PR-S-${n}`, items: one({ price: v }), totalAmount: 200 }))).status, `new price ${s}`).toBe(400);
+        expect((await call('req', 'PUT', `/api/prs/${id}`, { totalAmount: v })).status, `total ${s}`).toBe(400);
+        for (const key of ['shippingCost', 'roundingAdj', 'combinedDiscountValue']) {
+          expect((await call('req', 'PUT', `/api/prs/${id}`, { financials: fin(200, { [key]: v }) })).status, `financials.${key} ${s}`).toBe(400);
+        }
+      }
+      expect(snap(id)).toBe(before);
+      expect(count()).toBe(1);
+      // plain decimal texts are fine and stored as numbers
+      const ok = await call('req', 'PUT', `/api/prs/${id}`, { items: one({ price: ' 100.00 ', purchaseQty: '2', qty: 2 }), totalAmount: '199.50', financials: fin(200, { shippingCost: '0', roundingAdj: '-0.5', grandTotal: '199.5' }) });
+      expect(ok.status, JSON.stringify(ok.json)).toBe(200);
+      expect(itemsOf(id)[0]).toMatchObject({ price: 100, purchaseQty: 2, qty: 2 });
+      expect(row(id).totalAmount).toBe(199.5);
+      expect(extraOf(id).financials).toMatchObject({ roundingAdj: -0.5, shippingCost: 0, grandTotal: 199.5 });
+    });
+
+    it('9. total / lineTotal / stockQty / discountAmount of a line are the server\'s : the client\'s values are overwritten (new PR, editor, a caller who cannot edit)', async () => {
+      const id = await create({ items: [LINE({ total: 1, lineTotal: 2, stockQty: 5000, productUrl: '' })], totalAmount: 200, financials: fin(200) });
+      expect(itemsOf(id)[0]).toMatchObject({ total: 200, lineTotal: 200, stockQty: 2 });
+      expect((await call('asst', 'PUT', `/api/prs/${id}`, { items: [{ ...itemsOf(id)[0], total: 7, lineTotal: 7, stockQty: 1 }] })).status).toBe(200);
+      expect(itemsOf(id)[0]).toMatchObject({ total: 200, lineTotal: 200, stockQty: 2 });
+      // the requester at SUBMITTED cannot edit : an echo with tampered derived values is accepted but the values stay the server's
+      setStatus(id, 'APPROVED');
+      expect((await call('req', 'PUT', `/api/prs/${id}`, { items: [{ ...itemsOf(id)[0], total: 1, lineTotal: 1, stockQty: 99 }] })).status).toBe(200);
+      expect(itemsOf(id)[0]).toMatchObject({ total: 200, lineTotal: 200, stockQty: 2 });
+      expect(row(id).totalAmount).toBe(200);
+    });
+
+    it('10. an admin that sets a total different from the lines\' leaves an audit row PR_TOTAL_OVERRIDE { expected, given } ; an honest total / an unchanged echo does not', async () => {
+      const id = await create();
+      setStatus(id, 'APPROVED');
+      expect(auditRows('PR_TOTAL_OVERRIDE')).toHaveLength(0);
+      expect((await call('adm', 'PUT', `/api/prs/${id}`, { totalAmount: 90 })).status).toBe(200);
+      expect(row(id).totalAmount).toBe(90);
+      const a = auditRows('PR_TOTAL_OVERRIDE');
+      expect(a).toHaveLength(1);
+      expect(a[0]).toMatchObject({ entityType: 'pr', entityId: id });
+      expect(a[0].details).toMatchObject({ expected: 250, given: 90 });
+      // the same figure sent again (nothing moves) and a PUT without a total : no new row
+      expect((await call('adm', 'PUT', `/api/prs/${id}`, { totalAmount: 90 })).status).toBe(200);
+      expect((await call('adm', 'PUT', `/api/prs/${id}`, { reason: 'note only' })).status).toBe(200);
+      expect(auditRows('PR_TOTAL_OVERRIDE')).toHaveLength(1);
+      // the honest total, and a new line set with its own honest total : none
+      expect((await call('adm', 'PUT', `/api/prs/${id}`, { totalAmount: 250 })).status).toBe(200);
+      expect((await call('adm', 'PUT', `/api/prs/${id}`, { items: [LINE({ qty: 4, purchaseQty: 4, productUrl: 'https://shop.example/pen' }), LINES()[1]], totalAmount: 450 })).status).toBe(200);
+      expect(auditRows('PR_TOTAL_OVERRIDE')).toHaveLength(1);
+      // lines changed + a total that does not follow them : a second row with the new expected figure
+      expect((await call('adm', 'PUT', `/api/prs/${id}`, { items: [LINE({ qty: 1, purchaseQty: 1, productUrl: 'https://shop.example/pen' }), LINES()[1]], totalAmount: 10 })).status).toBe(200);
+      const b = auditRows('PR_TOTAL_OVERRIDE');
+      expect(b).toHaveLength(2);
+      expect(b.map((x) => x.details.expected).sort()).toEqual([150, 250]);
+      expect(b.map((x) => x.details.given).sort()).toEqual([10, 90]);
+      // POST upsert path is audited too
+      expect((await call('adm', 'POST', '/api/prs', { id, department: 'PD', totalAmount: 5 })).status).toBe(200);
+      expect(auditRows('PR_TOTAL_OVERRIDE')).toHaveLength(3);
+    });
+
+    it('11. old PRs : a PR sent back as it is is never refused for its old figures (names that already disagree, text figures) ; a changed old line is judged by the rules', async () => {
+      const old = [
+        { productId: 'P1', code: 'C1', name: 'Pen', purchaseQty: 1, qty: 1, quantity: 1000, price: '1,234.50', conversionRate: 1, discountPercent: '', productUrl: '' },
+        { productId: 'P2', code: 'C2', name: 'Ink', purchaseQty: 1, qty: 1, price: 50, productUrl: '' }
+      ];
+      sdb.prepare("INSERT INTO prs (id, prNumber, department, requesterId, requesterName, status, totalAmount, itemsJson, extraJson) VALUES ('PR-OLD3', 'OLD-3', 'PD', 'REQUESTER_PD', 'Old', 'SUBMITTED', 1284.5, ?, ?)")
+        .run(JSON.stringify(old), JSON.stringify({ financials: FIN({ subtotal: 1284.5, grandTotal: 1284.5 }) }));
+      const view = (await call('asst', 'GET', '/api/prs')).json.find((x) => x.id === 'PR-OLD3');
+      const echo = await call('asst', 'PUT', '/api/prs/PR-OLD3', { ...view, status: 'REVIEWED' });
+      expect(echo.status, JSON.stringify(echo.json)).toBe(200);
+      expect(row('PR-OLD3').totalAmount).toBe(1284.5);
+      expect(itemsOf('PR-OLD3')[0].quantity).toBe(1000); // untouched
+      // a line of it that CHANGES must obey the rules : the other name (1000) now disagrees with the new qty -> 400
+      setStatus('PR-OLD3', 'SUBMITTED');
+      expect((await call('asst', 'PUT', '/api/prs/PR-OLD3', { items: [{ ...old[0], purchaseQty: 2, qty: 2 }, old[1]], totalAmount: 100 })).status).toBe(400);
+    });
+  });
 });

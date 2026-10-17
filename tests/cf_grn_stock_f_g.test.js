@@ -500,14 +500,21 @@ d('GRN stock (G) and PO amounts / status (F)', () => {
     expect((await call('POST', '/api/pos', { id: 'PO-G1', status: 'nope' })).status).toBe(400);
   });
 
-  it('G20 qty keys of a new PO line are one figure (the highest sent) and the PR ceiling uses it ; conflicting keys cannot hide a big qty', async () => {
+  it('G20 qty keys of a new PO line are one figure (read in the PR\'s order : purchaseQty, qty, quantity, orderedQty - kla round 3, no longer "the highest sent") and the PR ceiling uses it', async () => {
     sdb.prepare("INSERT INTO prs (id, prNumber, department, requesterId, requesterName, status, totalAmount, itemsJson) VALUES ('PR-1','PD001/2026','PD','U1','W','APPROVED',500,?)")
       .run(JSON.stringify([{ productId: 'P1', qty: 6 }]));
     const mk = (id, line) => ({ id, prNumber: 'PD001/2026', department: 'PD', status: 'ISSUED', items: [line] });
-    expect((await callPm('POST', '/api/pos', mk('A', { productId: 'P1', qty: 1, purchaseQty: 1, orderedQty: 99 }))).status).toBe(400);
-    expect((await callPm('POST', '/api/pos', mk('A', { productId: 'P1', qty: 99, purchaseQty: 1 }))).status).toBe(400);
-    expect((await callPm('POST', '/api/pos', mk('A', { productId: 'P1', qty: 2, purchaseQty: 4, orderedQty: 3 }))).status).toBe(200);
-    expect(JSON.parse(sdb.prepare("SELECT itemsJson FROM pos WHERE id = 'A'").get().itemsJson)[0]).toMatchObject({ qty: 4, purchaseQty: 4, orderedQty: 4 });
+    const stored = (id) => JSON.parse(sdb.prepare('SELECT itemsJson FROM pos WHERE id = ?').get(id).itemsJson)[0];
+    // a big name cannot hide behind the first one any more : the line is worth the FIRST name (what the PR amounts would read) and every name is written with it
+    expect((await callPm('POST', '/api/pos', mk('A', { productId: 'P1', qty: 1, purchaseQty: 1, orderedQty: 99 }))).status).toBe(200);
+    expect(stored('A')).toMatchObject({ qty: 1, purchaseQty: 1, orderedQty: 1 });
+    expect((await callPm('POST', '/api/pos', mk('B', { productId: 'P1', qty: 99, purchaseQty: 1 }))).status).toBe(200);
+    expect(stored('B')).toMatchObject({ qty: 1, purchaseQty: 1 });
+    // a line that says 99 in the name that is read is over the ceiling
+    expect((await callPm('POST', '/api/pos', mk('C', { productId: 'P1', qty: 99 }))).status).toBe(400);
+    expect((await callPm('POST', '/api/pos', mk('C', { productId: 'P1', purchaseQty: 99, qty: 1 }))).status).toBe(400);
+    expect((await callPm('POST', '/api/pos', mk('D', { productId: 'P1', qty: 2, purchaseQty: 4, orderedQty: 3 }))).status).toBe(200);
+    expect(stored('D')).toMatchObject({ qty: 4, purchaseQty: 4, orderedQty: 4 });
   });
 
   it('G21 a PO cancelled after a partial receipt still counts what it received : a new PO cannot take the whole PR again ; the PR-level stock ceiling holds', async () => {
@@ -564,8 +571,14 @@ d('GRN stock (G) and PO amounts / status (F)', () => {
   it('G25 an approved PR keeps its stored qty / price / conversion whatever the body says ; lines cannot be added, removed or swapped', async () => {
     const lines = [{ productId: 'P1', qty: 6, purchaseQty: 6, orderedQty: 6, price: 10, conversionRate: 2 }, { productId: 'P2', qty: 3, purchaseQty: 3, price: 5 }];
     sdb.prepare("INSERT INTO prs (id, prNumber, department, requesterId, requesterName, status, totalAmount, itemsJson) VALUES ('PR-1','PD001/2026','PD','U1','W','APPROVED',500,?)").run(JSON.stringify(lines));
+    // (kla round 3 : names of one figure that disagree - orderedQty 600 vs qty 6, unitPrice 1 vs price 10 - are refused outright (403 for a caller who cannot edit) instead of being overwritten)
     const hack = [{ ...lines[0], orderedQty: 600, qty: 6, conversionRate: 9999, conversionRatio: 9999, unitPrice: 1, note: 'kept' }, { ...lines[1], orderedQty: 50, conversionRate: 77 }];
-    const r = await callPm('PUT', '/api/prs/PR-1', { items: hack });
+    const before = sdb.prepare("SELECT itemsJson FROM prs WHERE id = 'PR-1'").get().itemsJson;
+    expect((await callPm('PUT', '/api/prs/PR-1', { items: hack })).status).toBe(403);
+    expect(sdb.prepare("SELECT itemsJson FROM prs WHERE id = 'PR-1'").get().itemsJson).toBe(before);
+    // the figures a body repeats or changes that are not a contradiction are still ignored : the stored ones win
+    const soft = [{ ...lines[0], conversionRate: 9999, conversionRatio: 9999, note: 'kept' }, { ...lines[1], conversionRate: 77 }];
+    const r = await callPm('PUT', '/api/prs/PR-1', { items: soft });
     expect(r.status).toBe(200);
     const saved = JSON.parse(sdb.prepare("SELECT itemsJson FROM prs WHERE id = 'PR-1'").get().itemsJson);
     expect(saved[0]).toMatchObject({ qty: 6, orderedQty: 6, conversionRate: 2, note: 'kept' });

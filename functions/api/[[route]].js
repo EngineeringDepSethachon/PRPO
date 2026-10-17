@@ -81,7 +81,8 @@ async function writePrCommitment(db, prId, actorName, actorRole) {
 // items / total comparison for the PR content lock (fingerprint = product, qty, price ; tolerant of extra client-only fields)
 function itemFingerprint(items) {
   const list = Array.isArray(items) ? items : [];
-  return list.map((i) => `${i && (i.productId || i.id || i.code || i.name) || ''}|${Number(i && (i.purchaseQty ?? i.qty ?? i.quantity ?? 1)) || 0}|${Number(i && i.price) || 0}`).join(';');
+  // (qty and price are read the way the amounts read them : lineQty / linePrice - one order for every name)
+  return list.map((i) => `${i && (i.productId || i.id || i.code || i.name) || ''}|${lineQty(i) || 0}|${linePrice(i) || 0}`).join(';');
 }
 function prContentChanged(curRow, body) {
   const hasTotal = (body.totalAmount !== undefined && body.totalAmount !== null) || (body.total !== undefined && body.total !== null);
@@ -147,7 +148,13 @@ async function resolveReviewTarget(db, authUser, curStatus, requested) {
 }
 const prLineKey2 = (it) => String((it && (it.productId || it.id || it.code)) || '');
 const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
-const lineQty = (it) => Number(it && (it.purchaseQty ?? it.qty ?? it.quantity ?? 1));
+// The quantity of a line, read in ONE order everywhere (the PR amounts, the PR -> PO ceiling : orderedQtyOf) : purchaseQty, qty, quantity, orderedQty ; none = 1.
+// (a PR line written by the server carries all four names with the same number : normalizePrLine)
+const PR_QTY_READ_ORDER = ['purchaseQty', 'qty', 'quantity', 'orderedQty'];
+const lineQty = (it) => {
+  if (it && typeof it === 'object') for (const k of PR_QTY_READ_ORDER) if (it[k] !== undefined && it[k] !== null) return Number(it[k]);
+  return 1;
+};
 // unit price of a line : price, else the aliases the BUFFER edit keeps in step (unitPrice / estimatedPrice) ; '' / null count as "not there"
 const linePrice = (it) => {
   if (!it || typeof it !== 'object') return 0;
@@ -194,9 +201,22 @@ function lockPrLinks(base, items) {
 }
 // loose equality of two scalars as a client echo would send them (numbers vs numeric strings, null / '' / 0 / false are all "nothing")
 const isBlankVal = (v) => v === undefined || v === null || v === '' || v === 0 || v === false || v === '0';
+// A figure the client sends (kla round 3) : a finite number, or a plain decimal string (/^\d+(\.\d+)?$/, spaces around it allowed). Anything else - 0x3E8, 1e3, 1000abc,
+// '', -5 as text, Infinity, an object - is NOT a number (null) : one reading for every figure, so parseFloat / Number can never disagree about the same text.
+const PR_NUM_RE = /^\d+(\.\d+)?$/;
+function strictNum(v) {
+  if (typeof v === 'number') return Number.isFinite(v) ? v : null;
+  if (typeof v === 'string') {
+    const t = v.trim();
+    if (!PR_NUM_RE.test(t)) return null;
+    const n = Number(t);
+    return Number.isFinite(n) ? n : null;
+  }
+  return null;
+}
 function looseEq(a, b) {
   if (isBlankVal(a) && isBlankVal(b)) return true;
-  const num = (v) => (typeof v === 'number' ? v : (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null));
+  const num = strictNum;
   const na = num(a); const nb = num(b);
   if (na !== null && nb !== null) return Math.abs(na - nb) <= 0.005;
   return trimVal(a) === trimVal(b);
@@ -440,7 +460,9 @@ const PR_ERR_FIN = { status: 400, message: 'ข้อมูลส่วนลด
 const PR_ERR_MISMATCH = { status: 400, message: 'ยอดรวมไม่ตรงกับรายการสินค้า' };
 const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
 const hasVal = (v) => v !== undefined && v !== null && v !== '';
-const numOf = (v) => (typeof v === 'number' ? v : (typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN));
+const numOf = (v) => { const n = strictNum(v); return n === null ? NaN : n; };
+// (roundingAdj is the one figure that may be negative as text : "-0.5")
+const signedNumOf = (v) => (typeof v === 'string' && /^\s*-\d+(\.\d+)?\s*$/.test(v) ? -numOf(v.trim().slice(1)) : numOf(v));
 const boolOf = (v) => (v === true || v === 1 || v === '1' || v === 'true' ? true : (v === false || v === 0 || v === '0' || v === 'false' ? false : null));
 const PR_FIN_AMOUNT_KEYS = ['subtotal', 'itemDiscountTotal', 'combinedDiscountAmount', 'totalDiscount', 'vatAmount', 'grandTotal'];
 const PR_FIN_PARAM_DEFAULTS = { combinedDiscountType: 'fixed', combinedDiscountValue: 0, vatMode: 'NONE', roundingAdj: 0, shippingCost: 0 };
@@ -456,6 +478,8 @@ function prShapeError(p) {
     if (!Number.isFinite(n) || n < 0) return PR_ERR_TOTAL;
   }
   if (p.financials !== undefined && p.financials !== null && !isObj(p.financials)) return PR_ERR_FIN;
+  // an empty text is not a figure (every other part of the financials treats '' as "not sent", so it is refused here, for every role)
+  if (isObj(p.financials)) for (const k of [...PR_FIN_AMOUNT_KEYS, 'combinedDiscountValue', 'shippingCost', 'roundingAdj']) if (p.financials[k] === '') return PR_ERR_FIN;
   return null;
 }
 const sentTotalOf = (p) => (hasVal(p.totalAmount) ? numOf(p.totalAmount) : (hasVal(p.total) ? numOf(p.total) : null));
@@ -483,77 +507,222 @@ function prFinChanged(storedFin, bodyFin) {
   }
   return false;
 }
-// the figures of one line, validated when it comes from the body (strict) ; -> { qty, price, pct, da } | null (invalid)
-function prLineFigures(it, strict) {
-  if (!isObj(it)) return strict ? null : { qty: 0, price: 0, pct: 0, da: 0 };
-  const qRaw = it.purchaseQty ?? it.qty ?? it.quantity ?? 1;
-  const qty = Number(qRaw);
-  const pRaw = PR_PRICE_ALIASES_ORDER.map((k) => it[k]).find(hasVal);
-  const price = pRaw === undefined ? 0 : parseFloat(pRaw);
-  const pct = hasVal(it.discountPercent) ? parseFloat(it.discountPercent) : 0;
-  const da = hasVal(it.discountAmount) ? parseFloat(it.discountAmount) : 0;
-  if (!strict) return { qty: Number.isFinite(qty) ? qty : 0, price: Number.isFinite(price) ? price : 0, pct: Number.isFinite(pct) ? pct : 0, da: Number.isFinite(da) ? da : 0 };
-  const scalar = (v) => typeof v === 'number' || typeof v === 'string';
-  if (!scalar(qRaw) || !Number.isFinite(qty) || qty < 0 || qty > 1e7) return null;
-  if (pRaw !== undefined && (!scalar(pRaw) || !Number.isFinite(price) || price < 0 || price > 1e9)) return null;
-  if (hasVal(it.discountPercent) && (!scalar(it.discountPercent) || !Number.isFinite(pct) || pct < 0 || pct > 100)) return null;
-  if (hasVal(it.discountAmount) && (!scalar(it.discountAmount) || !Number.isFinite(da) || da < 0 || da > qty * price + 0.01)) return null;
-  return { qty, price, pct, da };
+// ── normalizeLine (kla round 3) : the ONE function every write of PR lines goes through (POST new / upsert, PUT ; every role, an admin too) ──
+//  - a figure the client sends is read by strictNum (a number, or a plain decimal text) : 0x3E8 / 1e3 / 1000abc / '' / an object is a 400
+//  - the quantity has four names (purchaseQty, qty, quantity, orderedQty), the unit price three (price, unitPrice, estimatedPrice) : every name the line carries must give
+//    the SAME number (else 400) and the server then writes that number over ALL of them, so no reader (the amounts, the PO ceiling, the screens) can see another figure
+//  - qty is > 0 and <= 1e7 (none sent = 1, like lineQty), price 0..1e9
+//  - discount : a percent (0..100) gives the amount (r2 of qty x price x percent) ; an amount sent with it must agree within a cent (400) ; an amount alone is kept (never above
+//    the line : 400) ; both are written
+//  - stockQty = qty x conversionRate ; total (and lineTotal when the line has it) = qty x price - discount : the client's own values for these are never kept
+//  - actualPrice / actUnitPrice (the PO's) are not touched
+// A bad value that the STORED line holds identically (an old / imported PR sent back as it is) is read the way the old totals read it (parseFloat) instead of failing.
+const PR_ERR_QTY = { status: 400, message: 'จำนวนสินค้าไม่ถูกต้อง' };
+const PR_ERR_PRICE = { status: 400, message: 'ราคาต่อหน่วยไม่ถูกต้อง' };
+const PR_ERR_LINE_DISC = { status: 400, message: 'ส่วนลดของรายการสินค้าไม่ถูกต้อง' };
+const isSent = (v) => v !== undefined && v !== null;
+// one figure of a body line (s = the stored line, if any) -> { n } | { bad: true } | {} (not sent)
+function prFigure(it, s, k) {
+  const v = it[k];
+  if (!isSent(v)) return {};
+  const n = strictNum(v);
+  if (n !== null) return { n };
+  if (s && s[k] === v) { const f = parseFloat(v); return { n: Number.isFinite(f) && f >= 0 ? f : 0 }; }
+  return { bad: true };
+}
+// a figure with several names -> { value } (undefined = none sent) | { error }
+function prNamedFigure(it, s, names, err) {
+  let value; let mixed = false;
+  for (const k of names) {
+    const f = prFigure(it, s, k);
+    if (f.bad) return { error: err };
+    if (f.n === undefined) continue;
+    if (value === undefined) value = f.n; else if (f.n !== value) mixed = true;
+  }
+  // names that disagree are a 400 - except a line sent back exactly as the stored one holds it (an old PR that already disagrees with itself) : the first name wins, as its total always did
+  if (mixed && !(s && names.every((k) => !isSent(it[k]) || it[k] === s[k]))) return { error: err };
+  return { value };
+}
+// skipDiscount : the discount keys of the line are not read (the BUFFER's edit at PENDING_BUFFER takes only qty / price / links from the body and keeps the stored discount)
+function normalizePrLine(it, s, skipDiscount) {
+  if (!isObj(it)) return { error: PR_ERR_ITEMS };
+  const q = prNamedFigure(it, s, PR_QTY_READ_ORDER, PR_ERR_QTY);
+  if (q.error) return q;
+  const qty = q.value === undefined ? 1 : q.value;
+  if (!(qty > 0) || qty > 1e7) return { error: PR_ERR_QTY };
+  const pr = prNamedFigure(it, s, PR_PRICE_ALIASES_ORDER, PR_ERR_PRICE);
+  if (pr.error) return pr;
+  const price = pr.value === undefined ? 0 : pr.value;
+  if (price < 0 || price > 1e9) return { error: PR_ERR_PRICE };
+  const out = { ...it };
+  let rate = 0;
+  for (const k of ['conversionRate', 'conversionRatio']) {
+    const f = prFigure(it, s, k);
+    if (f.bad || (f.n !== undefined && f.n > 1e9)) return { error: PR_ERR_ITEMS };
+    if (f.n !== undefined) { out[k] = f.n; if (!rate && f.n > 0) rate = f.n; }
+  }
+  const gross = qty * price;
+  const pf = skipDiscount ? {} : prFigure(it, s, 'discountPercent'); const af = skipDiscount ? {} : prFigure(it, s, 'discountAmount');
+  if (pf.bad || af.bad) return { error: PR_ERR_LINE_DISC };
+  const pct = pf.n === undefined ? 0 : pf.n; const da = af.n === undefined ? 0 : af.n;
+  if (pct < 0 || pct > 100 || da < 0) return { error: PR_ERR_LINE_DISC };
+  let amount;
+  if (pct > 0) {
+    amount = r2(gross * (pct / 100)); // ONE formula (the percent wins : workflowEngine.editPRItems, prLineDiscount)
+    if (da > 0 && Math.abs(Math.round(da * 100) - Math.round(amount * 100)) > 1) return { error: PR_ERR_LINE_DISC };
+  } else {
+    if (da > gross + 0.01) return { error: PR_ERR_LINE_DISC };
+    amount = Math.min(gross, da);
+  }
+  for (const k of PR_QTY_READ_ORDER) out[k] = qty;
+  for (const k of PR_PRICE_ALIASES_ORDER) out[k] = price;
+  out.stockQty = qty * (rate > 0 ? rate : 1);
+  if (!skipDiscount) {
+    if (isSent(it.discountPercent) || pct > 0) out.discountPercent = pct;
+    if (isSent(it.discountAmount) || isSent(it.discountPercent) || amount > 0) out.discountAmount = amount;
+  }
+  const total = r2(Math.max(0, gross - amount));
+  out.total = total;
+  if ('lineTotal' in it) out.lineTotal = total;
+  return { line: out };
+}
+function normalizePrItems(items, storedItems, skipDiscount) {
+  const out = [];
+  for (let i = 0; i < items.length; i += 1) {
+    const s = storedItems && storedItems.length ? storedLineFor(storedItems, items, i) : null;
+    const r = normalizePrLine(items[i], isObj(s) ? s : null, skipDiscount);
+    if (r.error) return r;
+    out.push(r.line);
+  }
+  return { items: out };
+}
+function sameJsonValue(a, b) {
+  if (a === b) return true;
+  if (!a || !b || typeof a !== 'object' || typeof b !== 'object' || Array.isArray(a) !== Array.isArray(b)) return false;
+  const ka = Object.keys(a); const kb = Object.keys(b);
+  return ka.length === kb.length && ka.every((k) => Object.prototype.hasOwnProperty.call(b, k) && sameJsonValue(a[k], b[k]));
+}
+const prItemsSame = (stored, items) => stored.length === items.length && items.every((it, i) => sameJsonValue(it, stored[i]));
+// The lines of a body, normalized (the body `p` is NOT touched) : -> { error } | { items } | {} (no items in the body). `cur` = the stored row (null = a new PR).
+// A whole old PR sent back unchanged is never refused for its old figures : it stays as it is (echo).
+function prNormalizeBody(p, cur, skipDiscount) {
+  if (!Array.isArray(p.items)) return {};
+  const stored = cur ? parseItemsJson(cur.itemsJson) : [];
+  // the lines sent back exactly as stored change nothing : they stay as they are (an old / imported line is neither refused nor rewritten)
+  if (cur && prItemsSame(stored, p.items)) return { items: p.items, echo: true };
+  const r = normalizePrItems(p.items, stored, skipDiscount);
+  if (r.error) return { error: r.error };
+  return { items: r.items };
+}
+// money of ANY line (normalized or stored), read leniently : qty, unit price, the line discount (ONE formula from the line : prLineDiscount)
+function prLineMoney(it) {
+  const q = lineQty(it); const qty = Number.isFinite(q) ? q : 0;
+  const price = linePrice(it);
+  return { qty, price, disc: prLineDiscount(it, qty, price) };
+}
+// the settings of the amounts : the body's financials, else the body's top-level keys (createPR reads those too), else the stored ones. Only a value from the BODY is range-checked
+// (a stored one is history : an old PR with a odd setting can still have a line edited). -> { error } | { settings, ... }
+const PR_FIN_SETTING_KEYS = ['combinedDiscountType', 'combinedDiscountValue', 'vatMode', 'roundingAdj', 'shippingCost', 'hasVat'];
+function prSettings(p, bodyFin, storedFin, storedExtra) {
+  const pick = (k) => {
+    for (const [src, fromBody] of [[bodyFin, true], [p, true], [storedFin, false], [storedExtra, false]]) if (src && hasVal(src[k])) return { v: src[k], fromBody };
+    return null;
+  };
+  const num = (k, fallback, signed) => {
+    const x = pick(k);
+    if (!x) return { n: fallback, bad: false };
+    const n = signed ? signedNumOf(x.v) : numOf(x.v);
+    return { n: Number.isFinite(n) ? n : 0, bad: x.fromBody && !Number.isFinite(n) };
+  };
+  const vm = pick('vatMode'); const vatMode = vm ? String(vm.v) : 'NONE';
+  if (vm && vm.fromBody && !PR_VAT_MODES.has(vatMode)) return { error: PR_ERR_FIN };
+  const cv = num('combinedDiscountValue', 0); const ship = num('shippingCost', 0); const rnd = num('roundingAdj', 0, true);
+  if (cv.bad || ship.bad || rnd.bad) return { error: PR_ERR_FIN };
+  const ct = pick('combinedDiscountType'); const cType = ct ? String(ct.v) : (cv.n > 0 ? 'percent' : 'fixed');
+  if (ct && ct.fromBody && cType !== 'percent' && cType !== 'fixed') return { error: PR_ERR_FIN };
+  const fromBody = (k) => { const x = pick(k); return Boolean(x && x.fromBody); };
+  if ((fromBody('combinedDiscountValue') && (cv.n < 0 || (cType === 'percent' && cv.n > 100))) || (fromBody('shippingCost') && (ship.n < 0 || ship.n > 1e9)) || (fromBody('roundingAdj') && Math.abs(rnd.n) > 1)) return { error: PR_ERR_FIN };
+  const hv = pick('hasVat'); const hvFlag = hv ? boolOf(hv.v) : null;
+  if (hv && hv.fromBody && hvFlag === null) return { error: PR_ERR_FIN };
+  return { vatMode, cv, ship, rnd, cType, hvFlag, sv: pick('vatAmount'), fromBody, settings: { combinedDiscountType: cType, combinedDiscountValue: cv.n, vatMode, roundingAdj: rnd.n, shippingCost: ship.n } };
+}
+// VAT applies when the mode says so and nobody switched it off (hasVat) ; with no flag at all, a sent VAT of 0 on a positive subtotal means "off" (the stored-PR rule)
+const prVatOn = (S, subtotal) => S.vatMode !== 'NONE' && (S.hvFlag !== null ? S.hvFlag : !(S.sv && numOf(S.sv.v) === 0 && subtotal > 0));
+const prSubtotalOf = (lines) => lines.reduce((sum, it) => { const m = prLineMoney(it); return sum + m.qty * m.price; }, 0);
+function prAmountsOf(lines, S, vatOn) {
+  const money = lines.map(prLineMoney);
+  return prExpectedAmounts(money.map((m) => ({ purchaseQty: m.qty, price: m.price })), money.map((m) => m.disc), S.settings, vatOn);
+}
+// the totals a body may honestly carry : the formula's, and - a PR that is not a SELF one has no VAT / shipping / rounding and the create view sends its total as the plain
+// subtotal (item discounts not taken off)
+function prCandidateList(a, S, vatOn, chRaw) {
+  const c = [a];
+  if (chRaw !== 'SELF' && !vatOn && S.ship.n === 0 && S.rnd.n === 0) c.push({ ...a, grandTotal: r2(a.subtotal) });
+  return c;
+}
+const prChannelOf = (cur, p, storedExtra) => trimVal(p.purchaseChannel ?? p.channel ?? (cur && cur.purchaseChannel) ?? storedExtra.channel).toUpperCase();
+// Do the (normalized) lines of a write give other amounts than the lines the PR holds, under the PR's own settings ? Missing keys count as their defaults (a discount key cut out of a
+// line = 0), so cutting them cannot hide a change. Judged on the amounts of the stored LINES, not the stored total (an old PR whose total never matched its lines can be sent back).
+function prFiguresDiffer(cur, items) {
+  if (!cur || !Array.isArray(items)) return false;
+  const storedItems = parseItemsJson(cur.itemsJson);
+  if (prItemsSame(storedItems, items)) return false;
+  const storedExtra = parseExtra(cur.extraJson);
+  const S = prSettings({}, null, isObj(storedExtra.financials) ? storedExtra.financials : null, storedExtra);
+  if (S.error) return false;
+  const vatOn = prVatOn(S, prSubtotalOf(storedItems));
+  const a = prAmountsOf(storedItems, S, vatOn); const b = prAmountsOf(items, S, vatOn);
+  return Math.abs(a.grandTotal - b.grandTotal) > 0.01 || Math.abs(a.subtotal - b.subtotal) > 0.01 || Math.abs(a.itemDiscountTotal - b.itemDiscountTotal) > 0.01;
+}
+// An admin is not held to the computed amounts on an existing PR, but a total that differs from the lines' is written to the audit log (PR_TOTAL_OVERRIDE { expected, given }) -> null | { expected, given }
+const PR_TOTAL_OVERRIDES = new WeakMap();
+function prTotalOverride(cur, p, differ) {
+  const bodyFin = isObj(p.financials) ? p.financials : null;
+  const given = sentTotalOf(p) ?? (bodyFin && hasVal(bodyFin.grandTotal) ? numOf(bodyFin.grandTotal) : null);
+  if (given === null || !Number.isFinite(given)) return null;
+  const storedItems = parseItemsJson(cur.itemsJson);
+  const storedExtra = parseExtra(cur.extraJson);
+  const S = prSettings(p, bodyFin, isObj(storedExtra.financials) ? storedExtra.financials : null, storedExtra);
+  if (S.error) return null;
+  const lines = Array.isArray(p.items) ? p.items : storedItems;
+  if (lines.length === 0) return null;
+  const vatOn = prVatOn(S, prSubtotalOf(lines));
+  const a = prAmountsOf(lines, S, vatOn);
+  if (prCandidateList(a, S, vatOn, prChannelOf(cur, p, storedExtra)).some((c) => Math.abs(c.grandTotal - given) <= 0.01)) return null;
+  // judged only when the admin moves something : the total, or the lines (an old PR sent back as it is, whose total never matched its lines, is not an override)
+  if (!(differ || Math.abs(given - Number(cur.totalAmount || 0)) > 0.005)) return null;
+  return { expected: a.grandTotal, given };
 }
 /**
- * The amounts of a write that may change the content of a PR (see the block comment above). cur = the stored row (null = a new PR), p = the body (mutated).
+ * The amounts of a write that may change the content of a PR (see the block comment above). cur = the stored row (null = a new PR), p = the body (mutated ; its lines are
+ * ALREADY normalized : normalizeLine), rawItems = the lines as the client sent them.
  * -> null (go on) | { status, message }
  */
-function prEnforceAmounts(cur, p) {
+function prEnforceAmounts(cur, p, rawItems) {
   const storedExtra = cur ? parseExtra(cur.extraJson) : {};
   const storedFin = isObj(storedExtra.financials) ? storedExtra.financials : null;
   const bodyFin = isObj(p.financials) ? p.financials : null;
   const storedItems = cur ? parseItemsJson(cur.itemsJson) : [];
   const sent = sentTotalOf(p);
+  const bodyItems = Array.isArray(p.items);
   if (cur) {
+    const raw = Array.isArray(rawItems) ? rawItems : (bodyItems ? p.items : null);
+    // the lines count as changed when a figure they carry differs (raw) OR their amounts differ from the stored lines' (normalized : a key the client left out is its default)
     const changed = (sent !== null && Math.abs(sent - Number(cur.totalAmount || 0)) > 0.005)
-      || (Array.isArray(p.items) && prFiguresChanged(storedItems, p.items))
+      || (bodyItems && ((raw !== null && prFiguresChanged(storedItems, raw)) || prFiguresDiffer(cur, p.items)))
       || (bodyFin !== null && prFinChanged(storedFin, bodyFin));
     if (!changed) { delete p.total; delete p.totalAmount; delete p.financials; return null; } // nothing changed : the stored total / financials stay
   }
   if (bodyFin) for (const k of PR_FIN_AMOUNT_KEYS) if (hasVal(bodyFin[k]) && !(Number.isFinite(numOf(bodyFin[k])) && numOf(bodyFin[k]) >= 0)) return PR_ERR_TOTAL;
-  const bodyItems = Array.isArray(p.items);
   const lines = bodyItems ? p.items : storedItems;
-  // settings : the body's financials, else the body's top-level keys (createPR reads those too), else the stored ones. Only a value from the BODY is range-checked
-  // (a stored one is history : an old PR with a odd setting can still have a line edited)
-  const pick = (k) => {
-    for (const [src, fromBody] of [[bodyFin, true], [p, true], [storedFin, false], [storedExtra, false]]) if (src && hasVal(src[k])) return { v: src[k], fromBody };
-    return null;
-  };
-  const num = (k, fallback) => { const x = pick(k); if (!x) return { n: fallback, bad: false }; const n = numOf(x.v); return { n: Number.isFinite(n) ? n : 0, bad: x.fromBody && !Number.isFinite(n) }; };
-  const vm = pick('vatMode'); const vatMode = vm ? String(vm.v) : 'NONE';
-  if (vm && vm.fromBody && !PR_VAT_MODES.has(vatMode)) return PR_ERR_FIN;
-  const cv =num('combinedDiscountValue', 0); const ship = num('shippingCost', 0); const rnd = num('roundingAdj', 0);
-  if (cv.bad || ship.bad || rnd.bad) return PR_ERR_FIN;
-  const ct = pick('combinedDiscountType'); const cType = ct ? String(ct.v) : (cv.n > 0 ? 'percent' : 'fixed');
-  if (ct && ct.fromBody && cType !== 'percent' && cType !== 'fixed') return PR_ERR_FIN;
-  const fromBody = (k) => { const x = pick(k); return Boolean(x && x.fromBody); };
-  if ((fromBody('combinedDiscountValue') && (cv.n < 0 || (cType === 'percent' && cv.n > 100))) || (fromBody('shippingCost') && (ship.n < 0 || ship.n > 1e9)) || (fromBody('roundingAdj') && Math.abs(rnd.n) > 1)) return PR_ERR_FIN;
-  const hv = pick('hasVat'); const hvFlag = hv ? boolOf(hv.v) : null;
-  if (hv && hv.fromBody && hvFlag === null) return PR_ERR_FIN;
+  const S = prSettings(p, bodyFin, storedFin, storedExtra);
+  if (S.error) return S.error;
   if (lines.length === 0) return null; // no line to compute from : the total stays as sent (it was checked for its shape)
-  const figs = lines.map((it) => prLineFigures(it, bodyItems));
-  if (figs.some((f) => f === null)) return PR_ERR_ITEMS;
-  const pseudo = figs.map((f) => ({ purchaseQty: f.qty, price: f.price }));
-  const subtotal = figs.reduce((s, f) => s + f.qty * f.price, 0);
-  if (fromBody('combinedDiscountValue') && cType === 'fixed' && cv.n > subtotal + 0.005) return PR_ERR_FIN;
-  // VAT applies when the mode says so and nobody switched it off (hasVat) ; with no flag at all, a sent VAT of 0 on a positive subtotal means "off" (the stored-PR rule)
-  const sv = pick('vatAmount');
-  const vatOn = vatMode !== 'NONE' && (hvFlag !== null ? hvFlag : !(sv && numOf(sv.v) === 0 && subtotal > 0));
-  const settings = { combinedDiscountType: cType, combinedDiscountValue: cv.n, vatMode, roundingAdj: rnd.n, shippingCost: ship.n };
-  // the line discount : the createPR / updatePR rule (a given amount, else from the percent) and the editPRItems rule (the percent wins) - both capped at the line amount
-  const discA = figs.map((f) => Math.min(f.qty * f.price, Math.max(0, f.da || (f.pct > 0 ? f.qty * f.price * (f.pct / 100) : 0))));
-  const discB = figs.map((f) => (f.pct > 0 ? r2(f.qty * f.price * (f.pct / 100)) : Math.min(f.qty * f.price, Math.max(0, f.da))));
-  const cands = [prExpectedAmounts(pseudo, discA, settings, vatOn)];
-  if (discB.some((d, i) => Math.abs(d - discA[i]) > 0.000001)) cands.push(prExpectedAmounts(pseudo, discB, settings, vatOn));
-  // a PR that is not a SELF one has no VAT / shipping / rounding and the create view sends its total as the plain subtotal (item discounts not taken off)
-  const chRaw = trimVal(p.purchaseChannel ?? p.channel ?? (cur && cur.purchaseChannel) ?? storedExtra.channel).toUpperCase();
-  if (chRaw !== 'SELF' && !vatOn && ship.n === 0 && rnd.n === 0) cands.push({ ...cands[0], grandTotal: r2(subtotal) });
+  const subtotal = prSubtotalOf(lines);
+  if (S.fromBody('combinedDiscountValue') && S.cType === 'fixed' && S.cv.n > subtotal + 0.005) return PR_ERR_FIN;
+  const vatOn = prVatOn(S, subtotal);
+  const a = prAmountsOf(lines, S, vatOn);
+  const cands = prCandidateList(a, S, vatOn, prChannelOf(cur, p, storedExtra));
   const finGrand = bodyFin && hasVal(bodyFin.grandTotal) ? numOf(bodyFin.grandTotal) : null;
   let chosen = cands[0];
   if (sent !== null) {
@@ -567,11 +736,13 @@ function prEnforceAmounts(cur, p) {
   delete p.total;
   p.totalAmount = chosen.grandTotal;
   delete p.financials;
-  if (bodyFin || storedFin) {
+  // financials are written whenever the PR has some, OR a setting that went into the amounts came from the body (financials or a top-level key) : a setting that was
+  // used must leave a trace (a new PR sent with a top-level combinedDiscountValue and no financials used to lose it)
+  if (bodyFin || storedFin || PR_FIN_SETTING_KEYS.some((k) => S.fromBody(k))) {
     p.financials = {
-      subtotal: r2(chosen.subtotal), itemDiscountTotal: r2(chosen.itemDiscountTotal), combinedDiscountType: cType, combinedDiscountValue: cv.n,
-      combinedDiscountAmount: r2(chosen.combinedDiscountAmount), totalDiscount: r2(chosen.totalDiscount), vatMode, vatAmount: chosen.vatAmount,
-      roundingAdj: rnd.n, shippingCost: ship.n, grandTotal: chosen.grandTotal
+      subtotal: r2(chosen.subtotal), itemDiscountTotal: r2(chosen.itemDiscountTotal), combinedDiscountType: S.cType, combinedDiscountValue: S.cv.n,
+      combinedDiscountAmount: r2(chosen.combinedDiscountAmount), totalDiscount: r2(chosen.totalDiscount), vatMode: S.vatMode, vatAmount: chosen.vatAmount,
+      roundingAdj: S.rnd.n, shippingCost: S.ship.n, grandTotal: chosen.grandTotal
     };
   }
   return null;
@@ -592,13 +763,29 @@ function guardPrWrite(authUser, cur, p, rawLinks) {
   // the shape of the body first, for everybody (an admin too) : items must be an array of objects, a total must be a finite number >= 0
   const shape = prShapeError(p);
   if (shape) return shape;
-  // an admin is not restricted (beyond the shape above), except that his edit of a PR parked at the BUFFER step is checked like the BUFFER's (the total must match the lines)
-  if (perms.isAdmin && cur.status !== PR_PENDING_BUFFER) return null;
+  // the lines next, for everybody (an admin too) : normalizeLine - a figure that is not a number, names of one figure that disagree, qty <= 0, a discount that contradicts
+  // itself are a 400. `nres.items` = the lines as the server writes them (p.items itself is only replaced on the paths that WRITE the body's lines)
+  // (the BUFFER's edit at PENDING_BUFFER keeps the stored discount : the discount keys of its body are not read)
+  const nres = prNormalizeBody(p, cur, cur.status === PR_PENDING_BUFFER && (perms.isBuffer || perms.isAdmin));
   const canEdit = canEditPrContent(authUser, cur.status);
-  if (prContentChanged(cur, p) && !canEdit) return FORBID;
+  // lines that fail the rules : a 400 for a caller who may edit them ; a caller who may not edit the content at all is told so first (403), as for any other change
+  if (nres.error) return canEdit ? nres.error : FORBID;
+  // do the lines give other amounts than the stored lines ? (a cut-out discount key counts : the missing key is its default)
+  const differ = nres.items ? prFiguresDiffer(cur, nres.items) : false;
+  // an admin is not restricted (beyond the shape + the lines above), except that his edit of a PR parked at the BUFFER step is checked like the BUFFER's (the total must match
+  // the lines) ; a total he sets that is not the lines' is written to the audit log (PR_TOTAL_OVERRIDE)
+  if (perms.isAdmin && cur.status !== PR_PENDING_BUFFER) {
+    if (nres.items) p.items = nres.items;
+    const ov = prTotalOverride(cur, p, differ);
+    if (ov) PR_TOTAL_OVERRIDES.set(p, ov);
+    return null;
+  }
+  if ((prContentChanged(cur, p) || differ) && !canEdit) return FORBID;
   const base = parseItemsJson(cur.itemsJson);
+  const rawItems = Array.isArray(p.items) ? p.items : null;
   if (cur.status === PR_PENDING_BUFFER) {
     if (perms.isBuffer || perms.isAdmin) {
+      if (nres.items) p.items = nres.items;
       const be = prBufferEdit(cur, p, rawLinks);
       if (be.status) return be;
       applyBufferEdit(p, be);
@@ -617,8 +804,11 @@ function guardPrWrite(authUser, cur, p, rawLinks) {
       const fz = freezePrItems(cur.itemsJson, p.items);
       if (fz.error) return FORBID;
       p.items = fz.items;
-    } else if (PR_LINK_LOCK_STATUSES.has(statusKey)) {
-      if (!lockPrLinks(base, p.items)) return FORBID; // e.g. REVIEWED edited by the reviewer / approver : qty / price yes, links no
+      // the frozen figures are the stored ones : the server's own total / stockQty go with them, never the client's (a sent-back PR as it is stays untouched)
+      if (!prItemsSame(base, p.items)) p.items.forEach((x) => { if (isObj(x)) prStampLine(x); });
+    } else {
+      p.items = nres.items; // the lines as the server writes them (normalizeLine)
+      if (PR_LINK_LOCK_STATUSES.has(statusKey) && !lockPrLinks(base, p.items)) return FORBID; // e.g. REVIEWED edited by the reviewer / approver : qty / price yes, links no
     }
   }
   if (!canEdit) {
@@ -626,7 +816,16 @@ function guardPrWrite(authUser, cur, p, rawLinks) {
     delete p.financials; delete p.total; delete p.totalAmount;
     return null;
   }
-  return prEnforceAmounts(cur, p);
+  return prEnforceAmounts(cur, p, rawItems);
+}
+// total / lineTotal / stockQty of a line from its own figures (the lines of a caller who may not edit : their figures are the stored ones, the rest is the server's)
+function prStampLine(x) {
+  const m = prLineMoney(x);
+  const total = r2(Math.max(0, m.qty * m.price - m.disc));
+  x.total = total;
+  if ('lineTotal' in x) x.lineTotal = total;
+  const rate = [x.conversionRate, x.conversionRatio].map(Number).find((n) => Number.isFinite(n) && n > 0) || 1;
+  x.stockQty = m.qty * rate;
 }
 // what the BUFFER changed, line by line (qty / price / link, before -> after) : the detail of the BUFFER_FORWARD audit row
 function prItemChanges(storedItemsJson, newItems) {
@@ -1754,12 +1953,18 @@ const lineKeyOf = (it) => (it && (it.productId || it.id || it.code)) || '';
 // admin may correct anything ; changes to a closed PO's qty / price are reported through `notes` (the caller writes an audit row).
 const hasGrn = (extra) => Boolean(extra && Array.isArray(extra.grnHistory) && extra.grnHistory.length > 0);
 const PRE_ORDER_STATUSES = new Set(['', ...PO_PRE_ORDER]); // the same set the transition rules use (rbac.js)
-// The ordered qty of a PO line, read the same way everywhere (PR ceiling, line guard, receive, ceilings) : the HIGHEST positive of the qty keys, else 1.
-const QTY_KEYS = ['orderedQty', 'purchaseQty', 'qty', 'quantity'];
+// The ordered qty of a PO line, read the same way everywhere (PR ceiling, line guard, receive, ceilings) AND the way the PR amounts read a PR line (lineQty : purchaseQty,
+// qty, quantity, orderedQty) : the FIRST of those names that holds a positive number, else 1. NOT the highest - a PR line {purchaseQty:1, qty:1, quantity:1000} is worth 1
+// in the amounts, so it must be 1 at the PO ceiling too (normalizePrLine now refuses such a PR line ; an old one is still read consistently).
+const QTY_KEYS = PR_QTY_READ_ORDER;
 const orderedQtyOf = (line) => {
-  let m = 0;
-  for (const k of QTY_KEYS) { const n = Number(line && line[k]); if (Number.isFinite(n) && n > m) m = n; }
-  return m > 0 ? m : 1;
+  for (const k of QTY_KEYS) {
+    const v = line && line[k];
+    if (v === undefined || v === null || v === '') continue;
+    const n = strictNum(v); // (a text like 0x3E8 is not a number here either : Number() and parseFloat would read it differently)
+    if (n !== null && n > 0) return n;
+  }
+  return 1;
 };
 // A PO body's status: trimmed + upper-cased at the single entry (a non-string / unknown value is refused for a non-admin) -> an error response or null
 function checkPoStatus(p, authUser) {
@@ -2760,6 +2965,7 @@ async function handleRequest(context, state) {
             p.department = deptCode; // stored canonical (upper-case, no DEPT-)
             if (!canAccessDepartment(authUser, p.department)) return errorResponse(FORBIDDEN_MSG, 403);
             // the amounts of a new PR are the server's : total + financials computed from the lines (a total that does not match them is a 400)
+            { const nr = prNormalizeBody(p, null); if (nr.error) return errorResponse(nr.error.message, nr.error.status); if (nr.items) p.items = nr.items; } // normalizeLine : the lines are the server's figures
             { const amt = prEnforceAmounts(null, p); if (amt) return errorResponse(amt.message, amt.status); }
             // a new PR's id must not be another PR's number (lookups are "id = ? OR prNumber = ?")
             if (await lookupStatus(db, 'SELECT id FROM prs WHERE prNumber = ? LIMIT 1', p.id)) return errorResponse('เลขที่/รหัส PR ซ้ำกับเอกสารที่มีอยู่', 409);
@@ -2881,6 +3087,7 @@ async function handleRequest(context, state) {
           }
           markTouched('prs', prId);
           await audit('PR_UPSERT', 'pr', prId, { requesterUserId: authUser.userId, prNo });
+          { const ov = PR_TOTAL_OVERRIDES.get(p); if (ov) await audit('PR_TOTAL_OVERRIDE', 'pr', prId, { prNo, expected: ov.expected, given: ov.given }); } // an admin's total that is not the lines'
           if (curRow && curRow.status === 'REVIEWED' && PR_APPROVED_TO.includes(status)) {
             await writePrCommitment(db, prId, authUser.name || authUser.username, authUser.title || authUser.canonicalRole || authUser.roleKey);
           }
@@ -2923,6 +3130,9 @@ async function handleRequest(context, state) {
             status = rv.status;
             p.status = status;
           }
+        } else {
+          // (no such PR : nothing is written, but the lines are still refused when they are not figures)
+          const nr = prNormalizeBody(p, null); if (nr.error) return errorResponse(nr.error.message, nr.error.status);
         }
         if (status && curRow && !canTransitionPR(authUser, curRow.status, status)) return errorResponse(FORBIDDEN_MSG, 403);
         const targetId = curRow && curRow.id ? curRow.id : subId;
@@ -2992,6 +3202,7 @@ async function handleRequest(context, state) {
           return errorResponse('เอกสารถูกแก้ไขโดยผู้อื่น กรุณาโหลดข้อมูลใหม่แล้วลองอีกครั้ง', 409);
         }
         markTouched('prs', targetId);
+        { const ov = PR_TOTAL_OVERRIDES.get(p); if (ov) await audit('PR_TOTAL_OVERRIDE', 'pr', targetId, { expected: ov.expected, given: ov.given }); } // an admin's total that is not the lines'
         if (curRow && curRow.status === 'REVIEWED' && PR_APPROVED_TO.includes(status)) {
           await writePrCommitment(db, targetId, authUser.name || authUser.username, authUser.title || authUser.canonicalRole || authUser.roleKey);
         }
@@ -3792,7 +4003,7 @@ async function handleRequest(context, state) {
                 const line = lines[li];
                 const prItem = isPlain(line) && rowOfLine[li] >= 0 ? prItems[rowOfLine[li]] : null;
                 if (!prItem) return errorResponse('รายการใน PO ไม่ตรงกับรายการใน PR', 400);
-                // one qty for every qty key of the line (the highest the body sent), so every reader of the line sees the same figure
+                // one qty for every qty key of the line (read in the PR's order : orderedQtyOf, never the highest the body sent), so every reader of the line sees the same figure
                 const q = orderedQtyOf(line);
                 let wrote = false;
                 for (const qk of QTY_KEYS) if (qk in line) { line[qk] = q; wrote = true; }

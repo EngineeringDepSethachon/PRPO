@@ -1,3 +1,21 @@
+# M12 — Phase 3 v1.3.0: FR-04 ขยายฟอนต์ทั้งระบบ (เริ่มหลัง v1.2.0 ขึ้น main ; ผู้ใช้ตอบ Q11/Q13/Q14 = A)
+ลำดับ (สมชาย): B0 → B1 ∥ B2 ∥ B3 → B4 → B5a ∥ B5b ∥ B5c → B6 → QA → bump 1.3.0
+- [ ] B0 screenshot baseline ก่อนแก้ (playwright ใน scratchpad, 1366×768 + 390×844: Login, Dashboard, Workspace, PR list/create, PR/PO/GRN modal, OnlineTask, Budget, Stock, Admin, Sidebar) — nong (ติดตั้ง Chromium ครั้งเดียว Q14=A)
+- [ ] B1 tailwind.config.js theme.extend.fontSize: xs .875/1.25, sm 1/1.5, base 1.125/1.75, lg 1.25/1.75, xl 1.375/1.875 (2xl+ คงเดิม Q13=A) — nong
+- [ ] B2 PrintablePO.jsx ล็อกขนาดเดิม 17 จุด (Q11=A) ; po_procurement 516-560 ผ่าน — malee
+- [x] B3 scripts/codemod-font-scale.mjs (dry-run default, --write) + tests/codemod_font_scale.test.js (40 ผ่าน) — malee ; dry-run: 497 จุด / 54 ไฟล์ ไม่มี warning (มากสุด QuickIssueView 47, OnlineOrderCard 44, PODetailsModal 36) ; **ยังไม่ --write** (รอหลัง v1.2.0)
+- [ ] B4 รัน codemod --write + แก้เทสต์ที่ assert คลาส + tests/font_scale_guard.test.js + npm test/build — nong
+- [ ] B5a/B5b/B5c ไล่เก็บจุดล้น (ตาราง/โครงหน้า ∥ modal ∥ Budget/Stock/Admin) กติกา min-w-0 / break-words / leading-normal / whitespace-nowrap / overflow-x-auto / ห้ามย่อกลับด้วย text-[px] — malee ×3
+- [ ] B6 screenshot หลังแก้ + รายการเทียบ → prae → bump 1.3.0 + CHANGELOG → preview → main
+
+# M11 — Phase 3 v1.2.0: FR-03 การ์ดงานจัดซื้อออนไลน์ (เริ่มหลัง v1.1.0 ขึ้น main ; ผู้ใช้ตอบ Q12 = A ทุกแท็บ)
+ลำดับ (สมชาย): A1 ∥ A2 → A3 → A4 → A5 (QA → kla ลิงก์ภายนอก/clipboard) → A6 bump 1.2.0
+- [x] A1 urlHelper.getLinkLabel(url, platform) → {label, host} + tests/url_link_label.test.js (84 ผ่าน) — nong ; host ชนะ platform, จับ label โดเมนทีละส่วน, scheme อันตรายคืนค่าว่าง
+- [ ] A2 src/components/procurement/ProductActionCard.jsx + AttachmentThumbnail prop + OnlineOrderCard โหมด pending (~2271-2455): รูป w-24 sm:w-28 คลิก lightbox, CTA min-h-[44px] "เปิดลิงก์ร้านค้าออนไลน์ ↗" + ป้ายแพลตฟอร์ม + คัดลอกลิงก์, ProductRemarkNote, จำนวน/หน่วย/ราคาอนุมัติ text-base/lg ; คง input/handler เดิมทั้งหมด — malee
+- [ ] A3 OnlineOrderCard โหมด read-only (~2456-2650) ใช้ ProductActionCard คงป้ายเคลม/คืนเงิน/สมการ/ตัวกรอง — malee (คนเดิม)
+- [ ] A4 tests/online_product_action_card.test.jsx + regression (po_procurement, qa_product_remark, claim_state_machine_evidence, inventory_grn, cf_private_files_ui, cf_p4_*, cf_qa_r5) + npm test/build — nong
+- [ ] A5 prae → kla (ลิงก์ภายนอก, clipboard) — [ ] A6 bump 1.2.0 + CHANGELOG → preview → main
+
 # M10 — Phase 3 v1.1.0: FR-02 หมายเหตุสินค้า + FR-01 role พี่สุ (BUFFER) (SRS 2026-10-16 ; ผู้ใช้ตอบ Q1-Q10 ในแชท 2026-10-17 ; แผน docs/plan.md หัวข้อบนสุด)
 ลำดับ (สมชาย): T1 ∥ T2 ∥ T4 → T3 ∥ T5 → T6 → T7 → T8 (QA + kla) → backup → bump 1.1.0 → CHANGELOG → tag → preview → main
 - [x] T1 FR-02 client (nong) — QA PASS (prae อ่านโค้ด + Neo รันเทสต์ 239/239 + build ; bug ต่ำ editingPR ไม่คัดลอก productRemark → แก้แล้ว + เทสต์ d3) ; ProductRemarkNote.jsx + tests/pr_product_remark.test.jsx, tests/qa_product_remark.test.jsx: คอมโพเนนต์แสดงหมายเหตุ (`item.productRemark || product.remark` ข้อความธรรมดา) ; PRCreateView คัดลอก productRemark ตอนเพิ่มรายการ + แสดง ; PRDetailsModal / OnlineOrderCard (แก้ไขได้+อ่านอย่างเดียว) / PODetailsModal แสดงใต้ชื่อสินค้า ; tests/pr_product_remark.test.jsx

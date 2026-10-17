@@ -516,6 +516,10 @@ export const workflowEngine = {
         total: Math.max(0, gross - discountAmount)
       };
       if (discountAmount > 0 || item.discountAmount !== undefined) next.discountAmount = discountAmount;
+      // the other names the line already carries for the qty / price (a BUFFER edit writes quantity / orderedQty / unitPrice / estimatedPrice) follow the new figures :
+      // the server refuses a line whose names disagree and writes one number over all of them
+      for (const k of ['quantity', 'orderedQty']) { if (k in next) next[k] = pQty; }
+      for (const k of ['unitPrice', 'estimatedPrice']) { if (k in next) next[k] = price; }
 
       // ── link : the key the caller changed wins (productUrl is read first by getProductUrl, so keep every url key in step) ──
       // compare with the effective old link (getProductUrl) - an older row may keep it only in onlineUrl / link / url / itemUrl,

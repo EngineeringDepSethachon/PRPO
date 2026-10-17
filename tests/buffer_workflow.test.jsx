@@ -308,6 +308,21 @@ describe('editPRItems : link + totals + permission', () => {
     expect(log.note).toContain('ปรับตามราคาจริง');
   });
 
+  it('the other names a line already carries for its qty / price follow the edit (the server refuses a line whose names disagree : kla round 3)', async () => {
+    storageService.savePRs([seedPr()]);
+    const items = seedPr().items.map(it => (it.id === 'I1'
+      ? { ...it, quantity: 2, orderedQty: 2, unitPrice: 50, estimatedPrice: 50, purchaseQty: 5, qty: 5, price: 70 }
+      : it));
+    const out = await workflowEngine.editPRItems('PR-BUF-1', items, buffer, '');
+    const i1 = out.items.find(i => i.id === 'I1');
+    expect([i1.purchaseQty, i1.qty, i1.quantity, i1.orderedQty]).toEqual([5, 5, 5, 5]);
+    expect([i1.price, i1.unitPrice, i1.estimatedPrice]).toEqual([70, 70, 70]);
+    // a name the line does not carry is not invented
+    const i2 = out.items.find(i => i.id === 'I2');
+    expect('quantity' in i2).toBe(false);
+    expect('unitPrice' in i2).toBe(false);
+  });
+
   it('a PR without financials just sums the rows ; clearing the link clears every url key', async () => {
     storageService.savePRs([seedPr()]);
     const items = seedPr().items.map(it => (it.id === 'I1' ? { ...it, productUrl: '', purchaseQty: 3, qty: 3 } : it));

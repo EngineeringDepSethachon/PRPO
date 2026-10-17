@@ -289,7 +289,9 @@ d('BUFFER hardening (M10 T2/T3)', () => {
   it('after the BUFFER edit every quantity / price alias is equal (quantity, orderedQty, purchaseQty, qty / unitPrice, estimatedPrice, price) ; name / productId / productRemark stay', async () => {
     const stale = (over = {}) => LINE({ quantity: 2, orderedQty: 2, unitPrice: 100, estimatedPrice: 100, productRemark: 'blue', ...over });
     const id = await parked({ totalAmount: 250, items: [stale(), LINES()[1]] });
-    const r = await forward(id, { items: [{ ...stale(), qty: 3, purchaseQty: 3, quantity: 1, orderedQty: 99, price: 90, unitPrice: 5, estimatedPrice: 7, name: 'Other', productRemark: 'red' }, LINES()[1]], totalAmount: 320 });
+    // (kla round 3 : names of one figure that disagree are a 400 now - normalizeLine - instead of being overwritten silently)
+    expect((await forward(id, { items: [{ ...stale(), qty: 3, purchaseQty: 3, quantity: 1, orderedQty: 99, price: 90, unitPrice: 5, estimatedPrice: 7, name: 'Other', productRemark: 'red' }, LINES()[1]], totalAmount: 320 })).status).toBe(400);
+    const r = await forward(id, { items: [{ ...stale(), qty: 3, purchaseQty: 3, quantity: 3, orderedQty: 3, price: 90, unitPrice: 90, estimatedPrice: 90, name: 'Other', productRemark: 'red' }, LINES()[1]], totalAmount: 320 });
     expect(r.status).toBe(200);
     const l = itemsOf(id)[0];
     expect([l.quantity, l.orderedQty, l.purchaseQty, l.qty]).toEqual([3, 3, 3, 3]);
@@ -331,7 +333,8 @@ d('BUFFER hardening (M10 T2/T3)', () => {
     expect((await call('su', 'PUT', `/api/prs/${id}`, { items: [LINE({ link: 'https://shop.example/pen', productUrl: 'https://evil.example/' }), LINES()[1]] })).status).toBe(403);
     expect(itemsOf(id)[0].productUrl).toBe('https://shop.example/pen-v2');
     // the reviewer's normal edit (qty) keeps working, the links come out as they were stored
-    const q = await call('asst', 'PUT', `/api/prs/${id}`, { items: [{ ...itemsOf(id)[0], qty: 4, purchaseQty: 4 }, itemsOf(id)[1]], totalAmount: 450 });
+    // (a line the BUFFER edited carries all four qty names : an edit changes them all, as workflowEngine.editPRItems does)
+    const q = await call('asst', 'PUT', `/api/prs/${id}`, { items: [{ ...itemsOf(id)[0], qty: 4, purchaseQty: 4, quantity: 4, orderedQty: 4 }, itemsOf(id)[1]], totalAmount: 450 });
     expect(q.status).toBe(200);
     expect(itemsOf(id)[0]).toMatchObject({ purchaseQty: 4, productUrl: 'https://shop.example/pen-v2', link: 'https://shop.example/pen' });
     // approved : still locked
@@ -360,8 +363,8 @@ d('BUFFER hardening (M10 T2/T3)', () => {
     const r = await call('req', 'PUT', `/api/prs/${id}`, { financials: DISC_FIN({ combinedDiscountValue: 200, grandTotal: 30 }) });
     expect(r.status).toBe(200);
     expect(extraOf(id).financials).toEqual(stored);
-    // and a line discount of a frozen PR is the stored one
-    expect((await call('req', 'PUT', `/api/prs/${id}`, { items: [{ ...DISC_LINES()[0], discountAmount: 999, discountPercent: 0 }, DISC_LINES()[1]] })).status).toBe(200);
+    // and a line discount of a frozen PR is the stored one : a caller who may not edit the lines is refused (403, kla round 3 - it used to be ignored silently)
+    expect((await call('req', 'PUT', `/api/prs/${id}`, { items: [{ ...DISC_LINES()[0], discountAmount: 999, discountPercent: 0 }, DISC_LINES()[1]] })).status).toBe(403);
     expect(itemsOf(id)[0]).toMatchObject({ discountPercent: 10, discountAmount: 20 });
   });
 

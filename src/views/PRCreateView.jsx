@@ -369,7 +369,9 @@ export default function PRCreateView({
           productId: it.productId || it.code,
           qty: Number(it.purchaseQty ?? it.qty) || 1,
           price: parseFloat(it.price) || 0,
-          discountPercent: parseFloat(it.discountPercent) || 0,
+          // (a line whose amount was typed by hand is saved without its derived percent : show the percent again as the screen derives it from an amount)
+          discountPercent: parseFloat(it.discountPercent) || ((parseFloat(it.discountAmount) > 0 && (Number(it.purchaseQty ?? it.qty) || 1) * (parseFloat(it.price) || 0) > 0)
+            ? parseFloat(((parseFloat(it.discountAmount) / ((Number(it.purchaseQty ?? it.qty) || 1) * (parseFloat(it.price) || 0))) * 100).toFixed(2)) : 0),
           discountAmount: parseFloat(it.discountAmount) || 0,
           vendorId: it.vendorId || it.supplierId || '',
           platform: it.platform || it.storePlatform || 'Shopee',
@@ -959,6 +961,9 @@ export default function PRCreateView({
           : (prod?.stockUnit || prod?.unit || 'ชิ้น');
         const price = parseFloat(item.price) || 0;
         const rowTotal = Math.max(0, (price * pQty) - discA);
+        // the server takes the line discount from the percent when one is sent (and refuses an amount that does not agree with it) : the percent goes only when it gives
+        // exactly the amount shown - an amount typed by hand keeps its own value (the totals here use it), its derived percent (2 decimals) is not sent
+        const discPercentSent = (discP > 0 && discA > 0 && Math.round((price * pQty * (discP / 100) + Number.EPSILON) * 100) !== Math.round(discA * 100)) ? 0 : discP;
 
         return {
           productId: prod?.id || item.productId,
@@ -973,7 +978,7 @@ export default function PRCreateView({
           qty: pQty,
           unit: pUnit,
           price: price,
-          discountPercent: discP,
+          discountPercent: discPercentSent,
           discountAmount: discA,
           vendorId: vId,
           vendorName: vName,

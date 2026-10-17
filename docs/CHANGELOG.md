@@ -14,6 +14,15 @@
 
 ---
 
+## v1.1.0 — 2026-10-17 (Phase 3 ส่วนที่ 1: หมายเหตุสินค้า + role "พี่สุ")
+- **backup ก่อน deploy:** `prpo-backups/prpo-db-20261017-v1.0.0.sql` ; **migration:** ไม่มี (สถานะ/role ใหม่เป็นค่าข้อความในคอลัมน์เดิม ฟิลด์พี่สุอยู่ใน extraJson)
+- **FR-02 หมายเหตุสินค้า:** กล่อง "สเปก/หมายเหตุ" ใต้ชื่อสินค้าในหน้าสร้าง PR, รายละเอียด PR, การ์ดงานจัดซื้อออนไลน์ (ทั้งโหมดแก้ไข/อ่าน) และรายละเอียด PO ; PR ใหม่คัดลอก `productRemark` ลงรายการ PR เก่าดึงจาก master ด้วย productId
+- **FR-01 role ใหม่ `BUFFER` "ผู้ตรวจสอบจัดซื้อ (พี่สุ)":** เลือกได้ในหน้า Admin (บังคับ level 2 แผนก ALL) ; flow PR ใหม่ `SUBMITTED → PENDING_BUFFER ("รอพี่สุตรวจสอบ") → REVIEWED → APPROVED` — ถ้าไม่มีบัญชี BUFFER ที่ ACTIVE ระบบข้ามขั้นไป REVIEWED เอง (ระบบเดิมไม่สะดุด) ; พี่สุเห็น PR/PO/สต๊อก/งบทุกแผนก (อ่าน) แก้ได้เฉพาะ จำนวน/ราคา/ลิงก์ ของ PR ที่ PENDING_BUFFER + คอมเมนต์ถึงผู้อนุมัติ + ปุ่มเดียว "บันทึกการแก้ไขและส่งต่อผู้อนุมัติ" ; ไม่มีปุ่มตีกลับ/ยกเลิก/อนุมัติ/จัดสรรงบ/แก้ master ; Reviewer/Approver/Admin ตีกลับ-ยกเลิก PR ที่ค้างที่พี่สุได้ ; timeline บันทึก "ผู้ตรวจสอบจัดซื้อส่งต่อผู้อนุมัติ" พร้อมค่าก่อน→หลัง ; แจ้งเตือน PR_PENDING_BUFFER → พี่สุ และส่งต่อ → ผู้อนุมัติ ; PDF ไม่เปลี่ยน
+- **ความปลอดภัย (ผลตรวจ kla 3 รอบ):** สิทธิ์เขียนของ BUFFER จำกัดที่ PR ขั้นตัวเอง/สร้าง PR/อ่านแจ้งเตือน/อัปโหลด ที่เหลือ 403 ; เส้นทางเขียน PR ทุก role: `items` ต้องเป็น array ของ object, ยอดต้องเป็นตัวเลข, server คำนวณยอดรวม+financials เองทุกครั้งที่เนื้อหาเปลี่ยน (ต่างเกิน 0.01 → 400) พร้อมขอบเขตส่วนลด/VAT/ค่าส่ง, ลิงก์/ส่วนลด/financials ล็อกตั้งแต่ PENDING_BUFFER, key การเงินบนสุดไม่หลุดเข้า extraJson, roleId normalize + level clamp
+- **ผลข้างเคียงที่ตั้งใจ:** POST PR ที่ไม่ส่ง reason ไม่ลบ reason เดิมอีก ; PR ที่ไม่มี financials เดิมไม่ถูกสร้าง financials ให้ ; admin แก้ PR เดิมไม่ถูกบังคับยอด
+- **เทสต์:** vitest 2802 ผ่าน (133 ไฟล์) ; เทสต์ใหม่ 12 ไฟล์ (buffer_*, cf_buffer_*, cf_qa_buffer, cf_pr_write_hardening, pr_product_remark, qa_*) ; เอกสาร parity.md c.5 / plan.md / tasks.md M10
+- **ค้าง:** v1.2.0 การ์ดงานออนไลน์ (FR-03), v1.3.0 ขยายฟอนต์ (FR-04) ; ช่อง ONLINE ยังรับยอดแบบ subtotal (สูงกว่าจริงได้ ไม่ต่ำกว่า) ; ทุกคนในแผนกแก้/ยกเลิก DRAFT ของคนอื่นได้ (ของเดิมก่อน M10)
+
 ## v1.0.0 — 2026-10-16 (ปล่อยใช้งานจริง)
 - **Production:** https://prpo-pdqc.pages.dev (branch main, D1 `prpo-db`, R2 `prpo-files`) ; **Preview:** https://preview.prpo-pdqc.pages.dev (D1 `prpo-db-preview`, R2 `prpo-files-preview`)
 - **ฐานข้อมูล:** migrations 0001–0017 ; ล้างข้อมูลทดสอบก่อนปล่อย (backup `prpo-backups/prpo-db-20261015-pre-reset.sql`) เหลือ admin 1 บัญชี + แผนก PD/QC + สถานที่เก็บ/หน่วยนับ
