@@ -97,6 +97,12 @@ describe('Google Drive Image Resolver & Helper Functions', () => {
       const extUrl = 'https://images.unsplash.com/photo-1579546929518-9e396f3cc809';
       expect(resolveDriveImageUrl(extUrl)).toBe(extUrl);
     });
+
+    it('keeps the R2 proxy file path (exact shape) untouched', () => {
+      const proxyPath = '/api/files/3f2a9c1e-7b4d-4e8a-9c1f-0123456789ab';
+      expect(resolveDriveImageUrl(proxyPath)).toBe(proxyPath);
+      expect(resolveDriveImageUrl({ url: proxyPath })).toBe(proxyPath);
+    });
   });
 
   describe('getDriveLh3Url', () => {

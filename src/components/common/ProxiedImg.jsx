@@ -14,6 +14,7 @@ export default function ProxiedImg({ att, size = 'w400', urlInput, ...rest }) {
   return (
     <img
       {...rest}
+      referrerPolicy="no-referrer"
       src={src}
       onError={(e) => { if (!proxied.url) handleDriveImageError(e, att); }}
     />

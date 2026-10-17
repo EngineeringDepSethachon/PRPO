@@ -28,24 +28,27 @@ export const getProductUrl = (item) => {
 };
 
 /**
- * ชื่อแพลตฟอร์มที่รู้จัก (key = ชื่อ label ใน host หรือ platform ที่ normalize แล้ว)
+ * allowlist : โดเมนที่จดทะเบียน (registrable domain) ตรงตัว -> ชื่อแพลตฟอร์ม
+ * ใช้ Map (ไม่ใช่ object) เพื่อไม่ให้ key ของ prototype (เช่น constructor) ถูกนับเป็นแพลตฟอร์ม
+ * shop.line.me ไม่อยู่ในนี้ (line.me ทั้งโดเมนไม่ใช่ LINE Shopping) ; จับแยกใน platformNameFromHost
  */
-const LINK_PLATFORM_NAMES = {
-  shopee: 'Shopee',
-  lazada: 'Lazada',
-  nocnoc: 'NocNoc',
-  jd: 'JD Central',
-  jdcentral: 'JD Central',
-  amazon: 'Amazon',
-  aliexpress: 'AliExpress',
-  line: 'LINE Shopping',
-  lineshopping: 'LINE Shopping',
-  facebook: 'Facebook',
-  tiktok: 'TikTok Shop',
-  tiktokshop: 'TikTok Shop',
-};
+const LINK_PLATFORM_BY_DOMAIN = new Map([
+  ['shopee.co.th', 'Shopee'],
+  ['shopee.com', 'Shopee'],
+  ['shopee.sg', 'Shopee'],
+  ['lazada.co.th', 'Lazada'],
+  ['lazada.com', 'Lazada'],
+  ['nocnoc.com', 'NocNoc'],
+  ['jd.co.th', 'JD Central'],
+  ['jd.com', 'JD Central'],
+  ['amazon.com', 'Amazon'],
+  ['amazon.co.jp', 'Amazon'],
+  ['amazon.co.uk', 'Amazon'],
+  ['aliexpress.com', 'AliExpress'],
+  ['facebook.com', 'Facebook'],
+  ['tiktok.com', 'TikTok Shop'],
+]);
 
-const LINK_HOST_KEYS = ['shopee', 'lazada', 'nocnoc', 'jd', 'jdcentral', 'amazon', 'aliexpress', 'facebook', 'tiktok'];
 const LINK_DANGEROUS_SCHEME_RE = /^(javascript|data|vbscript|file|blob|about):/i;
 const LINK_SCHEME_RE = /^[a-z][a-z0-9+.-]*:/i;
 const LINK_HOST_PORT_RE = /^[a-z0-9.-]+:\d+(?:[/?#]|$)/i;
@@ -99,11 +102,9 @@ const registrableDomain = (host) => {
  * @returns {string} ชื่อแพลตฟอร์ม หรือ '' ถ้าจับไม่ได้
  */
 const platformNameFromHost = (host) => {
-  if (host === 'shop.line.me' || host.endsWith('.shop.line.me')) return LINK_PLATFORM_NAMES.line;
-  // เทียบจาก "โดเมนที่จดทะเบียน" เท่านั้น (shopee.evil.com -> evil.com ไม่ใช่ Shopee ; m.facebook.com -> facebook.com ใช่)
-  const brand = registrableDomain(host).split('.')[0];
-  if (LINK_HOST_KEYS.includes(brand)) return LINK_PLATFORM_NAMES[brand];
-  return '';
+  if (host === 'shop.line.me' || host.endsWith('.shop.line.me')) return 'LINE Shopping';
+  // เทียบ "โดเมนที่จดทะเบียนทั้งค่า" กับ allowlist เท่านั้น (shopee.evil.com -> evil.com ไม่ใช่ Shopee ; m.facebook.com -> facebook.com ใช่ ; shopee.xyz ไม่ใช่)
+  return LINK_PLATFORM_BY_DOMAIN.get(registrableDomain(host)) || '';
 };
 
 /**

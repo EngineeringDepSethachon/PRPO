@@ -15,6 +15,9 @@
  * @param {string} [size='w1200'] CDN thumbnail resolution size (e.g. 'w400', 'w1200', 'w1600')
  * @returns {string} Direct image URL for <img src="..." />
  */
+// path proxy ของไฟล์ที่เก็บใน R2 (เขียน regex เอง ไม่ import cfAttachments เพื่อกัน circular import กับ driveService)
+const PROXY_FILE_PATH_RE = /^\/api\/files\/[A-Za-z0-9_-]{10,128}(?:\?download=1)?$/;
+
 export function resolveDriveImageUrl(input, size = 'w1200') {
   if (!input) return '';
 
@@ -25,7 +28,7 @@ export function resolveDriveImageUrl(input, size = 'w1200') {
       if (typeof input.fileId === 'string' && (input.fileId.includes('BASE64_') || input.fileId.includes('STORED_IN_DRIVE'))) {
         return '';
       }
-      return `https://drive.google.com/thumbnail?id=${input.fileId}&sz=${size}`;
+      return `https://drive.google.com/thumbnail?id=${encodeURIComponent(input.fileId)}&sz=${size}`;
     }
     if (input.url && typeof input.url === 'string') return resolveDriveImageUrl(input.url, size);
     if (input.previewUrl && typeof input.previewUrl === 'string') return resolveDriveImageUrl(input.previewUrl, size);
@@ -41,16 +44,22 @@ export function resolveDriveImageUrl(input, size = 'w1200') {
     return '';
   }
 
-  // 2. Base64 or Blob Data URL
-  if (str.startsWith('data:image/') || str.startsWith('blob:')) {
+  // 2. Base64 (raster เท่านั้น : png/jpeg/webp/gif ; svg ไม่รับ) หรือ Blob Data URL
+  if (/^data:image\/(png|jpe?g|webp|gif)[;,]/i.test(str) || str.startsWith('blob:')) {
     return str;
   }
+  // data: อื่น ๆ และ scheme อื่นที่ไม่ใช่ http(s) (javascript:, file:, ...) ไม่รับ
+  if (/^data:/i.test(str)) return '';
 
-  // 3. If external HTTP/HTTPS URL and not Google Drive/GoogleUserContent
-  const isDriveUrl = str.includes('drive.google.com') || str.includes('googleusercontent.com') || str.includes('docs.google.com');
-  if ((str.startsWith('http://') || str.startsWith('https://')) && !isDriveUrl) {
+  // 3. external HTTP/HTTPS URL ที่ host ไม่ใช่ Google Drive (เช็ก hostname ไม่ใช่ substring) คืนค่าเดิม
+  const isHttp = /^https?:\/\//i.test(str);
+  if (isHttp && !isDriveHostUrl(str)) {
     return str;
   }
+  // path proxy ของไฟล์ R2 (ตรงรูปแบบเป๊ะเท่านั้น) คืนค่าเดิม
+  if (PROXY_FILE_PATH_RE.test(str)) return str;
+  // path ของเซิร์ฟเวอร์อื่น และ scheme อื่นที่ไม่ใช่ http(s) ไม่รับ (คืน '' = placeholder เดิม)
+  if (!isHttp && (str.startsWith('/') || /^[a-z][a-z0-9+.-]*:/i.test(str))) return '';
 
   // 4. Extract Drive File ID
   // Supports: /file/d/{id}/view, id={id}, googleusercontent.com/d/{id}, and raw 25+ char ID
@@ -66,7 +75,7 @@ export function resolveDriveImageUrl(input, size = 'w1200') {
     return '';
   }
 
-  return `https://drive.google.com/thumbnail?id=${fileId}&sz=${size}`;
+  return `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=${size}`;
 }
 
 /**

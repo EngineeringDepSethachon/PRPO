@@ -48,6 +48,7 @@ export default function AttachmentThumbnail({ img, imgIdx, onClick, sizeClass = 
       <img
         src={resolvedThumb}
         alt={finalAlt}
+        referrerPolicy="no-referrer"
         className="w-full h-full object-cover"
         onError={(e) => {
           if (resolvedThumb.startsWith('blob:') || resolvedThumb.startsWith('data:')) {

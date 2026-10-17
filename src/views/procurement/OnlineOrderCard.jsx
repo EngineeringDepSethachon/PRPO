@@ -6,8 +6,8 @@ import {
   Image as ImageIcon, X, Truck, Calendar
 } from 'lucide-react';
 import { sanitizeExternalUrl, getProductUrl } from '../../utils/urlHelper';
-import { pickAttachmentUrl } from '../../utils/attachmentUrls';
-import { driveFileIdOf, openProxiedFile } from '../../utils/cfAttachments';
+import { pickAttachmentUrl, isBlobUrl, isUsableUrl } from '../../utils/attachmentUrls';
+import { driveFileIdOf, openProxiedFile, isProxyFileUrl } from '../../utils/cfAttachments';
 import { apiService } from '../../services/apiService';
 import { modalService } from '../../services/modalService';
 import { storageService } from '../../services/storageService';
@@ -3102,7 +3102,7 @@ export default function OnlineOrderCard({
 
                       {doc.url && (
                         <a
-                          href={/^(blob:|data:(image\/|application\/pdf))/i.test(doc.url) ? doc.url : sanitizeExternalUrl(doc.url)}
+                          href={(/^data:(image\/(png|jpe?g|webp|gif)|application\/pdf);base64,/i.test(doc.url) || (isBlobUrl(doc.url) && isUsableUrl(doc.url))) ? doc.url : sanitizeExternalUrl(doc.url)}
                           download={doc.name || 'document'}
                           target="_blank"
                           rel="noopener noreferrer"
@@ -3110,7 +3110,10 @@ export default function OnlineOrderCard({
                             // cloudflare mode : a Drive file is downloaded through GET /api/files/:id (driveFileIdOf is null in other modes)
                             if (!driveFileIdOf(doc)) return;
                             e.preventDefault();
-                            openProxiedFile(doc, { download: true }).then((ok) => { if (!ok) window.open(doc.url, '_blank', 'noopener,noreferrer'); });
+                            openProxiedFile(doc, { download: true }).then((ok) => {
+                              // fallback : เปิดเฉพาะ https:// หรือ proxy path ของเรา (ไม่เปิด scheme อื่น)
+                              if (!ok && (/^https:\/\//i.test(doc.url) || isProxyFileUrl(doc.url))) window.open(doc.url, '_blank', 'noopener,noreferrer');
+                            });
                           }}
                           className="p-1.5 text-slate-400 hover:text-slate-700 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                           title="ดาวน์โหลดไฟล์"
