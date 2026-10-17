@@ -13,8 +13,9 @@
 - [x] A1 urlHelper.getLinkLabel(url, platform) → {label, host} + tests/url_link_label.test.js (84 ผ่าน) — nong ; host ชนะ platform, จับ label โดเมนทีละส่วน, scheme อันตรายคืนค่าว่าง
 - [x] A2+A3 (malee) เสร็จ เทสต์ 280 ผ่าน (รวมใหม่ 22) build ผ่าน ; ProductActionCard props +nameExtra ; ทุกแท็บ ; กำลัง QA (prae) → A4/A5: src/components/procurement/ProductActionCard.jsx + AttachmentThumbnail prop + OnlineOrderCard โหมด pending (~2271-2455): รูป w-24 sm:w-28 คลิก lightbox, CTA min-h-[44px] "เปิดลิงก์ร้านค้าออนไลน์ ↗" + ป้ายแพลตฟอร์ม + คัดลอกลิงก์, ProductRemarkNote, จำนวน/หน่วย/ราคาอนุมัติ text-base/lg ; คง input/handler เดิมทั้งหมด — malee
 - [ ] A3 OnlineOrderCard โหมด read-only (~2456-2650) ใช้ ProductActionCard คงป้ายเคลม/คืนเงิน/สมการ/ตัวกรอง — malee (คนเดิม)
-- [ ] A4 tests/online_product_action_card.test.jsx + regression (po_procurement, qa_product_remark, claim_state_machine_evidence, inventory_grn, cf_private_files_ui, cf_p4_*, cf_qa_r5) + npm test/build — nong
-- [ ] A5 prae → kla (ลิงก์ภายนอก, clipboard) — [ ] A6 bump 1.2.0 + CHANGELOG → preview → main
+- [x] A4 เทสต์: online_product_action_card (22) + qa_online_card (35, prae) + regression ผ่าน ; npm test 3004/3004
+- [x] A5 prae PASS (bug เล็ก 5 → แก้แล้ว) ; kla PASS (ต่ำ 4: regex ลิงก์เอกสาร, allowlist โดเมนตรงตัว, กัน window.open, referrerPolicy → เก็บแล้ว ; http(s) ภายนอกใน driveHelper คง passthrough ตามเดิม)
+- [x] A6 v1.2.0: backup prpo-db-20261017-v1.1.0.sql → bump → CHANGELOG → tag → build worktree → preview + main (2026-10-17)
 
 # M10 — Phase 3 v1.1.0: FR-02 หมายเหตุสินค้า + FR-01 role พี่สุ (BUFFER) (SRS 2026-10-16 ; ผู้ใช้ตอบ Q1-Q10 ในแชท 2026-10-17 ; แผน docs/plan.md หัวข้อบนสุด)
 ลำดับ (สมชาย): T1 ∥ T2 ∥ T4 → T3 ∥ T5 → T6 → T7 → T8 (QA + kla) → backup → bump 1.1.0 → CHANGELOG → tag → preview → main
