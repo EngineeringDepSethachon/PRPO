@@ -19,6 +19,7 @@ import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import Pagination from '../components/common/Pagination';
 import { getUserDepartments, canAccessDepartmentData, isDepartmentMatch, matchDepartment } from '../utils/permissions';
+import { isBufferRole } from '../utils/bufferRole';
 
 export { MASTER_DATA_TABS, normalizeTabId, isTabActive, isDepartmentMatch, matchDepartment };
 
@@ -129,16 +130,22 @@ function MasterDataContent({
     effectiveRole?.roleId === 'REVIEWER' ||
     effectiveRole?.positionKey === 'REVIEWER'
   );
+  // the purchasing checker (BUFFER, level 2) is not opened by the level >= 2 rule below (ROLES.BUFFER.canDeleteMaster is false)
+  const isBufferUser = isBufferRole(effectiveRole) || isBufferRole(effectiveUser) || auth?.canonicalRole === 'BUFFER';
   const canDeleteMaster = Boolean(
     isAdmin ||
-    isReviewer ||
-    effectiveRole?.canDeleteMaster ||
-    effectiveUser?.canDeleteMaster ||
-    effectiveRole?.canManageMaster ||
-    effectiveUser?.canManageMaster ||
-    Number(effectiveRole?.level) >= 2 ||
-    Number(effectiveUser?.level) >= 2
+    (!isBufferUser && (
+      isReviewer ||
+      effectiveRole?.canDeleteMaster ||
+      effectiveUser?.canDeleteMaster ||
+      effectiveRole?.canManageMaster ||
+      effectiveUser?.canManageMaster ||
+      Number(effectiveRole?.level) >= 2 ||
+      Number(effectiveUser?.level) >= 2
+    ))
   );
+  // M10: BUFFER (พี่สุ) and any role without canManageMaster see master data read-only : the add / edit / delete / reactivate buttons are not rendered
+  const canWriteMaster = !isBufferUser;
 
   // Tab Resolution & Defensive Fallback
   const resolveTab = useCallback((targetTab, adminFlag) => {
@@ -1173,7 +1180,7 @@ function MasterDataContent({
 
         {/* Primary Action Button in Header */}
         <div className="flex items-center gap-2.5">
-          {(activeTab === 'catalog' || activeTab === 'products') ? (
+          {!canWriteMaster ? null : (activeTab === 'catalog' || activeTab === 'products') ? (
             <button
               onClick={() => { setEditProd(null); setShowProdModal(true); }}
               className="bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white text-xs sm:text-sm font-semibold px-5 py-2.5 rounded-xl flex items-center gap-2 shadow-sm transition-all cursor-pointer"
@@ -1399,6 +1406,7 @@ function MasterDataContent({
                         <td className="py-3.5 pr-6 text-center whitespace-nowrap">
                           {(() => {
                             const canModifyProd = isAdmin || canAccessDepartmentData(targetUserObj, p.department || p.category);
+                            if (!canWriteMaster) return null; // M10: read-only (BUFFER) : no edit / reactivate / delete buttons
                             return (
                               <div className="flex items-center justify-center gap-1.5">
                                 <button
@@ -1553,6 +1561,7 @@ function MasterDataContent({
                       <td className="py-3.5 pr-6 text-center whitespace-nowrap">
                         {(() => {
                           const canModifyVendor = isAdmin || canAccessDepartmentData(targetUserObj, v.department);
+                          if (!canWriteMaster) return null; // M10: read-only (BUFFER)
                           return (
                             <div className="flex items-center justify-center gap-1.5">
                               <button
@@ -1699,6 +1708,7 @@ function MasterDataContent({
                           <td className="py-3.5 pr-6 text-center whitespace-nowrap">
                             {(() => {
                               const canModifyLoc = isAdmin || canAccessDepartmentData(targetUserObj, loc.department);
+                              if (!canWriteMaster) return null; // M10: read-only (BUFFER)
                               return (
                                 <div className="flex items-center justify-center gap-1.5">
                                   <button
@@ -1860,6 +1870,7 @@ function MasterDataContent({
                           <td className="py-3.5 pr-6 text-center whitespace-nowrap">
                             {(() => {
                               const canModifyUnit = isAdmin || canAccessDepartmentData(targetUserObj, unit.department);
+                              if (!canWriteMaster) return null; // M10: read-only (BUFFER)
                               return (
                                 <div className="flex items-center justify-center gap-1.5">
                                   <button

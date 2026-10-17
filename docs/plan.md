@@ -1,3 +1,55 @@
+# Phase 3 — Post-Production Workflow & UX/UI (SRS 2026-10-16) — Fable อนุมัติ cmvc242gq1f336 (2026-10-17) ; ผู้ใช้ตอบ Q1-Q10 แล้ว
+
+สเปก: `C:\Users\Admin\Downloads\system_requirement_specification_phase_3.md` (FR-01 role "พี่สุ", FR-02 หมายเหตุสินค้าใน PR, FR-03 ยกเครื่องการ์ดงานออนไลน์, FR-04 ขยายฟอนต์)
+ฐานปัจจุบัน: v1.0.0 production ใช้งานจริงแล้ว → ทุก FR ต้องขึ้น preview ก่อน และออกเวอร์ชันตาม docs/CHANGELOG.md ; ห้ามทำให้ PR/PO เดิมแสดงผลผิด
+
+## ข้อเท็จจริงจากการสำรวจโค้ด (2026-10-17)
+- PR flow จริง: `DRAFT → SUBMITTED → REVIEWED (= รออนุมัติ Plant Mgr) → APPROVED → PO_ISSUED / IN_PROGRESS_ONLINE` (constants.js:345) ; ชื่อสถานะใน SRS (PENDING_REVIEW/PENDING_APPROVAL) ไม่มีในระบบ → ใช้ชื่อจริง
+- สิทธิ์ตัดสินจาก level เป็นหลัก (resolveUserPermissions client/server), reviewer = level 2 ที่ไม่ใช่ online purchaser, approver = level ≥ 3 ; role ที่เลือกได้ในหน้า Admin: UserMasterView ROLE_OPTIONS + UserCRUDModal (สองสำเนา)
+- transition บังคับทั้ง client (workflowEngine.canAction/updatePRStatus, PRDetailsModal ปุ่ม) และ server (rbac.PR_FLOWS/ACTORS/canTransitionPR, route POST/PUT /api/prs + prApprovalPatch + audit + notify.js + writePrCommitment ตอน REVIEWED→APPROVED)
+- แก้ qty/ราคาตอนอนุมัติมีอยู่แล้ว (PRDetailsModal canApproverEdit, workflowEngine.editPRItems, server canEditPrContent level ≥ 2 ใน SUBMITTED/REVIEWED/REJECTED_TO_L2) แต่ยังไม่มีช่องแก้ลิงก์ และไม่คำนวณ financials/grandTotal ใหม่ ; งบผูกพันคำนวณสดจาก totalAmount จนกว่าจะอนุมัติ (server เขียน ledger ครั้งเดียวตอนอนุมัติ) → แก้ยอดก่อนอนุมัติไม่ต้องแก้ ledger
+- หมายเหตุสินค้า: `products.remark` (migration 0017) ส่งมากับ bootstrap แล้ว แต่ PR item ไม่คัดลอก และไม่มีที่แสดงนอก StockCard/ProductRemarkDrawer
+- การ์ดงานออนไลน์: OnlineOrderCard.jsx รูป w-8/w-7, ลิงก์เป็นไอคอน w-3 ; ImageLightboxModal มีอยู่แล้ว (เปิดจาก OnlineOrderCard/PRDetailsModal)
+- ฟอนต์: ไม่มี fontSize override ใน tailwind.config ; นับได้ text-xs 1137, text-sm 244, text-[11px] 330, text-[10px] 175, text-[9px] 11 ใน src
+
+## การออกแบบที่เสนอ
+### FR-01 role "พี่สุ" (BUFFER)
+- roleId ใหม่ `BUFFER` (ป้าย "ผู้ตรวจสอบจัดซื้อ (พี่สุ)"), level 2, department ALL, canViewAllDepts=1, canReview=0, canFinalApprove=0, canOnlinePurchase=0 ; เพิ่มใน constants.ROLES, ROLE_OPTIONS ทั้งสองหน้า, resolvePermissions (client+server) ให้รู้จัก `isBuffer` จาก roleId ไม่ใช่ level, NOTIFICATION_ROLES, scope.buildViewer (เห็นทุกแผนก)
+- สถานะใหม่ `PENDING_BUFFER` ("รอพี่สุตรวจสอบ") แทรกก่อน REVIEWED: `SUBMITTED → PENDING_BUFFER (reviewer กดผ่าน) → REVIEWED (พี่สุกดส่งต่อ) → APPROVED` ; REVIEWED ยังหมายถึง "รออนุมัติ" เหมือนเดิม จึงไม่ต้องแตะ approve guard / ledger / PO
+- **server เป็นผู้เลือกเท่านั้น** ตอน reviewer กดผ่าน (ไม่เชื่อสถานะจาก client): ถ้ามีผู้ใช้ ACTIVE roleId BUFFER อย่างน้อย 1 คน → PENDING_BUFFER ไม่งั้น → REVIEWED (ข้ามอัตโนมัติ) [Q1] ; ใช้กับ PR ทุกใบ ภายใน+ออนไลน์ [Q2]
+- สิทธิ์พี่สุที่ PENDING_BUFFER: แก้ qty / price / onlineUrl(productUrl) + คอมเมนต์ ; ปุ่มเดียว "บันทึกการแก้ไขและส่งต่อผู้อนุมัติ" → REVIEWED พร้อมประทับ `bufferReviewedBy/ById/At`, `bufferComment` (extraJson ไม่ต้อง migration), audit `BUFFER_FORWARD`, แจ้งเตือน Approver ; ไม่มี reject/cancel (canAction/canCancelPR false, server PR_FLOWS actor buffer มีแค่ PENDING_BUFFER→REVIEWED)
+- ใครตีกลับ/ยกเลิก PR ที่ค้างที่พี่สุ: Approver (level ≥ 3), Admin **และ Reviewer** [Q6]
+- **RBAC level 2 (เงื่อนไข Fable):** isBuffer ตัดสินจาก roleId ; ตัด isBuffer ออกจาก reviewer (canReview) และจัดสรรงบ/ตรวจทานแทน reviewer ไม่ได้ แต่ดูงบ/สร้าง PR/ดูสต๊อกทุกแผนกได้ [Q7] ; พี่สุแก้ PR ได้เฉพาะสถานะ PENDING_BUFFER ; ที่ PENDING_BUFFER แก้ได้เฉพาะพี่สุ+admin (reviewer level 2 แก้ไม่ได้) [Q9] — ทั้ง client (canApproverEdit/editPRItems) และ server (canEditPrContent) ; เทสต์ตาราง cf_rbac ครอบทุก actor × สถานะใหม่
+- แก้ยอด: **server recompute** totalAmount + financials.grandTotal (ตามส่วนลด/VAT เดิม) ไม่รับยอดรวมจาก client ; client คำนวณแสดงผลด้วยสูตรเดียวกัน ; productUrl ต้องเป็น http/https เท่านั้น (server ตรวจ) ; itemFingerprint ให้รู้จัก url เพื่อ audit ค่าที่เปลี่ยน (ก่อน/หลัง) ใน timeline
+- ไม่เพิ่มพี่สุใน PDF PO (timeline อย่างเดียว) [Q8] ; ปิดบัญชีพี่สุขณะมี PR ค้าง → admin ส่งต่อแทน หรือ reviewer/approver ตีกลับ ไม่เพิ่มปุ่มใหม่ [Q10]
+- ไล่ทุกจุดที่ enumerate สถานะ PR ให้รู้จัก PENDING_BUFFER: ป้าย/สี, filter, dashboard/รายงาน, To-Do, scope, export, ผูกพันงบ (นับเหมือน SUBMITTED/REVIEWED)
+- **โหมด GAS:** ไม่รองรับ PENDING_BUFFER — production ใช้ Cloudflare ตั้งแต่ go-live 2026-10-16 GAS ไม่ใช่ backend production แล้ว จึงไม่ทำ parity (mock dev ทำตามเท่าที่ workflowEngine ใช้ร่วม)
+- To-Do: isTaskForMe(PENDING_BUFFER) = buffer เท่านั้น ; reviewer เห็นใน "รอผู้อื่น" ; approver เห็น in-progress ; แจ้งเตือนใหม่ `PR_PENDING_BUFFER` → targetRole BUFFER
+- ความเข้ากันได้: PR เก่าสถานะ REVIEWED/APPROVED ไม่เปลี่ยน ; ป้ายสถานะ/สีเพิ่ม 1 ค่า ; เทสต์: cf_rbac PR_TABLE, cf_extra_fields, workflow tests, workspace routing, notify
+
+### FR-02 หมายเหตุสินค้าใน PR / งานออนไลน์
+- ตอนสร้าง PR คัดลอก `productRemark` ลง item ; ตอนแสดงผลใช้ `item.productRemark || products.find(productId).remark` (PR เก่าก็เห็น) ; แสดงกล่อง "สเปก/หมายเหตุ" ใต้ชื่อสินค้าใน PRCreateView (แถวรายการ), PRDetailsModal, OnlineOrderCard (ทั้งแถวแก้ไขได้/อ่านอย่างเดียว), PODetailsModal ; ไม่แตะ server ; แสดงเป็น text เท่านั้น (ห้าม dangerouslySetInnerHTML) + whitespace-pre-wrap
+
+### FR-03 การ์ดงานออนไลน์
+- OnlineOrderCard: แถวสินค้าเป็นการ์ด: รูป w-24/w-28 (คลิกเปิด ImageLightboxModal เดิม), ปุ่ม CTA "เปิดลิงก์ร้านค้าออนไลน์ ↗" + ป้ายแพลตฟอร์ม/โดเมน + ปุ่ม "คัดลอกลิงก์", กรอบหมายเหตุสินค้า (FR-02), จำนวน/หน่วย/ราคาอนุมัติตัวใหญ่ ; AttachmentThumbnail รองรับ sizeClass ใหญ่ ; UI เท่านั้น
+
+### FR-04 ฟอนต์ทั้งระบบ
+- ทางเลือก A (แนะนำ): override `theme.fontSize` ใน tailwind.config.js เลื่อนสเกล 1 ขั้น (xs→14px, sm→16px, base→18px, lg→20px, …) ครอบคลุม text-xs/sm/base ~1,450 จุดในคราวเดียว + codemod เปลี่ยน `text-[8/9/10/11px]` (~520 จุด) → `text-xs` + leading-normal แล้วไล่ตรวจหน้าจอทุกหน้า (ตาราง/การ์ด/modal/Sidebar) แก้จุดล้นด้วย min-w-0/break-words
+- ทางเลือก B: ไล่เปลี่ยนคลาสทีละจุดตาม SRS (~2,000 จุด 60+ ไฟล์) งานใหญ่และเสี่ยงหลุดกว่า
+- PDF (generatePoPdf) ใช้ขนาดของตัวเอง ไม่กระทบ
+- ผู้ใช้เลือก A [Q4] ; ห้ามตาราง/ปุ่มเสียสัดส่วน ; playwright screenshot ก่อน/หลังหน้าหลักเพื่อยืนยัน
+
+## ลำดับ/เวอร์ชันที่เสนอ (แต่ละข้อ: โค้ด → npm test → preview → QA → kla (FR-01) → backup → bump → CHANGELOG → tag → main)
+1. v1.1.0 = FR-02 (เล็ก ไม่เปลี่ยน workflow) + FR-01 (ความต้องการหลักทางธุรกิจ)
+2. v1.2.0 = FR-03
+3. v1.3.0 = FR-04 (แตะทุกหน้า ทำหลังสุดเพื่อไม่ให้ปนกับบั๊กฟีเจอร์)
+ผู้ใช้ยืนยันลำดับ [Q5] ; ทุกเวอร์ชันต้อง ask ผู้ใช้ก่อน deploy main
+
+## คำตอบผู้ใช้ (2026-10-17)
+Q1 ข้ามอัตโนมัติ · Q2 ทุก PR · Q3 `BUFFER` "ผู้ตรวจสอบจัดซื้อ (พี่สุ)" · Q4 ทางเลือก A · Q5 ตามลำดับข้างบน · Q6 Approver+Admin+Reviewer ตีกลับ/ยกเลิกได้ พี่สุไม่มีปุ่ม · Q7 level 2 ดูงบ/สร้าง PR/ดูสต๊อกทุกแผนก แต่จัดสรรงบ/ตรวจทานแทน reviewer ไม่ได้ · Q8 ไม่ใส่ใน PDF PO · Q9 ที่ PENDING_BUFFER แก้ได้เฉพาะพี่สุ+admin · Q10 ปิดบัญชีพี่สุ → admin ส่งต่อ/ตีกลับ ไม่เพิ่มปุ่ม
+
+---
+
 # งาน R2 storage adapter (ผู้ใช้สั่ง 2026-10-13) — รอ Fable อนุมัติ
 
 สเปก: `docs/requirements-file-storage.md` (ผู้ใช้ตัดสิน: ใช้ R2 ตอนนี้ เพราะ Gmail ส่วนตัวสร้าง Shared Drive ไม่ได้ ; คงโค้ด Drive ไว้ย้ายภายหลัง) ; bucket + binding FILES ผู้ใช้เตรียมแล้ว

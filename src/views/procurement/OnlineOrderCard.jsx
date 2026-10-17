@@ -23,6 +23,7 @@ import AttachmentThumbnail from '../../components/common/AttachmentThumbnail';
 import { formatCurrency } from '../../utils/formatters.js';
 import ProxiedImg from '../../components/common/ProxiedImg';
 import LoadingOverlay from '../../components/common/LoadingOverlay.jsx';
+import ProductRemarkNote from '../../components/common/ProductRemarkNote';
 
 const formatMoney = (n) => formatCurrency(n);
 
@@ -530,7 +531,11 @@ export default function OnlineOrderCard({
     });
   }, [po]);
 
-  const { currentUser, refundBudget: _refundBudget, rollbackBudget, deductBudget } = useAppContext();
+  const { currentUser, refundBudget: _refundBudget, rollbackBudget, deductBudget, products } = useAppContext();
+  // หมายเหตุสินค้า (FR-02): products จาก context ; ถ้ายังว่างใช้ cache ใน storage
+  const productMaster = (Array.isArray(products) && products.length > 0)
+    ? products
+    : (storageService.getProducts?.() || []);
 
   // ── Status Mapping & Strict Mode Flags (Directive 1) ──
   const statusStr = String(po?.status || '').toLowerCase();
@@ -2291,8 +2296,8 @@ export default function OnlineOrderCard({
                     const origQty = Number(currentItem.originalPurchaseQty ?? currentItem.qty ?? currentItem.purchaseQty ?? 1);
 
                     return (
+                      <React.Fragment key={currentItem.id || resolvedIdx}>
                       <div
-                        key={currentItem.id || resolvedIdx}
                         className="flex items-center justify-between px-3.5 py-1.5 sm:py-2 bg-white hover:bg-slate-50/70 transition-colors gap-3 min-h-[44px] flex-wrap sm:flex-nowrap"
                       >
                         {/* ฝั่งซ้าย: [รูปภาพสินค้า] [รหัส SKU] [ชื่อสินค้า ↗] [Subtext อ้างอิง PR เดิม] */}
@@ -2442,6 +2447,9 @@ export default function OnlineOrderCard({
                           </div>
                         </div>
                       </div>
+                      {/* FR-02: หมายเหตุ/สเปกของสินค้า ใต้แถวสินค้า (แถวแก้ไขได้) */}
+                      <ProductRemarkNote item={currentItem} products={productMaster} className="!border-t-0 mx-3.5 mb-1.5 -mt-1" />
+                      </React.Fragment>
                     );
                   })}
                 </div>
@@ -2483,7 +2491,8 @@ export default function OnlineOrderCard({
                     const rawUrl = getProductUrl(currentItem);
                     
                     return (
-                      <div key={currentItem.id || resolvedIdx} className="py-1.5 px-3 bg-white hover:bg-slate-50/70 transition-colors flex items-center justify-between gap-2.5 min-h-[36px] text-xs">
+                      <React.Fragment key={currentItem.id || resolvedIdx}>
+                      <div className="py-1.5 px-3 bg-white hover:bg-slate-50/70 transition-colors flex items-center justify-between gap-2.5 min-h-[36px] text-xs">
                         {/* ฝั่งซ้าย: [Img] [รหัส] ชื่อสินค้า ↗ */}
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                           {/* Item Thumbnail (28x28) */}
@@ -2643,6 +2652,9 @@ export default function OnlineOrderCard({
                           </div>
                         )}
                       </div>
+                      {/* FR-02: หมายเหตุ/สเปกของสินค้า ใต้แถวสินค้า (แถวอ่านอย่างเดียว) */}
+                      <ProductRemarkNote item={currentItem} products={productMaster} className="!border-t-0 mx-3 mb-1 -mt-0.5" />
+                      </React.Fragment>
                     );
                   })}
                 </div>

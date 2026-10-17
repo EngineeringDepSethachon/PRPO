@@ -20,9 +20,11 @@ import CollapsibleActivityTimeline from '../common/CollapsibleActivityTimeline';
 import POSettlementModal from './POSettlementModal';
 import { generatePoPdf } from '../../utils/generatePoPdf';
 import { sanitizeExternalUrl, getProductUrl } from '../../utils/urlHelper';
+import { isBufferRole } from '../../utils/bufferRole';
 import ReceivingModal, { resolveRefundedQtyAndAmount } from '../../views/inventory/ReceivingModal';
 import { getValidConversionRate, toStockQuantity } from '../../utils/uomEngine.js';
 import ProxiedImg from '../common/ProxiedImg';
+import ProductRemarkNote from '../common/ProductRemarkNote';
 import { isSelfClaimStatus } from '../../services/workspaceService';
 
 const getVendorDisplayName = (vendorData) => {
@@ -41,8 +43,12 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
   } catch {
     context = null;
   }
+  // หมายเหตุสินค้า (FR-02): products จาก context ; ถ้ายังว่างใช้ cache ใน storage
+  const productMaster = (Array.isArray(context?.products) && context.products.length > 0)
+    ? context.products
+    : (storageService.getProducts?.() || []);
   const currentUser = context?.currentUser;
-  const rawRole = typeof currentUser?.role === 'object' 
+  const rawRole = typeof currentUser?.role === 'object'
     ? (currentUser?.role?.id || currentUser?.role?.name || '') 
     : (currentUser?.role || currentRole?.roleId || currentRole?.id || '');
   const role = String(rawRole).toLowerCase();
@@ -490,7 +496,8 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
 
   const isOnlinePurchaser = currentRole?.roleId === 'ONLINE_PURCHASER' || currentRole?.id === 'ONLINE_PURCHASER';
   const isPOCancellable = !['CLOSED', 'RECEIVED', 'CANCELLED'].includes(selectedPO.status);
-  const canCancelPO = !isOnlinePurchaser && (
+  // the purchasing checker (BUFFER, level 2) cannot cancel a PO : the server answers 403 to every PO write of that role (rbac BUFFER_WRITE_RULES)
+  const canCancelPO = !isOnlinePurchaser && !isBufferRole(currentRole) && (
     currentRole?.id === 'ADMIN' ||
     currentRole?.roleId === 'ADMIN' ||
     (currentRole?.level && currentRole?.level >= 2) ||
@@ -1341,6 +1348,9 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                                 {item.name}
                               </h4>
                             </div>
+
+                            {/* FR-02: หมายเหตุ/สเปกของสินค้าใต้ชื่อ */}
+                            <ProductRemarkNote item={item} products={productMaster} className="mt-1" />
 
                             {/* Platform Tag, Dual-UOM badge & External Link */}
                             <div className="flex items-center gap-2 flex-wrap text-xs pt-0.5">

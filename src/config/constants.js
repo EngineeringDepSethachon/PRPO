@@ -107,6 +107,28 @@ export const ROLES = {
     canOnlinePurchase: true,
     level: 99,
   },
+  BUFFER: {
+    id: 'BUFFER',
+    title: 'ผู้ตรวจสอบจัดซื้อ (พี่สุ)',
+    name: 'พี่สุ (ผู้ตรวจสอบจัดซื้อ)',
+    department: 'ALL',
+    canViewBudget: true,
+    canCreatePR: true,
+    canSubmitPR: true,
+    canDeleteOwnDraft: true,
+    canReceiveGoods: false,
+    canCloseOwnPO: false,
+    canManageMaster: false,  // M10: อ่านอย่างเดียวกับ master data (products / vendors / storage-locations / usage-units)
+    canDeleteMaster: false,
+    canViewAllDepts: true,
+    canReview: false,        // ตรวจแก้ไข qty/ราคา/ลิงก์ แล้วส่งต่อผู้อนุมัติ (ไม่มีตีกลับ/ยกเลิก)
+    canFinalApprove: false,
+    canViewBudgetMenu: true,
+    canSetBudget: false,
+    canOnlinePurchase: false,
+    isBuffer: true,
+    level: 2,
+  },
 
   // Legacy Department-Specific Aliases (Kept for 100% backward compatibility)
   REQUESTER_PD: {
@@ -214,6 +236,7 @@ export function resolveUserPermissions(user) {
   const level = Number(user.level || 1);
   const dept = user.department || 'PD';
   const isOnline = user.roleId === 'ONLINE_PURCHASER' || user.role_id === 'ONLINE_PURCHASER';
+  const isBuffer = user.roleId === 'BUFFER' || user.role_id === 'BUFFER';
 
   const userDepts = Array.isArray(user.departments) && user.departments.length > 0 ? user.departments : (
     Array.isArray(user.assignedDepartments) && user.assignedDepartments.length > 0 ? user.assignedDepartments : (
@@ -242,21 +265,24 @@ export function resolveUserPermissions(user) {
     canDeleteOwnDraft: level >= 1,
     canReceiveGoods: level === 1 || level >= 99,
     canCloseOwnPO: level === 1 || level >= 99,
-    canManageMaster: level >= 1,
-    canDeleteMaster: level >= 1,
+    canManageMaster: level >= 1 && !isBuffer,   // BUFFER (พี่สุ) อ่านอย่างเดียว
+    canDeleteMaster: level >= 1 && !isBuffer,
 
     // ─── LEVEL 2+ PERMISSIONS (หัวหน้างาน / ผู้ช่วยผู้จัดการ) ───
-    canReview: level >= 2,
+    canReview: level >= 2 && !isBuffer,
     canViewBudget: level >= 2,
     canViewBudgetMenu: level >= 2,
-    canViewAllDepts: level >= 99 || level >= 3 || dept === 'ALL' || userDepts.includes('ALL') || userDepts.includes('*'),
+    canViewAllDepts: isBuffer || level >= 99 || level >= 3 || dept === 'ALL' || userDepts.includes('ALL') || userDepts.includes('*'),
 
     // ─── LEVEL 3+ PERMISSIONS (ผู้จัดการ / ผู้อนุมัติขั้นสุดท้าย) ───
-    canFinalApprove: level >= 3,
-    canSetBudget: level >= 3,
+    canFinalApprove: level >= 3 && !isBuffer,
+    canSetBudget: level >= 3 && !isBuffer,
 
     // ─── SPECIAL TASK PERMISSIONS ───
     canOnlinePurchase: isOnline || level >= 99,
+
+    // ─── BUFFER (พี่สุ, ผู้ตรวจสอบจัดซื้อ) ───
+    isBuffer,
   };
 }
 
@@ -343,11 +369,13 @@ export const DEPARTMENTS = INITIAL_DEPARTMENTS.reduce((acc, d) => {
 });
 
 // ─── PR STATUS ────────────────────────────────────────────────────────────────
-// Workflow: DRAFT → SUBMITTED → REVIEWED → APPROVED → PO_ISSUED → IN_PROGRESS_ONLINE / CLOSED
+// Workflow: DRAFT → SUBMITTED → PENDING_BUFFER → REVIEWED → APPROVED → PO_ISSUED → IN_PROGRESS_ONLINE / CLOSED
+// (PENDING_BUFFER = รอพี่สุ (BUFFER) ตรวจสอบ/แก้ไข แล้วส่งต่อผู้อนุมัติ ; ตรรกะ workflow อยู่ที่ workflowEngine)
 // Rejection 1-Level: Level 3 Rejection -> REJECTED_TO_L2, Level 2 Rejection -> REJECTED_TO_DRAFT
 export const PR_STATUS = {
   DRAFT:               { id: 'DRAFT',               label: 'ร่างเอกสาร (Draft)',              color: 'bg-slate-100 text-slate-600 border-slate-200' },
   SUBMITTED:           { id: 'SUBMITTED',           label: 'รอตรวจสอบ (Asst. Mgr)',           color: 'bg-amber-50 text-amber-700 border-amber-200' },
+  PENDING_BUFFER:      { id: 'PENDING_BUFFER',      label: 'รอพี่สุตรวจสอบ',                  color: 'bg-purple-50 text-purple-700 border-purple-200' },
   WAITING_REVIEW:      { id: 'WAITING_REVIEW',      label: 'รอตรวจทาน (Asst. Mgr)',           color: 'bg-amber-50 text-amber-700 border-amber-200' },
   REVIEWED:            { id: 'REVIEWED',            label: 'ผ่านตรวจ / รออนุมัติ (Plant Mgr)', color: 'bg-blue-50 text-blue-700 border-blue-200' },
   APPROVED:            { id: 'APPROVED',            label: 'อนุมัติแล้ว (สร้าง PO)',           color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },

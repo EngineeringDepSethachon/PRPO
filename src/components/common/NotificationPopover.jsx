@@ -102,6 +102,9 @@ export default function NotificationPopover(props) {
     if (targetRole.includes('REQUEST')) {
       return roleStr.includes('REQUEST') || roleStr.includes('PD') || roleStr.includes('QC') || Number(user.level) === 1;
     }
+    if (targetRole === 'BUFFER') {
+      return roleStr === 'BUFFER' || String(user.roleId || user.role_id || '').toUpperCase() === 'BUFFER';
+    }
     if (targetRole.includes('APPROV')) {
       return isApproverOrMGT || roleStr.includes('APPROV') || roleStr.includes('REVIEW') || roleStr.includes('MANAGER') || Boolean(user.canReview || user.canFinalApprove);
     }
@@ -193,6 +196,14 @@ export default function NotificationPopover(props) {
         bg: 'bg-amber-50 text-amber-600 ring-1 ring-amber-200/60',
         badge: 'bg-amber-50 text-amber-700 border-amber-200',
         label: 'รับของบางส่วน'
+      };
+    }
+    if (item.type === 'PR_PENDING_BUFFER' || text.includes('ผู้ตรวจสอบจัดซื้อ')) {
+      return {
+        icon: <Clock size={15} strokeWidth={2.2} />,
+        bg: 'bg-purple-50 text-purple-600 ring-1 ring-purple-200/60',
+        badge: 'bg-purple-50 text-purple-700 border-purple-200',
+        label: 'รอพี่สุตรวจสอบ'
       };
     }
     if (text.includes('รอการตรวจสอบ') || text.includes('รออนุมัติ') || text.includes('review') || item.type === 'PR_SUBMITTED' || item.type === 'PR_REVIEWED') {

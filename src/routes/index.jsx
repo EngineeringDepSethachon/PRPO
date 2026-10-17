@@ -437,7 +437,7 @@ export const router = createHashRouter([
           { 
             path: 'budget', 
             element: (
-              <ProtectedRoute requiredPermission="BUDGET_MANAGE">
+              <ProtectedRoute requiredPermission="BUDGET_VIEW">
                 <BudgetRoute />
               </ProtectedRoute>
             ) 
@@ -445,7 +445,7 @@ export const router = createHashRouter([
           { 
             path: 'master-data', 
             element: (
-              <ProtectedRoute allowedRoles={['REQUESTER', 'REVIEWER', 'PURCHASER', 'APPROVER', 'ADMIN']} disallowOnlinePurchaser fallback="/dashboard">
+              <ProtectedRoute allowedRoles={['REQUESTER', 'REVIEWER', 'PURCHASER', 'APPROVER', 'BUFFER', 'ADMIN']} disallowOnlinePurchaser fallback="/dashboard">
                 <MasterDataRoute />
               </ProtectedRoute>
             ) 

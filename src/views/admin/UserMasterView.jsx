@@ -19,6 +19,7 @@ const ROLE_OPTIONS = [
   { id: 'ASST_MANAGER', label: 'Reviewer - ผู้ตรวจทาน (Asst. Manager)', title: 'Assistant Manager', level: 2, color: 'bg-amber-50 text-amber-700 border-amber-200' },
   { id: 'PLANT_MANAGER', label: 'Approver - ผู้อนุมัติ (Plant Manager)', title: 'Plant Manager', level: 3, color: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
   { id: 'ONLINE_PURCHASER', label: 'Purchaser - จัดซื้อออนไลน์ (Online)', title: 'Online Purchaser', level: 2, color: 'bg-purple-50 text-purple-700 border-purple-200' },
+  { id: 'BUFFER', label: 'ผู้ตรวจสอบจัดซื้อ (พี่สุ)', title: 'ผู้ตรวจสอบจัดซื้อ (พี่สุ)', level: 2, color: 'bg-indigo-50 text-indigo-700 border-indigo-200' },
   { id: 'ADMIN', label: 'Admin - ผู้ดูแลระบบ (System Admin)', title: 'System Administrator', level: 99, color: 'bg-rose-50 text-rose-700 border-rose-200' },
 ];
 
@@ -732,13 +733,13 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
         return modalService.warning('รหัสผ่านไม่ถูกต้อง', 'กรุณาตั้งรหัสผ่านใหม่ (อย่างน้อย 6 ตัวอักษร) ห้ามใช้รหัสเริ่มต้น');
       }
     }
-    if (roleId !== 'ADMIN' && roleId !== 'PLANT_MANAGER' && roleId !== 'ONLINE_PURCHASER' && assignedDepts.length === 0) {
+    if (roleId !== 'ADMIN' && roleId !== 'PLANT_MANAGER' && roleId !== 'ONLINE_PURCHASER' && roleId !== 'BUFFER' && assignedDepts.length === 0) {
       return modalService.warning('ยังไม่ได้เลือกแผนก', 'กรุณาเลือกแผนกที่ผู้ใช้งานรับผิดชอบอย่างน้อย 1 แผนก');
     }
 
     // Derive primaryDepartment and allowedDepartments from assignedDepts
-    const isAllDepts = assignedDepts.includes('ALL') || roleId === 'ADMIN' || roleId === 'PLANT_MANAGER' || roleId === 'ONLINE_PURCHASER';
-    const defaultPrimaryDept = (roleId === 'ONLINE_PURCHASER') ? 'PUR' : (roleId === 'ADMIN' || roleId === 'PLANT_MANAGER') ? 'MGT' : (assignedDepts.find(d => d !== 'ALL') || 'MGT');
+    const isAllDepts = assignedDepts.includes('ALL') || roleId === 'ADMIN' || roleId === 'PLANT_MANAGER' || roleId === 'ONLINE_PURCHASER' || roleId === 'BUFFER';
+    const defaultPrimaryDept = (roleId === 'ONLINE_PURCHASER') ? 'PUR' : (roleId === 'ADMIN' || roleId === 'PLANT_MANAGER' || roleId === 'BUFFER') ? 'MGT' : (assignedDepts.find(d => d !== 'ALL') || 'MGT');
     const primaryDept = isAllDepts ? defaultPrimaryDept : (assignedDepts.find(d => d !== 'ALL') || defaultPrimaryDept);
     const finalAssigned = isAllDepts ? ['*'] : assignedDepts;
     const allowedForPerms = isAllDepts ? ['*'] : assignedDepts;
@@ -912,7 +913,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                     if (opt && !title) setTitle(opt.title);
                     // Auto-set ALL departments for admin/plant-mgr/purchaser roles
                     const newRole = e.target.value;
-                    if (newRole === 'ADMIN' || newRole === 'PLANT_MANAGER' || newRole === 'ONLINE_PURCHASER') {
+                    if (newRole === 'ADMIN' || newRole === 'PLANT_MANAGER' || newRole === 'ONLINE_PURCHASER' || newRole === 'BUFFER') {
                       setAssignedDepts(['ALL']);
                     }
                   }}

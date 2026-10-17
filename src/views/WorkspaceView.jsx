@@ -134,6 +134,8 @@ export default function WorkspaceView({
         if (t.docType === 'PR') {
           if (['PENDING_REVIEW', 'WAITING_REVIEW', 'waiting_review', 'pending_review', 'รอตรวจทาน', 'รอตรวจสอบ', 'SUBMITTED', 'REJECTED_TO_L2'].includes(t.status)) {
             customLabel = 'รอหัวหน้างานตรวจสอบ';
+          } else if (t.status === 'PENDING_BUFFER') {
+            customLabel = 'รอพี่สุตรวจสอบ';
           } else if (['PENDING_APPROVE', 'PENDING_APPROVAL', 'WAITING_APPROVE', 'WAITING_APPROVAL', 'REVIEWED'].includes(t.status)) {
             // 1.3 ปรับ Badge แสดงสถานะให้ตรงกับบทบาท Assistant
             const isReviewerRole = user?.level === 2 || user?.roleId === 'ASST_MANAGER' || isUserMatched(t.reviewedBy, user);

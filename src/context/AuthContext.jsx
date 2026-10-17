@@ -13,6 +13,7 @@ import { resolveUserPermissions } from '../config/constants.js';
 import { isCloudflareMode, SESSION_INVALID_EVENT, updateStoredSessionToken, storedSessionBelongsToOther, readStoredSession, SESSION_GONE_EVENT, announceSessionGone } from '../config/backendMode.js';
 import { modalService } from '../services/modalService.js';
 import { isAdminUser } from '../utils/adminRule.js';
+import { isBufferRole } from '../utils/bufferRole.js';
 import { clearProxiedFileCache } from '../utils/cfAttachments.js';
 
 let _cachedClientIp = null;
@@ -73,18 +74,22 @@ export const CANONICAL_ROLES = {
   REVIEWER: 'REVIEWER',
   PURCHASER: 'PURCHASER',
   APPROVER: 'APPROVER',
-  ADMIN: 'ADMIN'
+  ADMIN: 'ADMIN',
+  // Phase 3 (FR-01) : the purchasing checker "พี่สุ" (roleId BUFFER, level 2) - sees the budget / every department and creates PRs, but is not a
+  // reviewer / approver / budget setter (decision Q7), so it must not fall into REQUESTER (department-scoped) or REVIEWER
+  BUFFER: 'BUFFER'
 };
 
 export const PERMISSIONS = {
-  PR_CREATE: ['REQUESTER', 'ADMIN'],
+  PR_CREATE: ['REQUESTER', 'BUFFER', 'ADMIN'],
   PR_APPROVE: ['APPROVER', 'ADMIN', 'REVIEWER'],
   ONLINE_PROCURE: ['PURCHASER', 'ADMIN'],
   CLAIM_RESOLVE: ['PURCHASER', 'ADMIN'],
   GRN_RECEIVE: ['REQUESTER', 'REVIEWER', 'ADMIN'],
   BUDGET_MANAGE: ['APPROVER', 'ADMIN', 'REVIEWER'],
+  BUDGET_VIEW: ['APPROVER', 'ADMIN', 'REVIEWER', 'BUFFER'], // read the budget page (route guard) ; BUDGET_MANAGE stays the set / allocate right
   SYSTEM_ADMIN: ['ADMIN'],
-  MASTER_DATA: ['REQUESTER', 'REVIEWER', 'PURCHASER', 'APPROVER', 'ADMIN']
+  MASTER_DATA: ['REQUESTER', 'REVIEWER', 'PURCHASER', 'APPROVER', 'BUFFER', 'ADMIN']
 };
 
 /**
@@ -92,6 +97,9 @@ export const PERMISSIONS = {
  */
 export const normalizeRole = (roleOrUser) => {
   if (!roleOrUser) return CANONICAL_ROLES.REQUESTER;
+
+  // BUFFER is told apart by roleId (never by level) and wins over a stale stored canonicalRole (older sessions saved REQUESTER for it)
+  if (typeof roleOrUser === 'string' ? roleOrUser.trim().toUpperCase() === 'BUFFER' : isBufferRole(roleOrUser)) return CANONICAL_ROLES.BUFFER;
 
   const rawRole = typeof roleOrUser === 'string'
     ? roleOrUser
@@ -397,7 +405,7 @@ export function AuthProvider({ children }) {
 
   /**
    * Helper Guard: Department scoping rule
-   * - ADMIN, PURCHASER, APPROVER can access all departments
+   * - ADMIN, PURCHASER, APPROVER, BUFFER (read across departments) can access all departments
    * - REVIEWER is scoped to their assigned departments (e.g. 'PD, QC')
    * - REQUESTER is strictly scoped to their own department (e.g. 'PD' or 'QC')
    */
@@ -405,7 +413,8 @@ export function AuthProvider({ children }) {
     if (!isAuthenticated) return false;
     if (canonicalRole === CANONICAL_ROLES.ADMIN ||
         canonicalRole === CANONICAL_ROLES.PURCHASER ||
-        canonicalRole === CANONICAL_ROLES.APPROVER) {
+        canonicalRole === CANONICAL_ROLES.APPROVER ||
+        canonicalRole === CANONICAL_ROLES.BUFFER) {
       return true;
     }
 

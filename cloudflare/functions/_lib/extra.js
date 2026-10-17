@@ -10,7 +10,7 @@ import { checkUserSignature } from './sanitize.js';
 import { productView } from './products.js';
 
 // targetRole values the client really produces (workflowEngine / notificationService targetRoles + the GAS role words)
-export const NOTIFICATION_ROLES = new Set(['ALL', 'ADMIN', 'REQUESTER', 'REQUESTER_PD', 'REQUESTER_QC', 'ASST_MANAGER', 'REVIEWER', 'APPROVER', 'PLANT_MANAGER', 'ONLINE_PURCHASER', 'PURCHASER', 'BUYER']);
+export const NOTIFICATION_ROLES = new Set(['ALL', 'ADMIN', 'REQUESTER', 'REQUESTER_PD', 'REQUESTER_QC', 'ASST_MANAGER', 'REVIEWER', 'APPROVER', 'PLANT_MANAGER', 'ONLINE_PURCHASER', 'PURCHASER', 'BUYER', 'BUFFER']);
 const RATE_WINDOW_MS = 60 * 1000;
 const NOTIFY_PER_MIN = 60; // rows per user per minute (POST /api/notifications)
 const AUDIT_PER_MIN = 120; // rows per user per minute (POST /api/audit-logs)
@@ -37,8 +37,13 @@ export function isUserTargetOfNotification(n, user) {
   const isAdmin = user.isAdmin || Number(user.level) >= 99 || String(user.roleId || '') === 'ADMIN'; // T4.6 admin rule (no username / text match)
   if (isAdmin) return true;
 
+  // Phase 3 (FR-01): the BUFFER role (roleId exactly 'BUFFER', never derived from level) is the only recipient of targetRole BUFFER (+ admin above),
+  // whatever the department (it sees every department) ; and a BUFFER user is level 2 but never receives Approver / Reviewer notifications for that reason.
+  const isBufferUser = String(user.roleId || user.role_id || '').toUpperCase() === 'BUFFER';
+  if (targetRole === 'BUFFER') return isBufferUser;
+
   const userDept = String(user.department || user.dept || '').toUpperCase();
-  const isApproverOrMGT = userRole.includes('APPROV') || userRole.includes('REVIEW') || userRole.includes('MANAGER') || userDept === 'MGT';
+  const isApproverOrMGT = !isBufferUser && (userRole.includes('APPROV') || userRole.includes('REVIEW') || userRole.includes('MANAGER') || userDept === 'MGT');
   const isApproverTarget = targetRole.includes('APPROV') || targetRole.includes('REVIEW') || (Array.isArray(n.targetRoles) && n.targetRoles.some((r) => {
     const ru = String(r).toUpperCase();
     return ru.includes('APPROV') || ru.includes('REVIEW') || ru.includes('MANAGER');
@@ -59,6 +64,7 @@ export function isUserTargetOfNotification(n, user) {
     return userRole.includes('REQUEST') || userRole.includes('PD') || userRole.includes('QC') || Number(user.level) === 1;
   }
   if (targetRole.includes('APPROV')) {
+    if (isBufferUser) return false;
     return isApproverOrMGT || userRole.includes('APPROV') || userRole.includes('REVIEW') || userRole.includes('PLANT_MANAGER') || userRole.includes('ASST_MANAGER') || Boolean(user.canReview || user.canFinalApprove);
   }
   if (targetRole.includes('PURCHAS') || targetRole.includes('BUYER')) {
@@ -134,7 +140,7 @@ export function auditModuleOf(entityType, fromClient = false) {
 // PR/PO rows feed the PR timeline / approval history, so pr/po entity types and every action the server itself writes are refused (400).
 // The current client never POSTs here (it logs to localStorage only), so this changes nothing a user sees.
 const AUDIT_SERVER_ACTIONS = new Set([
-  'CREATE', 'PR_DRAFTED', 'RESUBMIT', 'REVIEW_FORWARD', 'APPROVE', 'SEND_BACK', 'CANCEL', 'PR_UPSERT',
+  'CREATE', 'PR_DRAFTED', 'RESUBMIT', 'REVIEW_FORWARD', 'BUFFER_FORWARD', 'APPROVE', 'SEND_BACK', 'CANCEL', 'PR_UPSERT',
   'PO_CREATED', 'UPDATE_PO', 'GOODS_RECEIVED_FULL', 'GOODS_RECEIVED_PARTIAL', 'PO_SETTLED', 'PO_SETTLEMENT_EDITED', 'PO_ADMIN_ITEM_CHANGE', 'PR_COMPLETED_BY_PO',
   'PRODUCT_STOCK_SET', 'PRODUCT_CREATE', 'PRODUCT_MAC_RECALC', 'STOCK_LOG', 'STOCK_ISSUE', 'USAGE_UNIT_CREATE', 'USAGE_UNIT_DELETE', 'SIGNATURE_SAVE'
 ]);

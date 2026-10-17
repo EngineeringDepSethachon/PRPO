@@ -4,7 +4,7 @@
 import { hashPassword, verifyPassword, PASSWORD_ITERATIONS, MAX_PASSWORD_LENGTH } from '../_lib/password.js';
 import { sanitizeUser, signToken, verifyTokenDetailed, getBearerToken, hasSecret } from '../_lib/auth.js';
 import { buildCorsHeaders } from '../_lib/cors.js';
-import { authorize, canWriteBudget, resolvePermissions, canAdjustBudget, canTransitionPR, canTransitionPO, PO_CLIENT_STATUSES, PO_PRE_ORDER, normalizePoStatus, canAccessDepartment, clientCanAccessDepartmentData, clientViewOfUser, canEditPrContent, normalizeUser, normalizeDeptCode, ledgerDeptCode, isWildcardDept } from '../_lib/rbac.js';
+import { authorize, canWriteBudget, resolvePermissions, canAdjustBudget, canTransitionPR, canTransitionPO, PO_CLIENT_STATUSES, PO_PRE_ORDER, normalizePoStatus, canAccessDepartment, clientCanAccessDepartmentData, clientViewOfUser, canEditPrContent, normalizeUser, normalizeDeptCode, ledgerDeptCode, isWildcardDept, PR_PENDING_BUFFER, PR_REVIEW_STATUSES, isBufferRoleId, isUserRowActive } from '../_lib/rbac.js';
 import { issueDocNumber, issueGrnNumber, bangkokYear, bangkokMonth } from '../_lib/docnum.js';
 import { classifyUnhandled } from '../_lib/routes.js';
 import { handleExtraRoutes, listNotificationsFor } from '../_lib/extra.js';
@@ -96,7 +96,14 @@ function prContentChanged(curRow, body) {
 // A PR whose content is frozen for this caller (approved / PO issued / ... , see canEditPrContent) keeps the qty / price / conversion of its stored lines
 // whatever the body says (the fingerprint above only sees purchaseQty|qty|quantity + price) : the figures of the stored lines are copied over the body's, by
 // position ; adding, removing or re-ordering a line is refused. -> { items } | { error: true }. Other fields of a line (store, notes, flags ...) stay as sent.
-const PR_FROZEN_LINE_KEYS = ['qty', 'purchaseQty', 'orderedQty', 'quantity', 'price', 'unitPrice', 'estimatedPrice', 'conversionRate', 'conversionRatio'];
+// (M10 hardening : the line discount fields and every link alias are frozen with them - the fingerprint above deliberately does NOT contain a url, a link has
+// its own guard : prLinkLock / guardPrWrite)
+// every key a line may carry a product link under (urlHelper.getProductUrl reads productUrl, link, url, itemUrl, onlineUrl ; storeUrl is the store page)
+const PR_URL_ALIASES = ['productUrl', 'onlineUrl', 'link', 'url', 'itemUrl', 'storeUrl'];
+const PR_DISCOUNT_KEYS = ['discountPercent', 'discountAmount', 'discount', 'discountType', 'discountValue'];
+const PR_QTY_ALIASES = ['quantity', 'orderedQty', 'purchaseQty', 'qty'];
+const PR_PRICE_ALIASES = ['unitPrice', 'estimatedPrice', 'price'];
+const PR_FROZEN_LINE_KEYS = ['qty', 'purchaseQty', 'orderedQty', 'quantity', 'price', 'unitPrice', 'estimatedPrice', 'conversionRate', 'conversionRatio', ...PR_DISCOUNT_KEYS, ...PR_URL_ALIASES];
 function freezePrItems(storedItemsJson, clientItems) {
   let base = [];
   try { base = JSON.parse(storedItemsJson || '[]'); } catch { base = []; }
@@ -112,6 +119,328 @@ function freezePrItems(storedItemsJson, clientItems) {
     return out;
   });
   return items.some((x) => x === null) ? { error: true } : { items };
+}
+// ── Phase 3 (FR-01) : the purchasing checker step (PENDING_BUFFER, role BUFFER "พี่สุ") ──
+// The SERVER decides the step (never the client). A reviewer who passes a PR (-> REVIEWED or -> PENDING_BUFFER, whatever he sent) gets PENDING_BUFFER when at least
+// one ACTIVE user has roleId BUFFER, otherwise REVIEWED (the step is skipped : bufferSkipped true). Admin / BUFFER send exactly what they mean. A reviewer repeating
+// his pass on a PR that already waits at the BUFFER (the first response was lost) gets PENDING_BUFFER again : same status, a no-op, never a forward on the BUFFER's behalf.
+// The count is NOT caught : a failing query is a 500 (fail closed - never skip a control step because the database hiccuped).
+async function resolveReviewTarget(db, authUser, curStatus, requested) {
+  const out = { status: requested, bufferSkipped: false };
+  if (!requested || !curStatus || (requested !== 'REVIEWED' && requested !== PR_PENDING_BUFFER)) return out;
+  const perms = resolvePermissions(authUser);
+  // INTENDED : an admin sends exactly the status he means - REVIEWED straight from the review step passes the BUFFER step by design (the admin bypass of every
+  // flow, canTransitionPR) ; it is not a hole. The BUFFER role's own transition (PENDING_BUFFER -> REVIEWED) is checked by canTransitionPR.
+  if (perms.isAdmin || perms.isBuffer) return out;
+  if (!canTransitionPR(authUser, 'SUBMITTED', PR_PENDING_BUFFER)) return out; // not a reviewer : the normal permission check answers (403)
+  if (curStatus === PR_PENDING_BUFFER) return { status: PR_PENDING_BUFFER, bufferSkipped: false };
+  if (!PR_REVIEW_STATUSES.includes(curStatus)) return out;
+  // an ACTIVE BUFFER account : roleId BUFFER (any case) and the SAME "active" rule as the login (isUserRowActive : status 'ACTIVE' or isActive true / 1 / 'true' ;
+  // judged in JS on the whole row, so it also works on a database whose users table has no isActive column)
+  const res = await db.prepare("SELECT * FROM users WHERE UPPER(TRIM(roleId)) = 'BUFFER'").all();
+  if (((res && res.results) || []).some(isUserRowActive)) return { status: PR_PENDING_BUFFER, bufferSkipped: false };
+  return { status: 'REVIEWED', bufferSkipped: true };
+}
+const prLineKey2 = (it) => String((it && (it.productId || it.id || it.code)) || '');
+const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
+const lineQty = (it) => Number(it && (it.purchaseQty ?? it.qty ?? it.quantity ?? 1));
+const PR_URL_KEYS = ['productUrl', 'onlineUrl']; // the two links the BUFFER may set (every alias is locked for everybody else : PR_URL_ALIASES)
+const urlOf = (it, k) => (it && typeof it[k] === 'string' ? it[k].trim() : '');
+// a link the BUFFER may set : empty, or http(s) only (the link is later shown as an <a href>) - at most 2000 chars
+const isSafeHttpUrl = (u) => {
+  if (u === '') return true;
+  if (u.length > 2000) return false;
+  try { const x = new URL(u); return x.protocol === 'http:' || x.protocol === 'https:'; } catch { return false; }
+};
+const trimVal = (v) => (v === undefined || v === null ? '' : String(v).trim());
+const parseItemsJson = (json) => { let b = []; try { b = JSON.parse(json || '[]'); } catch { b = []; } return Array.isArray(b) ? b : []; };
+// the stored line a body line belongs to : the one at the same position when it is the same product, else the first stored line of that product
+function storedLineFor(base, items, i) {
+  const kb = prLineKey2(items[i]);
+  const direct = base[i];
+  if (direct && typeof direct === 'object' && prLineKey2(direct) === kb) return direct;
+  if (!kb) return direct && typeof direct === 'object' ? direct : null;
+  return base.find((x) => x && typeof x === 'object' && prLineKey2(x) === kb) || null;
+}
+// LINK LOCK : false when a link alias SENT in a body line differs from the stored line (trimmed) ; otherwise the stored aliases are copied over the body's
+// (an alias the body leaves out keeps its stored value, an alias the stored line has not is dropped), so a save can never change or clear a link.
+function lockPrLinks(base, items) {
+  for (let i = 0; i < items.length; i += 1) {
+    const it = items[i];
+    if (!it || typeof it !== 'object') continue;
+    const s = storedLineFor(base, items, i);
+    if (!s) continue;
+    for (const k of PR_URL_ALIASES) if (k in it && trimVal(it[k]) !== trimVal(s[k])) return false;
+  }
+  for (let i = 0; i < items.length; i += 1) {
+    const it = items[i];
+    if (!it || typeof it !== 'object') continue;
+    const s = storedLineFor(base, items, i);
+    if (!s) continue;
+    for (const k of PR_URL_ALIASES) { if (k in s) it[k] = s[k]; else delete it[k]; }
+  }
+  return true;
+}
+// loose equality of two scalars as a client echo would send them (numbers vs numeric strings, null / '' / 0 / false are all "nothing")
+const isBlankVal = (v) => v === undefined || v === null || v === '' || v === 0 || v === false || v === '0';
+function looseEq(a, b) {
+  if (isBlankVal(a) && isBlankVal(b)) return true;
+  const num = (v) => (typeof v === 'number' ? v : (typeof v === 'string' && v.trim() !== '' && Number.isFinite(Number(v)) ? Number(v) : null));
+  const na = num(a); const nb = num(b);
+  if (na !== null && nb !== null) return Math.abs(na - nb) <= 0.005;
+  return trimVal(a) === trimVal(b);
+}
+// line fields that are compared even when the stored line has no such key (a poisoned line adds them)
+const PR_LINE_WATCHED_KEYS = new Set([...PR_FROZEN_LINE_KEYS, 'name', 'productName', 'productId', 'productRemark', 'total', 'stockQty', 'unit', 'purchaseUnit', 'stockUnit']);
+// did the body change a line of the stored PR ? every scalar the body carries that the stored line also has, plus the watched keys
+function prLineDiffers(s, it) {
+  for (const [k, v] of Object.entries(it)) {
+    if (v !== null && typeof v === 'object') continue;
+    const sv = s[k];
+    if (sv !== null && typeof sv === 'object') continue;
+    if (k in s || PR_LINE_WATCHED_KEYS.has(k)) { if (!looseEq(v, sv)) return true; }
+  }
+  return false;
+}
+// is every field the body sends in `sent` equal to the stored object `stored` (the partial-merge view : json_patch only changes the keys that are sent) ?
+function sameSentFields(sent, stored) {
+  if (!sent || typeof sent !== 'object' || Array.isArray(sent)) return isBlankVal(sent);
+  const st = stored && typeof stored === 'object' && !Array.isArray(stored) ? stored : {};
+  for (const [k, v] of Object.entries(sent)) {
+    const sv = st[k];
+    if (v !== null && typeof v === 'object') {
+      if (Array.isArray(v) || Array.isArray(sv)) { if (JSON.stringify(v) !== JSON.stringify(sv === undefined ? null : sv) && !(Array.isArray(v) && v.length === 0 && (sv === undefined || sv === null))) return false; continue; }
+      if (!sameSentFields(v, sv)) return false;
+      continue;
+    }
+    if (sv !== null && typeof sv === 'object') return false;
+    if (!looseEq(v, sv)) return false;
+  }
+  return true;
+}
+// attachments : the body may only repeat what is stored (an entry is known when any of its identifiers is one of a stored entry's)
+const attIds = (a) => (a && typeof a === 'object' ? [a.id, a.fileId, a.driveId, a.url, a.name].map(trimVal).filter(Boolean) : [trimVal(a)].filter(Boolean));
+function attachmentsNotStored(sent, stored) {
+  if (!Array.isArray(sent)) return false;
+  const known = new Set((Array.isArray(stored) ? stored : []).flatMap(attIds));
+  if (sent.length !== (Array.isArray(stored) ? stored.length : 0)) return true;
+  return sent.some((a) => { const ids = attIds(a); return !ids.length || !ids.some((x) => known.has(x)); });
+}
+// the amounts of a PR from its lines and the PR's stored financials (workflowEngine.createPR / updatePR formula) : subtotal - line discounts - combined discount
+// (+ VAT 7% + rounding + shipping). The discount PARAMETERS (combined type / value, vat mode, rounding, shipping) always come from the stored PR, never the body.
+// discs[i] = the discount of line i (prLineDiscount : ONE formula chosen from the stored line).
+function prExpectedAmounts(lines, discs, fin) {
+  const f = fin && typeof fin === 'object' ? fin : {};
+  let subtotal = 0; let itemDisc = 0;
+  lines.forEach((it, i) => {
+    subtotal += lineQty(it) * (parseFloat(it.price) || 0);
+    itemDisc += Number(discs[i]) || 0;
+  });
+  const net = Math.max(0, subtotal - itemDisc);
+  const cType = f.combinedDiscountType || 'fixed';
+  const cValue = parseFloat(f.combinedDiscountValue) || 0;
+  const cAmount = cType === 'percent' ? net * (cValue / 100) : cValue;
+  const totalDiscount = itemDisc + cAmount;
+  const netAll = Math.max(0, subtotal - totalDiscount);
+  const vatMode = f.vatMode || 'NONE';
+  // the stored financials do not keep hasVat : VAT counts as off when the stored VAT is 0 on a positive subtotal
+  const vatOn = vatMode !== 'NONE' && !((parseFloat(f.vatAmount) || 0) === 0 && (parseFloat(f.subtotal) || 0) > 0);
+  const vatBase = vatMode === 'BEFORE_DISCOUNT' ? subtotal : netAll;
+  const vatAmount = vatOn ? (parseFloat((vatBase * 0.07).toFixed(2)) || 0) : 0;
+  const rounding = parseFloat(f.roundingAdj) || 0;
+  const shipping = parseFloat(f.shippingCost) || 0;
+  const grandTotal = vatMode === 'BEFORE_DISCOUNT'
+    ? parseFloat((subtotal + vatAmount - totalDiscount + rounding + shipping).toFixed(2))
+    : parseFloat((netAll + vatAmount + rounding + shipping).toFixed(2));
+  return { subtotal, itemDiscountTotal: itemDisc, combinedDiscountAmount: cAmount, totalDiscount, vatAmount, grandTotal };
+}
+// the discount of one line from the STORED line (never the body's) : a stored discountPercent re-derives it from the new amount, otherwise the stored absolute
+// discountAmount is kept ; either way never above the line amount (workflowEngine.editPRItems clamps the same way : qty x price)
+function prLineDiscount(storedLine, qty, price) {
+  const s = storedLine && typeof storedLine === 'object' ? storedLine : {};
+  const gross = qty * price;
+  const pct = parseFloat(s.discountPercent) || 0;
+  const raw = pct > 0 ? r2(gross * (pct / 100)) : (parseFloat(s.discountAmount) || 0);
+  return Math.min(gross, Math.max(0, raw));
+}
+/**
+ * Edit of a PR that waits at the BUFFER (decision Q9 : only the BUFFER role / admin, qty + price + link). curRow = the stored row, p = the body (p.items and / or the total).
+ * -> { items?, totalAmount?, financials? } to apply, or { status, message } (an HTTP answer). Rules :
+ *  - every new line is built from the STORED line : the body contributes only qty, price, productUrl and onlineUrl (a discount, a name, a product, a note,
+ *    any other key the body carries is ignored) ; a line is never added / removed / swapped (403, like freezePrItems) ; unit / conversion rate stay the
+ *    stored ones ; qty finite > 0, price finite >= 0 (400)
+ *  - the quantity and price ALIASES are written together (quantity / orderedQty / purchaseQty / qty, unitPrice / estimatedPrice / price) so no reader sees another number
+ *  - a link that CHANGED must be empty or http(s) (400) ; productUrl / onlineUrl are trimmed
+ *  - when qty / price changed, the total must be the sum of the lines minus the STORED discounts (+ the stored VAT / rounding / shipping) within 0.01, and
+ *    financials.grandTotal (if sent) too (400) ; the stored financials are then rewritten by the server (the client's copy is never kept : applyBufferEdit)
+ */
+// the link strings of a body's lines AS SENT (sanitizeWriteBody blanks an unknown scheme silently ; the BUFFER's edit must refuse it with a 400 instead)
+function rawLinksOf(body) {
+  if (!body || typeof body !== 'object' || !Array.isArray(body.items)) return null;
+  return body.items.map((it) => ({ productUrl: it && typeof it === 'object' ? it.productUrl : undefined, onlineUrl: it && typeof it === 'object' ? it.onlineUrl : undefined }));
+}
+function prBufferEdit(curRow, p, rawLinks) {
+  const FORBID = { status: 403, message: FORBIDDEN_MSG };
+  const base = parseItemsJson(curRow.itemsJson);
+  const hasTotal = (p.totalAmount !== undefined && p.totalAmount !== null) || (p.total !== undefined && p.total !== null);
+  const sentTotal = hasTotal ? Number(p.totalAmount ?? p.total) : null;
+  if (hasTotal && !Number.isFinite(sentTotal)) return { status: 400, message: 'ยอดรวมไม่ถูกต้อง' };
+  const storedTotal = Number(curRow.totalAmount || 0);
+  const out = {};
+  let lines = base;
+  let discs = base.map((s) => prLineDiscount(s, lineQty(s), parseFloat(s && s.price) || 0));
+  let figuresChanged = false;
+  if (Array.isArray(p.items)) {
+    if (p.items.length !== base.length) return FORBID;
+    const items = [];
+    const newDiscs = [];
+    for (let i = 0; i < base.length; i += 1) {
+      const s = base[i]; const it = p.items[i];
+      if (!it || typeof it !== 'object' || Array.isArray(it) || !s || typeof s !== 'object') return FORBID;
+      const kb = prLineKey2(s);
+      if (kb && prLineKey2(it) !== kb) return FORBID;
+      // the new line = the STORED line + the four fields the BUFFER owns (a key the body adds or changes anywhere else is not taken : no discount, name, product ...)
+      const line = { ...s };
+      const sentQty = it.purchaseQty ?? it.qty ?? it.quantity ?? it.orderedQty;
+      const sentPrice = it.price ?? it.unitPrice ?? it.estimatedPrice;
+      const qty = sentQty === undefined || sentQty === null ? lineQty(s) : Number(sentQty);
+      const price = sentPrice === undefined || sentPrice === null ? (parseFloat(s.price ?? s.unitPrice ?? s.estimatedPrice) || 0) : parseFloat(sentPrice);
+      if (!Number.isFinite(qty) || qty <= 0 || qty > 10000000) return { status: 400, message: 'จำนวนสินค้าไม่ถูกต้อง' };
+      if (!Number.isFinite(price) || price < 0 || price > 1e9) return { status: 400, message: 'ราคาต่อหน่วยไม่ถูกต้อง' };
+      for (const k of PR_QTY_ALIASES) line[k] = qty;
+      for (const k of PR_PRICE_ALIASES) line[k] = price;
+      const lineChanged = qty !== lineQty(s) || price !== (parseFloat(s.price ?? s.unitPrice ?? s.estimatedPrice) || 0);
+      const disc = prLineDiscount(s, qty, price);
+      if (lineChanged) {
+        figuresChanged = true;
+        const rate = Number(s.conversionRate) > 0 ? Number(s.conversionRate) : 1;
+        if ('stockQty' in s) line.stockQty = qty * rate;
+        if (disc > 0 || 'discountAmount' in s) line.discountAmount = disc;
+        line.total = r2(Math.max(0, qty * price - disc));
+      }
+      newDiscs.push(disc);
+      for (const k of PR_URL_KEYS) {
+        if (k in it) {
+          const u = urlOf(it, k);
+          const sent = rawLinks && rawLinks[i] && typeof rawLinks[i][k] === 'string' ? rawLinks[i][k].trim() : u; // as sent, before sanitizing
+          for (const v of [u, sent]) if (v !== urlOf(s, k) && !isSafeHttpUrl(v)) return { status: 400, message: 'ลิงก์สินค้าต้องขึ้นต้นด้วย http:// หรือ https://' };
+          line[k] = u;
+        }
+      }
+      items.push(line);
+    }
+    out.items = items;
+    lines = items;
+    discs = newDiscs;
+  }
+  const fin = (() => { const f = parseExtra(curRow.extraJson).financials; return f && typeof f === 'object' && !Array.isArray(f) ? f : null; })();
+  if (figuresChanged) {
+    if (!hasTotal) return { status: 400, message: 'ต้องส่งยอดรวมใหม่มาพร้อมรายการที่แก้ไข' };
+    // ONE formula, from the stored data (never "try both and take the one that fits")
+    const exp = prExpectedAmounts(lines, discs, fin);
+    if (Math.abs(exp.grandTotal - sentTotal) > 0.01) return { status: 400, message: 'ยอดรวมไม่ตรงกับรายการสินค้า' };
+    const fg = p.financials && typeof p.financials === 'object' ? p.financials.grandTotal : undefined;
+    if (fg !== undefined && fg !== null && (!Number.isFinite(Number(fg)) || Math.abs(Number(fg) - exp.grandTotal) > 0.01)) return { status: 400, message: 'ยอดรวมใน financials ไม่ตรงกับรายการสินค้า' };
+    out.totalAmount = exp.grandTotal;
+    if (fin) out.financials = { ...fin, subtotal: exp.subtotal, itemDiscountTotal: exp.itemDiscountTotal, combinedDiscountAmount: exp.combinedDiscountAmount, totalDiscount: exp.totalDiscount, vatAmount: exp.vatAmount, grandTotal: exp.grandTotal };
+  } else if (hasTotal && Math.abs(sentTotal - storedTotal) > 0.01) {
+    return { status: 400, message: 'ยอดรวมไม่ตรงกับรายการสินค้า' };
+  }
+  return out;
+}
+function applyBufferEdit(p, be) {
+  if (be.items) p.items = be.items;
+  if (be.totalAmount !== undefined) { p.totalAmount = be.totalAmount; delete p.total; }
+  // `financials` is the server's alone from PENDING_BUFFER on : the client's copy is dropped whatever it says, only the server's recomputation is stored
+  delete p.financials;
+  if (be.financials) p.financials = be.financials;
+}
+// A PR parked at PENDING_BUFFER seen by somebody who is neither the BUFFER role nor an admin (reviewer / approver sending it back or cancelling it, the requester,
+// anyone in the department) : the body may repeat what is stored but not change a line (any field), the financials, the reason or the attachments -> 403.
+// What the body repeats is replaced by the stored data, so the save writes nothing of it.
+function guardAtBufferNonOwner(cur, p, base) {
+  const FORBID = { status: 403, message: FORBIDDEN_MSG };
+  if (p.items !== undefined && p.items !== null && Array.isArray(p.items)) {
+    if (p.items.length !== base.length) return FORBID;
+    for (let i = 0; i < base.length; i += 1) {
+      const s = base[i]; const it = p.items[i];
+      if (!it || typeof it !== 'object' || Array.isArray(it) || !s || typeof s !== 'object') return FORBID;
+      const kb = prLineKey2(s);
+      if (kb && prLineKey2(it) !== kb) return FORBID;
+      if (prLineDiffers(s, it)) return FORBID;
+    }
+    p.items = base;
+  }
+  if (p.financials !== undefined && p.financials !== null) {
+    const stored = parseExtra(cur.extraJson).financials;
+    if (!sameSentFields(p.financials, stored)) return FORBID;
+  }
+  delete p.financials;
+  for (const k of ['reason', 'purpose']) {
+    if (p[k] !== undefined && p[k] !== null && cur.reason !== undefined && trimVal(p[k]) !== trimVal(cur.reason)) return FORBID;
+  }
+  if (p.attachments !== undefined && p.attachments !== null) {
+    if (attachmentsNotStored(p.attachments, parseJsonSafe(cur.attachmentsJson, []))) return FORBID;
+    delete p.attachments; // keep the stored list exactly
+  }
+  return null;
+}
+// statuses from PENDING_BUFFER on : the product links are the BUFFER's to change (at PENDING_BUFFER only) and nobody's after it
+const PR_LINK_LOCK_STATUSES = new Set(['PENDING_BUFFER', 'REVIEWED', 'APPROVED', 'PO_ISSUED', 'IN_PROGRESS_ONLINE']);
+/**
+ * The content guard of a write to an EXISTING PR (POST upsert and PUT share it) : mutates the body `p` and -> null (go on) | { status, message } (answer it).
+ *  - content (items / total) that the caller may not edit now is frozen (qty / price / discount / links of the stored lines win) ; a change in the totals is 403
+ *  - a caller that may not edit the content cannot write `financials` (the key is dropped) ; the discount fields of a line follow the same freeze
+ *  - links : every alias is locked for everybody but the BUFFER (at PENDING_BUFFER) and admin, from PENDING_BUFFER on and for any caller who cannot edit
+ *  - PENDING_BUFFER : BUFFER -> prBufferEdit (built from the stored lines) ; anybody else -> guardAtBufferNonOwner
+ *  - an admin is never restricted here
+ */
+function guardPrWrite(authUser, cur, p, rawLinks) {
+  const FORBID = { status: 403, message: FORBIDDEN_MSG };
+  const perms = resolvePermissions(authUser);
+  // an admin is not restricted, except that his edit of a PR parked at the BUFFER step is checked like the BUFFER's (the total must match the lines)
+  if (perms.isAdmin && cur.status !== PR_PENDING_BUFFER) return null;
+  const canEdit = canEditPrContent(authUser, cur.status);
+  if (prContentChanged(cur, p) && !canEdit) return FORBID;
+  const base = parseItemsJson(cur.itemsJson);
+  if (cur.status === PR_PENDING_BUFFER) {
+    if (perms.isBuffer || perms.isAdmin) {
+      const be = prBufferEdit(cur, p, rawLinks);
+      if (be.status) return be;
+      applyBufferEdit(p, be);
+      return null;
+    }
+    return guardAtBufferNonOwner(cur, p, base);
+  }
+  const statusKey = String(cur.status ?? '').trim().toUpperCase();
+  if (Array.isArray(p.items)) {
+    if (!canEdit) {
+      if (!lockPrLinks(base, p.items)) return FORBID;
+      const fz = freezePrItems(cur.itemsJson, p.items);
+      if (fz.error) return FORBID;
+      p.items = fz.items;
+    } else if (PR_LINK_LOCK_STATUSES.has(statusKey)) {
+      if (!lockPrLinks(base, p.items)) return FORBID; // e.g. REVIEWED edited by the reviewer / approver : qty / price yes, links no
+    }
+  }
+  if (!canEdit && p.financials !== undefined) delete p.financials;
+  return null;
+}
+// what the BUFFER changed, line by line (qty / price / link, before -> after) : the detail of the BUFFER_FORWARD audit row
+function prItemChanges(storedItemsJson, newItems) {
+  const base = parseItemsJson(storedItemsJson);
+  if (!Array.isArray(newItems)) return [];
+  const out = [];
+  newItems.forEach((it, i) => {
+    const s = base[i];
+    if (!s || !it) return;
+    const name = String(it.name || it.productName || s.name || s.productName || it.productId || s.productId || '').slice(0, 200);
+    const add = (field, before, after) => { if (out.length < 60) out.push({ index: i, productId: String(s.productId || s.id || s.code || ''), name, field, before, after }); };
+    if (lineQty(it) !== lineQty(s)) add('qty', lineQty(s), lineQty(it));
+    if ((parseFloat(it.price) || 0) !== (parseFloat(s.price) || 0)) add('price', parseFloat(s.price) || 0, parseFloat(it.price) || 0);
+    for (const k of PR_URL_ALIASES) { const a = urlOf(s, k); const b = urlOf(it, k); if (a !== b) add(k, a.slice(0, 500), b.slice(0, 500)); }
+  });
+  return out;
 }
 // Pairing of PO lines with PR rows when the same product is on several rows (other rate : box x12 + piece x1) : the n-th line of a product takes the n-th
 // still-free row of it ; a line that carries a rate prefers the free row with that rate (a split PO may hold only the second row). -> index into prItems, -1 = none
@@ -517,6 +846,10 @@ const PO_EXTRA_RESERVED = new Set(['id', 'poNumber', 'poNo', 'prId', 'prNumber',
 const APPROVAL_KEYS = ['reviewedBy', 'reviewerName', 'reviewerSignature', 'reviewedAt', 'reviewerId',
   'approvedBy', 'approverName', 'approverSignature', 'approvedAt', 'approverId', 'approvalHistory'];
 APPROVAL_KEYS.forEach((k) => { PR_EXTRA_RESERVED.add(k); PO_EXTRA_RESERVED.add(k); });
+// Phase 3 : who passed the PR at the purchasing-checker (BUFFER) step, when, and his comment : stamped by the server from the token, never from the body
+const BUFFER_STAMP_KEYS = ['bufferReviewedBy', 'bufferReviewedById', 'bufferReviewedAt', 'bufferComment'];
+BUFFER_STAMP_KEYS.forEach((k) => PR_EXTRA_RESERVED.add(k));
+const BUFFER_COMMENT_MAX = 2000;
 // amounts shown by BudgetView (pr.totalEstimate || pr.totalAmount) : only the server / importer may set them, never a client save ; refPrNo is copied from the PR
 ['totalEstimate', 'estimatedTotal'].forEach((k) => PR_EXTRA_RESERVED.add(k));
 PO_EXTRA_RESERVED.add('refPrNo');
@@ -584,17 +917,38 @@ async function signerOf(db, authUser, fallbackName) {
  * stored = the row's current extra (object), clientHistory = body.approvalHistory, prev / next = status before / after.
  * -> object to merge into extraJson.
  */
-async function prApprovalPatch(db, authUser, { stored, clientHistory, prev, next, isExisting, eventId, meta }) {
+async function prApprovalPatch(db, authUser, { stored, clientHistory, prev, next, isExisting, eventId, meta, body }) {
   const out = {};
   const now = new Date();
   const changed = Boolean(next) && next !== prev;
-  if (changed && REVIEW_STATUSES_OWN.includes(next)) {
+  // Phase 3 : the BUFFER step. bufferForward = PENDING_BUFFER -> REVIEWED (the BUFFER role, or an admin in his place) ; reviewerPass = the reviewer's pass
+  // (-> REVIEWED, or -> PENDING_BUFFER) : only that one stamps reviewedBy / reviewerName / reviewedAt, and a BUFFER forward never overwrites them.
+  const bufferForward = changed && prev === PR_PENDING_BUFFER && next === 'REVIEWED';
+  const reviewerPass = changed && !bufferForward && (REVIEW_STATUSES_OWN.includes(next) || next === PR_PENDING_BUFFER);
+  if (reviewerPass) {
     const s = await signerOf(db, authUser, 'คุณสมชาย มุ่งมั่น');
     const at = now.toISOString();
     out.reviewedBy = { id: authUser.roleKey, name: s.name, signature: s.signature, timestamp: at };
     out.reviewerName = s.name;
     out.reviewerSignature = s.signature;
     out.reviewedAt = at;
+    // a PR sent back and reviewed again starts the BUFFER step afresh : the old BUFFER stamps go (null = json_patch removes them)
+    if (isExisting && BUFFER_STAMP_KEYS.some((k) => stored[k] !== undefined && stored[k] !== null)) for (const k of BUFFER_STAMP_KEYS) out[k] = null;
+  }
+  let bufferComment = '';
+  if (bufferForward) {
+    const at = now.toISOString();
+    const name = authUser.employeeName || authUser.name || authUser.username || '';
+    out.bufferReviewedBy = name;
+    out.bufferReviewedById = authUser.userId || authUser.roleKey || '';
+    out.bufferReviewedAt = at;
+    // the comment is body.bufferComment ; body.note counts only when it differs from the PR's own stored note (the client sends the whole PR back, note included)
+    const b = body && typeof body === 'object' ? body : {};
+    let raw = typeof b.bufferComment === 'string' ? b.bufferComment : '';
+    if (!raw && typeof b.note === 'string' && b.note.trim() !== String(stored.note || '').trim()) raw = b.note;
+    bufferComment = raw.trim().slice(0, BUFFER_COMMENT_MAX);
+    out.bufferComment = bufferComment || null;
+    if (meta) { meta.bufferComment = bufferComment; if (bufferComment) meta.comment = bufferComment; }
   }
   if (changed && APPROVE_STATUSES_OWN.includes(next) && !APPROVE_STATUSES_OWN.includes(prev)) {
     const s = await signerOf(db, authUser, 'คุณประเสริฐ ยิ่งยง');
@@ -623,9 +977,11 @@ async function prApprovalPatch(db, authUser, { stored, clientHistory, prev, next
     if (!e || typeof e !== 'object' || Array.isArray(e)) continue;
     const action = String(e.action || '').slice(0, 40);
     if (!action) continue;
-    const gatedReview = REVIEW_STATUSES_OWN.includes(action);
+    const gatedReview = REVIEW_STATUSES_OWN.includes(action) || action === PR_PENDING_BUFFER;
+    const gatedBuffer = action === 'BUFFER_REVIEWED';
     const gatedApprove = APPROVE_STATUSES_OWN.includes(action);
-    if (gatedReview && !(changed && next === 'REVIEWED')) continue;
+    if (gatedReview && !reviewerPass) continue;
+    if (gatedBuffer && !bufferForward) continue;
     if (gatedApprove && !(changed && APPROVE_STATUSES_OWN.includes(next))) continue;
     const entry = {
       actorName,
@@ -651,8 +1007,9 @@ async function prApprovalPatch(db, authUser, { stored, clientHistory, prev, next
   }
   if (changed && added === 0) {
     // the action PDF / PrintablePO look for : 'APPROVED' for any approval status, 'REVIEWED' for the review
-    const action = APPROVE_STATUSES_OWN.includes(next) ? 'APPROVED' : next;
-    history.push({ actorName, actorRole, action, date: stamp, timestamp: stamp, comment: '', ...(eventId ? { id: eventId } : {}) });
+    // (PENDING_BUFFER is recorded as the reviewer's 'REVIEWED' : the PDF / PrintablePO look that action up ; the BUFFER's own step is 'BUFFER_REVIEWED')
+    const action = APPROVE_STATUSES_OWN.includes(next) ? 'APPROVED' : (bufferForward ? 'BUFFER_REVIEWED' : (next === PR_PENDING_BUFFER ? 'REVIEWED' : next));
+    history.push({ actorName, actorRole, action, date: stamp, timestamp: stamp, comment: bufferForward ? bufferComment : '', ...(eventId ? { id: eventId } : {}) });
     added += 1;
   }
   if (added > 0 || legacyBackfill) out.approvalHistory = history.slice(-500);
@@ -660,12 +1017,13 @@ async function prApprovalPatch(db, authUser, { stored, clientHistory, prev, next
 }
 // ── PR timeline from audit_logs (parity with GAS : logPRAudit writes AuditLogs rows, buildAuditLogsByDoc assembles pr.timeline when PRs are read) ──
 // Rows are written by the server only (actor = the token, never the body) and never updated / deleted ; the PR's timeline is rebuilt from them on every read.
-const PR_AUDIT_ACTIONS = ['CREATE', 'PR_DRAFTED', 'RESUBMIT', 'REVIEW_FORWARD', 'APPROVE', 'SEND_BACK', 'CANCEL'];
+const PR_AUDIT_ACTIONS = ['CREATE', 'PR_DRAFTED', 'RESUBMIT', 'REVIEW_FORWARD', 'BUFFER_FORWARD', 'APPROVE', 'SEND_BACK', 'CANCEL'];
 const PR_AUDIT_TEXT = {
   CREATE: 'สร้างใบขอซื้อและส่งตรวจสอบ',
   PR_DRAFTED: 'บันทึกแบบร่างใบขอซื้อ',
   RESUBMIT: 'แก้ไขรายละเอียดเอกสารและส่งตรวจสอบใหม่อีกครั้ง',
   REVIEW_FORWARD: 'ตรวจสอบผ่าน ส่งต่อ Plant Mgr',
+  BUFFER_FORWARD: 'ผู้ตรวจสอบจัดซื้อส่งต่อผู้อนุมัติ',
   APPROVE: 'อนุมัติใบขอซื้อ',
   SEND_BACK: 'ส่งกลับเพื่อแก้ไข',
   CANCEL: 'ยกเลิกใบขอซื้อ'
@@ -683,7 +1041,8 @@ function prAuditAction(prev, next, isExisting, resubmit = false) {
   if (!next) return resubmit && isExisting ? 'RESUBMIT' : null;
   if (!isExisting) return next === 'DRAFT' ? 'PR_DRAFTED' : 'CREATE';
   if (next === prev) return resubmit ? 'RESUBMIT' : null;
-  if (next === 'REVIEWED') return 'REVIEW_FORWARD';
+  if (prev === PR_PENDING_BUFFER && next === 'REVIEWED') return 'BUFFER_FORWARD'; // Phase 3 : the purchasing checker passes the PR on to the approver
+  if (next === 'REVIEWED' || next === PR_PENDING_BUFFER) return 'REVIEW_FORWARD'; // the reviewer's pass (into REVIEWED, or into the BUFFER step)
   if (APPROVE_STATUSES_OWN.includes(next) && !APPROVE_STATUSES_OWN.includes(prev)) return 'APPROVE';
   if (String(next).startsWith('REJECTED')) return 'SEND_BACK';
   if (next === 'CANCELLED') return 'CANCEL';
@@ -692,13 +1051,18 @@ function prAuditAction(prev, next, isExisting, resubmit = false) {
 }
 // the audit row as a prepared statement : it is written in the SAME db.batch (one transaction) as the PR write when the binding has batch
 // whereSql / whereBinds : a guard evaluated inside the batch (e.g. "the PR is still in the status this request read") so a second identical request writes no second row
-function prAuditStmt(db, authUser, { id, action, prId, prNo, status, comment, whereSql, whereBinds }) {
+function prAuditStmt(db, authUser, { id, action, prId, prNo, status, comment, whereSql, whereBinds, changes }) {
   if (!db || !action) return null;
-  const text = String(comment || '').trim().slice(0, 1000) || PR_AUDIT_TEXT[action] || '';
+  // the default wording of the reviewer's pass depends on where it goes (Phase 3) ; the BUFFER's own comment is shown after the fixed wording
+  const defaultText = action === 'REVIEW_FORWARD' && status === PR_PENDING_BUFFER ? 'ส่งต่อผู้ตรวจสอบจัดซื้อ' : (PR_AUDIT_TEXT[action] || '');
+  const given = String(comment || '').trim();
+  const text = (action === 'BUFFER_FORWARD' ? (given ? `${defaultText} : ${given}` : defaultText) : given || defaultText).slice(0, 1000);
   const details = {
     docNo: String(prNo || prId || ''), comment: text, summary: text, status: status || null,
     actorName: authUser.name || authUser.username || '', actorRole: authUser.title || authUser.canonicalRole || authUser.role || '', roleKey: authUser.roleKey
   };
+  // BUFFER_FORWARD : what the checker changed (qty / price / link of each line, before -> after) + his comment, for the timeline
+  if (action === 'BUFFER_FORWARD') { details.changes = Array.isArray(changes) ? changes : []; if (given) details.bufferComment = given.slice(0, BUFFER_COMMENT_MAX); }
   return db.prepare(`INSERT OR IGNORE INTO audit_logs (id, action, entityType, entityId, performedBy, details, timestamp) SELECT ?, ?, ?, ?, ?, ?, ? WHERE ${whereSql || '1'}`)
     .bind(id, action, 'pr', String(prId || ''), authUser.userId, JSON.stringify(details), new Date().toISOString(), ...(whereBinds || []));
 }
@@ -813,7 +1177,7 @@ async function runWithAudit(db, stmt, auditStmt, ctx, extras = [], auditFirst = 
 // reason text of the audit row of a send-back / cancel : taken from THIS request only (a cancel never picks an old rejectReason)
 const prTransitionComment = (act, p) => (act === 'SEND_BACK' ? (p.rejectReason || p.rejectionReason || p.returnComment || p.comment || p.cancelReason) : (act === 'CANCEL' ? (p.cancelReason || p.comment) : ''));
 // notification rows of a PR transition (GAS call sites ; recipients by role + the department of the row, see _lib/notify.js)
-const prNotifyStmts = (db, authUser, act, { dept, prNo, body, whereSql, whereBinds }) => notificationStmts(db, prNotificationParams(act, { dept, prNo, requesterName: authUser.name || authUser.username || '', body }), { whereSql, whereBinds });
+const prNotifyStmts = (db, authUser, act, { dept, prNo, body, status, whereSql, whereBinds }) => notificationStmts(db, prNotificationParams(act, { dept, prNo, requesterName: authUser.name || authUser.username || '', body, status }), { whereSql, whereBinds });
 // "the PR row is still in the status this request read" : the guard of the audit / notification rows of a status transition
 const prPrevStatusGuard = (prId, prevStatus) => ({ whereSql: '(SELECT status FROM prs WHERE id = ?) IS ?', whereBinds: [prId, prevStatus === undefined ? null : prevStatus] });
 // the audit events of the PRs the caller may see : ONE query (ids travel as one JSON parameter, json_each) ; uses idx_audit_logs_entity (entityType, entityId) ; no LIMIT (never drops the newest rows)
@@ -838,8 +1202,9 @@ async function prAuditEvents(db, prIds) {
       id: r.id, timestamp: r.timestamp, createdAt: r.timestamp, date: r.timestamp, time: r.timestamp, action: r.action, title: r.action, type: r.action,
       docNo: d.docNo || '', targetRef: d.docNo || '', actor: who, actorName: who, user: who, userName: who, by: who,
       role: d.actorRole || '', actorRole: d.actorRole || '', userRole: d.actorRole || '',
-      comment: text, note: text, details: text, description: text, summary: text, reason: text, changes: [], status: d.status || null
+      comment: text, note: text, details: text, description: text, summary: text, reason: text, changes: Array.isArray(d.changes) ? d.changes : [], status: d.status || null
     };
+    if (d.bufferComment) ev.bufferComment = d.bufferComment;
     if (!byPr.has(r.entityId)) byPr.set(r.entityId, []);
     byPr.get(r.entityId).push(ev);
   }
@@ -1525,9 +1890,7 @@ function resolveRoleKey(user) {
     || (level >= 99 ? 'ADMIN' : level >= 3 ? 'APPROVER' : level >= 2 ? (isOnline ? 'ONLINE_PURCHASER' : 'REVIEWER') : 'REQUESTER');
 }
 
-function isUserActive(u) {
-  return !!u && (u.isActive === true || String(u.isActive).toLowerCase() === 'true' || u.isActive === 1 || u.status === 'ACTIVE');
-}
+const isUserActive = isUserRowActive; // one rule (rbac.js) for login, token check and the BUFFER count (USER_ACTIVE_SQL)
 
 let dummyRecordPromise = null;
 function getDummyRecord() {
@@ -1537,6 +1900,8 @@ function getDummyRecord() {
   return dummyRecordPromise.then((r) => ({ hash: r.hash, salt: r.salt, iterations: r.iterations, algo: r.algo }));
 }
 
+// roleIds the user upsert accepts without looking at the table (src/config/constants.js ROLES keys ; UserMasterView ROLE_OPTIONS uses a subset)
+const KNOWN_ROLE_IDS = new Set(['REQUESTER', 'REQUESTER_PD', 'REQUESTER_QC', 'REVIEWER', 'ASST_MANAGER', 'APPROVER', 'PLANT_MANAGER', 'ONLINE_PURCHASER', 'BUFFER', 'ADMIN']);
 const FORBIDDEN_MSG = 'ไม่มีสิทธิ์ดำเนินการนี้';
 
 // stock quantity from a JSON body : a number or a plain decimal string only (no booleans / arrays / "5abc" / exponent forms). The screens' inputs are
@@ -1639,11 +2004,14 @@ async function handleRequest(context, state) {
 
     const rawLevel = Number(u.level || 1);
     const roleStr = String((u.roleId || '') + ' ' + (u.canonicalRole || '') + ' ' + (u.positionKey || '') + ' ' + (u.title || '')).toUpperCase();
-    const isAdmin = rawLevel >= 99 || String(u.roleId || '') === 'ADMIN'; // T4.6 : same as rbac.normalizeUser
-    const level = isAdmin ? 99 : rawLevel;
-    const isOnline = !isAdmin && (roleStr.includes('ONLINE_PURCHASER') || u.canonicalRole === 'PURCHASER');
-    const isApprover = isAdmin || level >= 3 || roleStr.includes('APPROV') || roleStr.includes('PLANT_MANAGER');
-    const isReviewer = isAdmin || (!isOnline && (isApprover || level >= 2 || roleStr.includes('REVIEW') || roleStr.includes('ASST_MANAGER')));
+    // Phase 3 (FR-01) : the purchasing checker "พี่สุ" = roleId 'BUFFER' (any case ; never derived from level / title text) : always level 2 (even when the row says
+    // 99 / 3), never a reviewer / approver / online purchaser / budget writer, sees every department (same as rbac.normalizeUser.isBuffer)
+    const isBuffer = isBufferRoleId(u.roleId);
+    const isAdmin = !isBuffer && (rawLevel >= 99 || String(u.roleId || '') === 'ADMIN'); // T4.6 : same as rbac.normalizeUser
+    const level = isAdmin ? 99 : (isBuffer ? 2 : rawLevel);
+    const isOnline = !isAdmin && !isBuffer && (roleStr.includes('ONLINE_PURCHASER') || u.canonicalRole === 'PURCHASER');
+    const isApprover = isAdmin || (!isBuffer && (level >= 3 || roleStr.includes('APPROV') || roleStr.includes('PLANT_MANAGER')));
+    const isReviewer = isAdmin || (!isBuffer && !isOnline && (isApprover || level >= 2 || roleStr.includes('REVIEW') || roleStr.includes('ASST_MANAGER')));
     const isPurchaser = isAdmin || isOnline || roleStr.includes('PURCHAS');
     const isRequester = isAdmin || (!isOnline && (roleStr.includes('REQUEST') || roleStr.includes('PD') || roleStr.includes('QC') || level === 1));
 
@@ -1655,17 +2023,17 @@ async function handleRequest(context, state) {
     const canCreatePR = isAdmin ? true : (u.canCreatePR !== undefined && u.canCreatePR !== null ? Boolean(Number(u.canCreatePR)) : Boolean(!isOnline && isRequester));
     const canSubmitPR = isAdmin ? true : (u.canSubmitPR !== undefined && u.canSubmitPR !== null ? Boolean(Number(u.canSubmitPR)) : canCreatePR);
     const canDeleteOwnDraft = isAdmin ? true : (u.canDeleteOwnDraft !== undefined && u.canDeleteOwnDraft !== null ? Boolean(Number(u.canDeleteOwnDraft)) : Boolean(!isOnline && level >= 1));
-    const canReview = isAdmin ? true : (u.canReview !== undefined && u.canReview !== null ? Boolean(Number(u.canReview)) : Boolean(!isOnline && level >= 2));
-    const canFinalApprove = isAdmin ? true : (u.canFinalApprove !== undefined && u.canFinalApprove !== null ? Boolean(Number(u.canFinalApprove)) : Boolean(level >= 3));
-    const canOnlinePurchase = isAdmin ? true : (u.canOnlinePurchase !== undefined && u.canOnlinePurchase !== null ? Boolean(Number(u.canOnlinePurchase)) : Boolean(isOnline));
+    const canReview = isAdmin ? true : isBuffer ? false : (u.canReview !== undefined && u.canReview !== null ? Boolean(Number(u.canReview)) : Boolean(!isOnline && level >= 2));
+    const canFinalApprove = isAdmin ? true : isBuffer ? false : (u.canFinalApprove !== undefined && u.canFinalApprove !== null ? Boolean(Number(u.canFinalApprove)) : Boolean(level >= 3));
+    const canOnlinePurchase = isAdmin ? true : isBuffer ? false : (u.canOnlinePurchase !== undefined && u.canOnlinePurchase !== null ? Boolean(Number(u.canOnlinePurchase)) : Boolean(isOnline));
     const canReceiveGoods = isAdmin ? true : (u.canReceiveGoods !== undefined && u.canReceiveGoods !== null ? Boolean(Number(u.canReceiveGoods)) : Boolean(!isOnline && (level === 1 || roleStr.includes('WH'))));
     const canCloseOwnPO = isAdmin ? true : (u.canCloseOwnPO !== undefined && u.canCloseOwnPO !== null ? Boolean(Number(u.canCloseOwnPO)) : Boolean(isOnline || level === 1));
-    const canManageMaster = isAdmin ? true : (u.canManageMaster !== undefined && u.canManageMaster !== null ? Boolean(Number(u.canManageMaster)) : Boolean(!isOnline && level >= 1));
-    const canDeleteMaster = isAdmin ? true : (u.canDeleteMaster !== undefined && u.canDeleteMaster !== null ? Boolean(Number(u.canDeleteMaster)) : false);
+    const canManageMaster = isAdmin ? true : isBuffer ? false : (u.canManageMaster !== undefined && u.canManageMaster !== null ? Boolean(Number(u.canManageMaster)) : Boolean(!isOnline && level >= 1));
+    const canDeleteMaster = isAdmin ? true : isBuffer ? false : (u.canDeleteMaster !== undefined && u.canDeleteMaster !== null ? Boolean(Number(u.canDeleteMaster)) : false);
     const canViewBudget = isAdmin ? true : (u.canViewBudget !== undefined && u.canViewBudget !== null ? Boolean(Number(u.canViewBudget)) : Boolean(!isOnline && level >= 2));
     const canViewBudgetMenu = isAdmin ? true : (u.canViewBudgetMenu !== undefined && u.canViewBudgetMenu !== null ? Boolean(Number(u.canViewBudgetMenu)) : Boolean(!isOnline && level >= 2));
-    const canSetBudget = isAdmin ? true : (u.canSetBudget !== undefined && u.canSetBudget !== null ? Boolean(Number(u.canSetBudget)) : Boolean(level >= 3));
-    const canViewAllDepts = isAdmin ? true : (u.canViewAllDepts !== undefined && u.canViewAllDepts !== null ? Boolean(Number(u.canViewAllDepts)) : Boolean(isOnline || level >= 2 || (u.department === 'ALL')));
+    const canSetBudget = isAdmin ? true : isBuffer ? false : (u.canSetBudget !== undefined && u.canSetBudget !== null ? Boolean(Number(u.canSetBudget)) : Boolean(level >= 3));
+    const canViewAllDepts = isAdmin ? true : isBuffer ? true : (u.canViewAllDepts !== undefined && u.canViewAllDepts !== null ? Boolean(Number(u.canViewAllDepts)) : Boolean(isOnline || level >= 2 || (u.department === 'ALL')));
 
     const permissions = {
       PR_CREATION: Boolean(isAdmin || canCreatePR),
@@ -1678,6 +2046,7 @@ async function handleRequest(context, state) {
 
     return {
       ...safe,
+      ...(isBuffer ? { canonicalRole: 'BUFFER', isBuffer: true } : {}),
       level,
       isAdmin,
       isApprover,
@@ -1881,6 +2250,9 @@ async function handleRequest(context, state) {
         return new Response(JSON.stringify({ error: 'กรุณาเปลี่ยนรหัสผ่านก่อนใช้งานระบบ', success: false, mustChangePassword: true }), { status: 403, headers: corsHeaders });
       }
       authUser = { ...authUser, ...sanitizeUser(row), userId: row.id, dbTokenVersion: Number(row.tokenVersion || 0), dbMustChange: Number(row.mustChangePassword) === 1 };
+      // Phase 3 : the BUFFER role is level 2 whatever the stored level says (a stored 3 would make it an approver in rbac.normalizeUser) ; the user upsert writes 2 as well
+      // (always : a stored 99 must not turn the BUFFER account into an admin either ; rbac.normalizeUser clamps as well)
+      if (isBufferRoleId(row.roleId)) authUser.level = 2;
       // level as the client sees it (admin normalized to 99) so the role key matches the frontend session id
       authUser.roleKey = resolveRoleKey({ roleId: row.roleId, level: formatSafeUser(row).level });
     } else {
@@ -2144,12 +2516,15 @@ async function handleRequest(context, state) {
       if (method === 'POST') {
         const data = await request.json().catch(() => ({}));
         { const shape = checkBodyShape(data); if (shape) return errorResponse(shape.message, shape.status); }
+        const prRawLinks = new Map(); // body -> its lines' link strings as sent (before sanitizing)
+        for (const x of Array.isArray(data) ? data : [data]) if (x && typeof x === 'object') prRawLinks.set(x, rawLinksOf(x));
         { const bad = await sanitizeWriteBody(db, data, authUser); if (bad) return errorResponse(bad.message, bad.status); }
         const prList = Array.isArray(data) ? data : [data];
         // RBAC (canAction): changing the status of an existing PR requires the role that owns that step
         // existing row + no status sent => keep the stored status (never the 'SUBMITTED' default) ; status sent => always checked
         const prCur = new Map();
         const prIssued = new Map(); // PR -> { requested } for numbers the server issued
+        const prSkipped = new Set(); // PRs whose reviewer pass skipped the BUFFER step (no active BUFFER user)
         const seenPr = new Set();
         for (const p of prList) {
           if (!p || typeof p !== 'object') return errorResponse('ข้อมูลไม่ถูกต้อง', 400);
@@ -2157,17 +2532,14 @@ async function handleRequest(context, state) {
           const batchKeys = [String(p.id), String(p.prNumber || p.prNo || p.id)];
           if (batchKeys.some((k) => seenPr.has(k))) return errorResponse('รหัส/เลขที่ PR ซ้ำกันในคำขอเดียวกัน', 400);
           batchKeys.forEach((k) => seenPr.add(k));
-          const cur = p.id ? await lookupStatus(db, 'SELECT id, prNumber, status, department, totalAmount, itemsJson, timelineJson, attachmentsJson, approvalWorkflowJson, extraJson FROM prs WHERE id = ? LIMIT 1', p.id) : null;
+          const cur = p.id ? await lookupStatus(db, 'SELECT id, prNumber, status, department, totalAmount, itemsJson, reason, timelineJson, attachmentsJson, approvalWorkflowJson, extraJson FROM prs WHERE id = ? LIMIT 1', p.id) : null;
           prCur.set(p, cur);
           if (cur) {
             // an existing PR: caller must reach its department, and its content (items / total) is frozen once the client freezes it
-            if (!canAccessDepartment(authUser, cur.department)) return errorResponse(FORBIDDEN_MSG, 403);
-            if (prContentChanged(cur, p) && !canEditPrContent(authUser, cur.status)) return errorResponse(FORBIDDEN_MSG, 403);
-            if (Array.isArray(p.items) && !canEditPrContent(authUser, cur.status)) {
-              const fz = freezePrItems(cur.itemsJson, p.items);
-              if (fz.error) return errorResponse(FORBIDDEN_MSG, 403);
-              p.items = fz.items;
-            }
+            // the department gate ; the BUFFER role (sees every department, writes only in its own) may still reach a PR parked at ITS step in any department
+            if (!canAccessDepartment(authUser, cur.department) && !(cur.status === PR_PENDING_BUFFER && resolvePermissions(authUser).isBuffer)) return errorResponse(FORBIDDEN_MSG, 403);
+            // content freeze / link lock / financials lock / the BUFFER's edit at PENDING_BUFFER (see guardPrWrite)
+            { const g = guardPrWrite(authUser, cur, p, prRawLinks.get(p)); if (g) return errorResponse(g.message, g.status); }
           } else {
             // new PR: a concrete, canonical department code. ALL / BOTH / * (any case) would open the document to everybody : admin only
             // (the client always creates a PR under a concrete department). Checked against the departments table when it has data.
@@ -2196,9 +2568,16 @@ async function handleRequest(context, state) {
               p.prNo = issued.docNo;
             }
           }
-          const effective = p.status || (cur ? null : 'SUBMITTED');
+          let effective = p.status || (cur ? null : 'SUBMITTED');
+          if (cur && effective) {
+            // Phase 3 : the server decides whether a reviewer's pass goes through the BUFFER step ; the status stored is the one returned
+            const rv = await resolveReviewTarget(db, authUser, cur.status, effective);
+            if (rv.bufferSkipped) prSkipped.add(p);
+            if (rv.status !== effective) { p.status = rv.status; effective = rv.status; }
+          }
           if (effective && !canTransitionPR(authUser, cur ? cur.status : undefined, effective)) return errorResponse(FORBIDDEN_MSG, 403);
         }
+        const prResults = []; // { id, status (as stored), bufferSkipped? } per PR of the request
         for (const p of prList) {
           const prId = p.id;
           let prNo = p.prNumber || p.prNo || prId;
@@ -2227,8 +2606,11 @@ async function handleRequest(context, state) {
           const prAuditId = prAuditAct ? `AL-${Date.now()}-${uid()}` : undefined;
           const prAuditMeta = {};
           Object.assign(prExtra, await prApprovalPatch(db, authUser, {
-            stored: curRow ? parseExtra(curRow.extraJson) : {}, clientHistory: p.approvalHistory, prev: curRow ? curRow.status : undefined, next: status, isExisting: Boolean(curRow), eventId: prAuditId, meta: prAuditMeta
+            stored: curRow ? parseExtra(curRow.extraJson) : {}, clientHistory: p.approvalHistory, prev: curRow ? curRow.status : undefined, next: status, isExisting: Boolean(curRow), eventId: prAuditId, meta: prAuditMeta, body: p
           }));
+          // BUFFER_FORWARD : what the checker changed in the lines (before -> after), for the audit row / timeline
+          const prAuditChanges = prAuditAct === 'BUFFER_FORWARD' && Array.isArray(p.items) ? prItemChanges(curRow.itemsJson, p.items) : undefined;
+          prResults.push({ id: prId, status, ...(prSkipped.has(p) ? { bufferSkipped: true } : {}) });
           Object.assign(prExtra, await docServerPatch(db, authUser, 'PR', { stored: curRow ? parseExtra(curRow.extraJson) : {}, body: p, next: status, isExisting: Boolean(curRow) }));
           const extraJson = extraPatchJson(prExtra, curRow ? parseExtra(curRow.extraJson) : undefined);
           if (extraJson === null) return errorResponse('ขนาดข้อมูลเกินกำหนด', 413);
@@ -2263,8 +2645,8 @@ async function handleRequest(context, state) {
           const prAuditComment = prAuditMeta.comment || prTransitionComment(prAuditAct, p);
           // the PR write and its audit row go in one batch (the row carries the number actually stored)
           // + the GAS notification rows of that transition (department = the stored row's, never the body's)
-          const savePr = (no) => runWithAudit(db, insertPr(no), prAuditAct ? prAuditStmt(db, authUser, { id: prAuditId, action: prAuditAct, prId, prNo: no, status, comment: prAuditComment, ...postGuard }) : null, { prId, action: prAuditAct },
-            prAuditAct ? prNotifyStmts(db, authUser, prAuditAct, { dept: (curRow && curRow.department) || dept, prNo: no, body: p, ...postGuard }) : [], Boolean(postGuard.whereSql));
+          const savePr = (no) => runWithAudit(db, insertPr(no), prAuditAct ? prAuditStmt(db, authUser, { id: prAuditId, action: prAuditAct, prId, prNo: no, status, comment: prAuditComment, changes: prAuditChanges, ...postGuard }) : null, { prId, action: prAuditAct },
+            prAuditAct ? prNotifyStmts(db, authUser, prAuditAct, { dept: (curRow && curRow.department) || dept, prNo: no, body: p, status, ...postGuard }) : [], Boolean(postGuard.whereSql));
           let saveRes;
           try {
             saveRes = await savePr(prNo);
@@ -2303,6 +2685,10 @@ async function handleRequest(context, state) {
           pr: prList[0],
           id: prList[0]?.id,
           prNo: prList[0]?.prNumber || prList[0]?.prNo,
+          // Phase 3 : the status as STORED (the server may have chosen PENDING_BUFFER / REVIEWED for a reviewer's pass) ; bufferSkipped when the BUFFER step was skipped
+          status: prResults[0]?.status,
+          ...(prResults[0]?.bufferSkipped ? { bufferSkipped: true } : {}),
+          ...(prResults.length > 1 ? { results: prResults } : {}),
           ...(first ? { issuedByServer: true, renumbered: Boolean(first.requested), requestedPrNo: first.requested } : {}),
           issued: prList.filter((x) => prIssued.has(x)).map((x) => ({ id: x.id, prNo: x.prNumber, requestedPrNo: prIssued.get(x).requested }))
         });
@@ -2311,17 +2697,21 @@ async function handleRequest(context, state) {
       if (method === 'PUT' && subId) {
         const p = await request.json().catch(() => ({}));
         { const shape = checkBodyShape(p); if (shape) return errorResponse(shape.message, shape.status); }
+        const putRawLinks = rawLinksOf(p);
         { const bad = await sanitizeWriteBody(db, p, authUser, { docKey: subId }); if (bad) return errorResponse(bad.message, bad.status); }
-        const status = p.status || null;
+        let status = p.status || null;
+        let putSkipped = false;
         // resolve ONE row (exact id first, then prNumber) ; the UPDATE below targets that id only
-        const curRow = await lookupStatus(db, 'SELECT id, status, department, totalAmount, itemsJson, timelineJson, attachmentsJson, extraJson FROM prs WHERE id = ? OR prNumber = ? ORDER BY (id = ?) DESC LIMIT 1', subId, subId, subId);
+        const curRow = await lookupStatus(db, 'SELECT id, status, department, totalAmount, itemsJson, reason, timelineJson, attachmentsJson, extraJson FROM prs WHERE id = ? OR prNumber = ? ORDER BY (id = ?) DESC LIMIT 1', subId, subId, subId);
         if (curRow) {
-          if (!canAccessDepartment(authUser, curRow.department)) return errorResponse(FORBIDDEN_MSG, 403);
-          if (prContentChanged(curRow, p) && !canEditPrContent(authUser, curRow.status)) return errorResponse(FORBIDDEN_MSG, 403);
-          if (Array.isArray(p.items) && !canEditPrContent(authUser, curRow.status)) {
-            const fz = freezePrItems(curRow.itemsJson, p.items);
-            if (fz.error) return errorResponse(FORBIDDEN_MSG, 403);
-            p.items = fz.items;
+          if (!canAccessDepartment(authUser, curRow.department) && !(curRow.status === PR_PENDING_BUFFER && resolvePermissions(authUser).isBuffer)) return errorResponse(FORBIDDEN_MSG, 403);
+          { const g = guardPrWrite(authUser, curRow, p, putRawLinks); if (g) return errorResponse(g.message, g.status); }
+          // Phase 3 : the server decides whether a reviewer's pass goes through the BUFFER step ; the status stored is the one returned
+          if (status) {
+            const rv = await resolveReviewTarget(db, authUser, curRow.status, status);
+            putSkipped = rv.bufferSkipped;
+            status = rv.status;
+            p.status = status;
           }
         }
         if (status && curRow && !canTransitionPR(authUser, curRow.status, status)) return errorResponse(FORBIDDEN_MSG, 403);
@@ -2342,14 +2732,17 @@ async function handleRequest(context, state) {
         const putAuditAct = putRawAct === 'RESUBMIT' && !putIsResend ? null : putRawAct;
         if (putRawAct === 'RESUBMIT' && !canEditPrContent(authUser, curRow.status)) {
           // a repeated submit (the first PUT worked, its response was lost) : same status sent again, content unchanged -> 200 no-op, nothing written, no audit row
-          if (status && status === curRow.status && !prContentChanged(curRow, p)) return jsonResponse({ success: true, id: subId, unchanged: true });
+          if (status && status === curRow.status && !prContentChanged(curRow, p)) return jsonResponse({ success: true, id: subId, unchanged: true, status: curRow.status });
           return errorResponse(FORBIDDEN_MSG, 403);
         }
         const putAuditId = putAuditAct ? `AL-${Date.now()}-${uid()}` : undefined;
         const putAuditMeta = {};
         Object.assign(putExtra, await prApprovalPatch(db, authUser, {
-          stored: curRow ? parseExtra(curRow.extraJson) : {}, clientHistory: p.approvalHistory, prev: curRow ? curRow.status : undefined, next: status || (curRow ? curRow.status : null), isExisting: Boolean(curRow), eventId: putAuditId, meta: putAuditMeta
+          stored: curRow ? parseExtra(curRow.extraJson) : {}, clientHistory: p.approvalHistory, prev: curRow ? curRow.status : undefined, next: status || (curRow ? curRow.status : null), isExisting: Boolean(curRow), eventId: putAuditId, meta: putAuditMeta, body: p
         }));
+        // BUFFER_FORWARD : what the checker changed in the lines (before -> after), for the audit row / timeline
+        const putAuditChanges = putAuditAct === 'BUFFER_FORWARD' && Array.isArray(p.items) ? prItemChanges(curRow.itemsJson, p.items) : undefined;
+        const putStored = (status || (curRow ? curRow.status : undefined)) || undefined; // the status the PR has after this request (what the response reports)
         Object.assign(putExtra, await docServerPatch(db, authUser, 'PR', { stored: curRow ? parseExtra(curRow.extraJson) : {}, body: p, next: status || (curRow ? curRow.status : null), isExisting: Boolean(curRow) }));
         const putExtraJson = extraPatchJson(putExtra, curRow ? parseExtra(curRow.extraJson) : undefined);
         if (putExtraJson === null) return errorResponse('ขนาดข้อมูลเกินกำหนด', 413);
@@ -2378,14 +2771,14 @@ async function handleRequest(context, state) {
         // (double click, a second writer) leave exactly one row of each.
         // (every audited write to an existing PR - a transition or a RESUBMIT of the same status - is guarded the same way)
         const putGuard = curRow && putAuditAct ? prPrevStatusGuard(targetId, curRow.status) : {};
-        const putRes = await runWithAudit(db, putUpdate, putAuditAct ? prAuditStmt(db, authUser, { id: putAuditId, action: putAuditAct, prId: targetId, prNo: putNumRow && putNumRow.prNumber, status, comment: putAuditMeta.comment || prTransitionComment(putAuditAct, p), ...putGuard }) : null, { prId: targetId, action: putAuditAct },
-        putAuditAct && curRow ? prNotifyStmts(db, authUser, putAuditAct, { dept: curRow.department || 'PD', prNo: (putNumRow && putNumRow.prNumber) || targetId, body: p, ...putGuard }) : [], Boolean(putGuard.whereSql));
+        const putRes = await runWithAudit(db, putUpdate, putAuditAct ? prAuditStmt(db, authUser, { id: putAuditId, action: putAuditAct, prId: targetId, prNo: putNumRow && putNumRow.prNumber, status, comment: putAuditMeta.comment || prTransitionComment(putAuditAct, p), changes: putAuditChanges, ...putGuard }) : null, { prId: targetId, action: putAuditAct },
+        putAuditAct && curRow ? prNotifyStmts(db, authUser, putAuditAct, { dept: curRow.department || 'PD', prNo: (putNumRow && putNumRow.prNumber) || targetId, body: p, status, ...putGuard }) : [], Boolean(putGuard.whereSql));
         // every write to an existing PR only applies while the PR still has the status read here ; not applied -> the PR moved meanwhile
         const putWon = putAuditAct ? Boolean(await db.prepare('SELECT 1 AS x FROM audit_logs WHERE id = ? LIMIT 1').bind(putAuditId).first().catch(() => null)) : writeApplied(putRes);
         if (curRow && !putWon) {
           // a transition to the status the PR now has -> 200 no-op ; anything else (an edit on an older view, another status) -> 409, nothing written
           const nowRow = await lookupStatus(db, 'SELECT status FROM prs WHERE id = ? LIMIT 1', targetId);
-          if (status && nowRow && nowRow.status === status && status !== curRow.status) return jsonResponse({ success: true, id: subId, unchanged: true });
+          if (status && nowRow && nowRow.status === status && status !== curRow.status) return jsonResponse({ success: true, id: subId, unchanged: true, status, ...(putSkipped ? { bufferSkipped: true } : {}) });
           return errorResponse('เอกสารถูกแก้ไขโดยผู้อื่น กรุณาโหลดข้อมูลใหม่แล้วลองอีกครั้ง', 409);
         }
         markTouched('prs', targetId);
@@ -2393,7 +2786,8 @@ async function handleRequest(context, state) {
           await writePrCommitment(db, targetId, authUser.name || authUser.username, authUser.title || authUser.canonicalRole || authUser.roleKey);
         }
 
-        return jsonResponse({ success: true, id: subId });
+        // Phase 3 : `status` = the status as STORED (the server may have chosen PENDING_BUFFER / REVIEWED for a reviewer's pass) ; bufferSkipped when the BUFFER step was skipped
+        return jsonResponse({ success: true, id: subId, ...(putStored ? { status: putStored } : {}), ...(putSkipped ? { bufferSkipped: true } : {}) });
       }
 
       if (method === 'DELETE' && subId) {
@@ -3936,19 +4330,29 @@ async function handleRequest(context, state) {
         }
 
         // No default role any more : a NEW user must come with a roleId (400 otherwise) ; an existing user keeps the stored role when none is sent
-        const roleId = (typeof u.roleId === 'string' ? u.roleId.trim() : '') || (existingUser && existingUser.roleId) || '';
-        if (!roleId) return errorResponse('กรุณาระบุบทบาท (roleId) ของผู้ใช้งาน', 400);
-        const roleUpper = String(roleId).toUpperCase();
-        const canonicalRole = u.canonicalRole || (
+        const roleIdRaw = (typeof u.roleId === 'string' ? u.roleId.trim() : '') || (existingUser && existingUser.roleId) || '';
+        if (!roleIdRaw) return errorResponse('กรุณาระบุบทบาท (roleId) ของผู้ใช้งาน', 400);
+        // roleId is stored trimmed and UPPER-CASE ('buffer' must not become a second spelling of BUFFER that every exact comparison misses) and must be a role the
+        // system knows : the ones of src/config/constants.js ROLES (UserMasterView ROLE_OPTIONS + the legacy department-coupled ids), or one already held by a user row
+        const roleId = String(roleIdRaw).trim().toUpperCase();
+        if (!KNOWN_ROLE_IDS.has(roleId)) {
+          const held = await db.prepare('SELECT 1 AS x FROM users WHERE UPPER(TRIM(roleId)) = ? LIMIT 1').bind(roleId).first().catch(() => null);
+          if (!held) return errorResponse('บทบาท (roleId) ไม่ถูกต้อง', 400);
+        }
+        const roleUpper = roleId;
+        // Phase 3 (FR-01) : roleId 'BUFFER' (the purchasing checker "พี่สุ") is ALWAYS level 2 with its fixed flags below, whatever the body says
+        // (a level >= 99 would make it an admin, a level 3 an approver)
+        const isBufferRole = roleId === 'BUFFER';
+        const canonicalRole = isBufferRole ? 'BUFFER' : (u.canonicalRole || (
           roleUpper === 'ADMIN' ? 'ADMIN' :
           (roleUpper.includes('ASST') || roleUpper.includes('REVIEW')) ? 'REVIEWER' :
           (roleUpper.includes('APPROV') || roleUpper.includes('MANAGER') || roleUpper.includes('PLANT')) ? 'APPROVER' :
           (roleUpper.includes('PURCHAS') || roleUpper.includes('BUYER')) ? 'PURCHASER' : 'REQUESTER'
-        );
+        ));
         const posKey = u.positionKey || roleId;
         const title = u.title || position || 'Officer';
         const defaultLevel = canonicalRole === 'ADMIN' ? 99 : (canonicalRole === 'APPROVER' ? 3 : (canonicalRole === 'REVIEWER' || canonicalRole === 'PURCHASER' ? 2 : 1));
-        const level = Number(u.level || defaultLevel);
+        const level = isBufferRole ? 2 : Number(u.level || defaultLevel);
         const status = u.status || 'ACTIVE';
         const pic = u.pictureUrl || '';
         const desc = u.description || '';
@@ -3961,17 +4365,17 @@ async function handleRequest(context, state) {
         const canCreatePR = u.canCreatePR !== undefined ? (u.canCreatePR ? 1 : 0) : (level >= 1 && !isOnline ? 1 : 0);
         const canSubmitPR = u.canSubmitPR !== undefined ? (u.canSubmitPR ? 1 : 0) : canCreatePR;
         const canDeleteOwnDraft = u.canDeleteOwnDraft !== undefined ? (u.canDeleteOwnDraft ? 1 : 0) : (level >= 1 && !isOnline ? 1 : 0);
-        const canReview = u.canReview !== undefined ? (u.canReview ? 1 : 0) : (level >= 2 && !isOnline ? 1 : 0);
-        const canFinalApprove = u.canFinalApprove !== undefined ? (u.canFinalApprove ? 1 : 0) : (level >= 3 ? 1 : 0);
-        const canOnlinePurchase = u.canOnlinePurchase !== undefined ? (u.canOnlinePurchase ? 1 : 0) : (isOnline || level >= 99 ? 1 : 0);
+        const canReview = isBufferRole ? 0 : (u.canReview !== undefined ? (u.canReview ? 1 : 0) : (level >= 2 && !isOnline ? 1 : 0));
+        const canFinalApprove = isBufferRole ? 0 : (u.canFinalApprove !== undefined ? (u.canFinalApprove ? 1 : 0) : (level >= 3 ? 1 : 0));
+        const canOnlinePurchase = isBufferRole ? 0 : (u.canOnlinePurchase !== undefined ? (u.canOnlinePurchase ? 1 : 0) : (isOnline || level >= 99 ? 1 : 0));
         const canReceiveGoods = u.canReceiveGoods !== undefined ? (u.canReceiveGoods ? 1 : 0) : (!isOnline && (level === 1 || level >= 99 || roleUpper.includes('WH')) ? 1 : 0);
         const canCloseOwnPO = u.canCloseOwnPO !== undefined ? (u.canCloseOwnPO ? 1 : 0) : (level === 1 || isOnline || level >= 99 ? 1 : 0);
-        const canManageMaster = u.canManageMaster !== undefined ? (u.canManageMaster ? 1 : 0) : (!isOnline && level >= 1 ? 1 : 0);
-        const canDeleteMaster = u.canDeleteMaster !== undefined ? (u.canDeleteMaster ? 1 : 0) : (level >= 99 ? 1 : 0);
+        const canManageMaster = isBufferRole ? 0 : (u.canManageMaster !== undefined ? (u.canManageMaster ? 1 : 0) : (!isOnline && level >= 1 ? 1 : 0));
+        const canDeleteMaster = isBufferRole ? 0 : (u.canDeleteMaster !== undefined ? (u.canDeleteMaster ? 1 : 0) : (level >= 99 ? 1 : 0));
         const canViewBudget = u.canViewBudget !== undefined ? (u.canViewBudget ? 1 : 0) : (!isOnline && level >= 2 ? 1 : 0);
         const canViewBudgetMenu = u.canViewBudgetMenu !== undefined ? (u.canViewBudgetMenu ? 1 : 0) : (!isOnline && level >= 2 ? 1 : 0);
-        const canSetBudget = u.canSetBudget !== undefined ? (u.canSetBudget ? 1 : 0) : (level >= 3 ? 1 : 0);
-        const canViewAllDepts = u.canViewAllDepts !== undefined ? (u.canViewAllDepts ? 1 : 0) : (isOnline || level >= 2 || dept === 'ALL' ? 1 : 0);
+        const canSetBudget = isBufferRole ? 0 : (u.canSetBudget !== undefined ? (u.canSetBudget ? 1 : 0) : (level >= 3 ? 1 : 0));
+        const canViewAllDepts = isBufferRole ? 1 : (u.canViewAllDepts !== undefined ? (u.canViewAllDepts ? 1 : 0) : (isOnline || level >= 2 || dept === 'ALL' ? 1 : 0));
         const now = new Date().toISOString();
 
         // E-signature : PNG / JPEG / WebP data URL (<= 400k chars) or a Drive URL. An unchanged stored value is not re-checked (old users keep working).

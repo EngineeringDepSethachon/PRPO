@@ -1,6 +1,7 @@
 import { workflowEngine } from './workflowEngine';
 import { hasDepartmentAccess } from '../utils/permissions';
 import { isPoInOpenClaim, isPoDone, isOwnerByRequesterId } from '../utils/claimState';
+import { isBufferRole } from '../utils/bufferRole';
 
 // WorkspaceView's own user matching (email / name / username only ; NOT the id) - kept exactly as the view had it
 const isWorkspaceUserMatched = (targetValue, currentUser) => {
@@ -26,6 +27,9 @@ export const canSeeWorkspaceDocument = (doc, user) => {
                           roleId === 'PLANT_MANAGER' || userLevel >= 3 ||
                           roleId === 'PURCHASER' || roleId === 'ONLINE_PURCHASER';
   if (isAdminOrGlobal) return true;
+
+  // Phase 3 : the purchasing checker (BUFFER, level 2) sees the workspace of every department
+  if (isBufferRole(user)) return true;
 
   // Reviewer / Approver (Asst. Manager) - sees ALL docs in their department(s)
   const isReviewer = roleId === 'ASST_MANAGER' || roleId === 'REVIEWER' || userLevel === 2;
@@ -113,6 +117,13 @@ export const isUserStakeholder = (doc, user, allPRs = []) => {
     } else if (isUserMatched(doc.reviewedBy, user)) return true;
   }
   if (Array.isArray(doc.reviewers) && doc.reviewers.some(r => isUserMatched(r, user))) return true;
+  // Phase 3 : the purchasing checker (BUFFER) who forwarded the PR
+  if (doc.bufferReviewedById && doc.bufferReviewedById === userId) return true;
+  if (doc.bufferReviewedBy) {
+    if (typeof doc.bufferReviewedBy === 'object') {
+      if (doc.bufferReviewedBy.name === userName || doc.bufferReviewedBy.id === userId) return true;
+    } else if (isUserMatched(doc.bufferReviewedBy, user)) return true;
+  }
   if (doc.approverId === userId || doc.approvedBy === userName) return true;
   if (doc.approverName && isUserMatched(doc.approverName, user)) return true;
 
@@ -290,6 +301,14 @@ export const isInProgressTask = (task, user, allPRs = [], allPOs = []) => {
   const roleId = String(user?.roleId || user?.id || '').toUpperCase();
   const userLevel = Number(user?.level || 1);
   if (roleId === 'ADMIN' || user?.role === 'admin' || userLevel >= 99) return true;
+
+  // Phase 3 : a PR parked at the purchasing checker (PENDING_BUFFER) is the BUFFER user's To-Do only ; the reviewer who passed it
+  // (level 2, department access) and the approver who is next (level >= 3) follow it as "in progress" ; the requester via isUserStakeholder
+  if (isPR && task.status === 'PENDING_BUFFER' && !isBufferRole(user)) {
+    const isOnline = roleId === 'ONLINE_PURCHASER' || Boolean(user?.canOnlinePurchase);
+    if (!isOnline && (userLevel >= 3 || user?.canFinalApprove)) return true;
+    if (!isOnline && userLevel === 2 && hasDepartmentAccess(user, task.department)) return true;
+  }
 
   return isUserStakeholder(task, user, allPRs);
 };

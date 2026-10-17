@@ -6,9 +6,13 @@
 - progress = จำนวน [x] / ทั้งหมด (server คำนวณ)
 -->
 # ไวท์บอร์ด Migrate Team
-อัปเดต: 2026-10-16 09:00
+อัปเดต: 2026-10-17 10:00
 
 ## ✅ ตัดสินใจแล้ว
+
+- [2026-10-17] Fable อนุมัติเปิด Phase 3 (cmvc242gq1f336) ลำดับ v1.1.0 → v1.2.0 → v1.3.0 ; เงื่อนไข: server เลือก PENDING_BUFFER/REVIEWED เอง + recompute ยอด + productUrl http/https, ตัด isBuffer จาก reviewer/จัดสรรงบ, ที่ PENDING_BUFFER แก้ได้เฉพาะพี่สุ+admin, เทสต์ cf_rbac ครบ actor×สถานะ, ไล่ทุกจุด enumerate สถานะ, remark แสดงเป็น text, FR-04 screenshot ก่อน/หลัง ; GAS ไม่รองรับ PENDING_BUFFER (ไม่ใช่ production แล้ว) ; รายละเอียด docs/plan.md
+
+- [2026-10-17] **Phase 3 ผู้ใช้ตัดสิน (ask ในแชท):** Q1 ไม่มีบัญชี BUFFER ที่ ACTIVE → ข้ามขั้นพี่สุอัตโนมัติไป Approver ; Q2 ขั้นพี่สุใช้กับ PR ทุกใบ (ภายใน+ออนไลน์) ; Q3 role ใหม่ รหัส `BUFFER` ป้าย "ผู้ตรวจสอบจัดซื้อ (พี่สุ)" ; Q4 ฟอนต์ = ปรับสเกล Tailwind ครั้งเดียว + codemod คลาสจิ๋ว แล้วไล่เก็บจุดล้น (ห้ามตาราง/ปุ่มเสียสัดส่วน) ; Q5 ลำดับ v1.1.0 (FR-02 หมายเหตุสินค้า + FR-01 พี่สุ) → v1.2.0 (FR-03 การ์ดงานออนไลน์) → v1.3.0 (FR-04 ฟอนต์) รันเทสต์+build+deploy จบทีละเวอร์ชัน ; Q6 PR ที่ค้างที่พี่สุ: Approver, Admin **และ Reviewer** ตีกลับ/ยกเลิกได้ ; พี่สุเองไม่มีปุ่ม reject/cancel ; Q7 พี่สุ = level 2 ดูงบ/สร้าง PR/ดูสต๊อกทุกแผนกได้ แต่จัดสรรงบและตรวจทานแทน Reviewer ไม่ได้ ; Q8 ไม่เพิ่มพี่สุใน PDF PO (timeline อย่างเดียว) ; Q9 ที่ PENDING_BUFFER แก้ qty/ราคา/ลิงก์ได้เฉพาะพี่สุ+admin ; Q10 ปิดบัญชีพี่สุขณะมี PR ค้าง → admin ส่งต่อแทน หรือ reviewer/approver ตีกลับ ไม่เพิ่มปุ่มใหม่ ; แผน docs/plan.md หัวข้อบนสุด ; task ใน docs/tasks.md M10
 
 - [2026-10-16] ผู้ใช้สั่งปล่อยใช้งานจริงที่ https://prpo-pdqc.pages.dev และล้างข้อมูลทดสอบ (Neo ทำแล้ว): backup C:\Users\Admin\prpo-backups\prpo-db-20261015-pre-reset.sql ; ลบ PR/PO/สต็อก/งบ/แจ้งเตือน/audit/ไฟล์แนบ+R2 8 ไฟล์/ตัวนับ/สินค้า/ผู้ขาย/ลายเซ็น และผู้ใช้ทุกคนยกเว้น admin ; เก็บแผนก (PD, QC) สถานที่เก็บ 1 หน่วยนับ 4 ; admin ได้รหัสชั่วคราว (ไฟล์นอก repo, mustChangePassword=1, token เก่าใช้ไม่ได้) ; แนวทางพัฒนาต่อ: แก้ → npm test → deploy preview (prpo-db-preview) → ทดสอบ → deploy main
 
@@ -127,6 +131,8 @@
 
 ## ⏳ ค้างอยู่
 
+- **[2026-10-17] v1.1.0 (M10 T1-T8 ใน docs/tasks.md) มี session อื่นกำลังทำอยู่ ผู้ใช้สั่งให้ห้อง Neo หยุดรอ ; ห้องนี้กลับมาทำเมื่อผู้ใช้สั่ง (ตรวจงานค้างที่ยังไม่ commit ก่อน ห้ามย้อนทิ้ง)**
+
 - **[2026-10-15] จำกัดการปิด PO ที่ค้างเคลม — Claude ทำครบ 3 ชั้นแล้ว (server rbac+route poOwnerCtx, client PODetailsModal.canResolveSelfClaim, เทสต์ 5 ไฟล์ + parity.md c.5) ตามคำสั่งผู้ใช้ "คุณทำเลย"** ; **ข้อสังเกตให้ kla/ทีมตรวจต่อ:** client เก็บ `requesterId` เป็น roleId (เช่น REQUESTER_PD) ไม่ใช่ user id → server จับ "เจ้าของ" ได้จาก `requesterName` ตรงกับชื่อใน token เป็นหลัก (ชื่อซ้ำกัน = ถือเป็นเจ้าของทั้งคู่) ควรให้ PR เก็บ user id จริงใน requesterId (งาน follow-up) ; สเปกเดิมที่เขียนไว้: (1) server `rbac.js canTransitionPO(authUser, from, to, ctx)` เพิ่ม ctx `{isOwner, isOnlinePo}` ; กฎ: from ∈ {CLAIM_REPORTED, CLAIM_IN_PROGRESS, CLAIM_PENDING, PARTIALLY_RECEIVED_IN_CLAIM, WAITING_DELIVERY_ROUND_2} → to ∈ {CLOSED, COMPLETED, COMPLETED_WITH_REFUND, SETTLED} อนุญาตเฉพาะ admin, level>=3 (ไม่ใช่ online), online purchaser (เคลมออนไลน์), หรือ isOwner (prs.requesterId == authUser.userId หรือ requesterName == authUser.name ; route หา owner จาก pos.prId/prNumber → prs) ; **ห้ามแตะ ORDERED→CLOSED/COMPLETED** (settle/รับครบปกติ) (2) client `PODetailsModal` ซ่อนปุ่มปิดเคลม/จัดการเคสจาก Reviewer/ผู้รับที่ไม่ใช่เจ้าของ (ตอนนี้ To-Do เป็น Requester+Admin แล้วแต่ปุ่มยังเปิดให้ L2) (3) อัปเดตเทสต์ที่บันทึกกฎเดิม "requester/receiver/reviewer ปิดเคลมได้": tests/cf_p4_claims_guards (R3-1/2, R4-4, R4-6, R5-2, R5-4), cf_qa_r5_po_transitions (10 เคส WAITING_DELIVERY_ROUND_2/PARTIALLY_RECEIVED_IN_CLAIM/CLAIM_REPORTED → COMPLETED* as L1/L2), cf_rbac PO_TABLE แถว CLAIM_*→COMPLETED (ALLP → ONLINE/L3/L4/ADMIN + owner ctx), cf_s4_pr_cascade S4d (ผู้เรียกต้องเป็นเจ้าของ PR หรือใช้ admin) ; parity.md c.5 อัปเดตด้วย
 - **[2026-10-14 ค่ำ] TC-001 ทำแล้ว deploy แล้ว** (commit ถัดจาก eeb0902): PDF PO ช่องผู้ขอซื้อใช้ผู้ขอซื้อตัวจริงของ PR (id → ชื่อตรงตัว) ไม่ fallback role/users[0] ; ไม่มีลายเซ็น = ช่องว่าง ; QA ควรเทสต์ PDF กับ PR ที่ผู้ขอซื้อมี/ไม่มีลายเซ็น
 
@@ -172,6 +178,17 @@
 - ผู้ใช้รันเอง: git checkout -- cloudflare/.env.example cloudflare/index.html cloudflare/jsconfig.json cloudflare/tailwind.config.js cloudflare/vite.config.js cloudflare/wrangler.toml cloudflare/wrangler.toml.example (อนุมัติแล้ว แต่สิทธิ์เครื่องบล็อกทีม)
 
 ## 🎯 Milestones
+
+### M10: Phase 3 v1.1.0 หมายเหตุสินค้า + role พี่สุ
+
+- [ ] T1 FR-02 หมายเหตุสินค้า client
+- [ ] T2 server RBAC BUFFER
+- [ ] T3 server route + notify
+- [ ] T4 client ค่าคงที่/ป้าย
+- [ ] T5 client engine
+- [ ] T6 PRDetailsModal
+- [ ] T7 parity.md
+- [ ] T8 QA + kla + ออกเวอร์ชัน 1.1.0
 
 ### M9: แก้บั๊กผู้ทดสอบ 2026-10-14 (docs/bug-log-tester-2026-10-14.md)
 

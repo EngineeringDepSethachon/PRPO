@@ -25,11 +25,19 @@ export function notificationStmt(db, { type, title, message, targetDept, targetR
 
 // ───────────── PR events (gas/Code.gs apiCreatePR :1524, apiApprovePR :1737/:1745, apiRejectPR :1806, apiCancelPR :1912) ─────────────
 // act = the audit action of the transition (CREATE / APPROVE / SEND_BACK / CANCEL) ; GAS sends nothing for REVIEW, DRAFT or a re-submit.
+// Phase 3 (FR-01) : REVIEW_FORWARD into PENDING_BUFFER (status = the status the PR was stored in) -> the BUFFER role ; BUFFER_FORWARD (PENDING_BUFFER -> REVIEWED) -> the Approver.
+// A review that skips the BUFFER step (no active BUFFER user : REVIEW_FORWARD into REVIEWED) sends nothing, exactly as before.
 const firstStr = (...vals) => { for (const v of vals) if (typeof v === 'string' && v) return v; return ''; };
 
-export function prNotificationParams(act, { dept, prNo, requesterName, body }) {
+export function prNotificationParams(act, { dept, prNo, requesterName, body, status }) {
   const d = dept || 'PD';
   const b = body && typeof body === 'object' ? body : {};
+  if (act === 'REVIEW_FORWARD' && status === 'PENDING_BUFFER') {
+    return [{ title: 'มี PR รอผู้ตรวจสอบจัดซื้อตรวจสอบ', message: 'มี PR รอผู้ตรวจสอบจัดซื้อตรวจสอบ: ใบขอซื้อ ' + prNo + ' แผนก ' + d, type: 'PR_PENDING_BUFFER', targetDept: d, targetRole: 'BUFFER', docRef: prNo }];
+  }
+  if (act === 'BUFFER_FORWARD') {
+    return [{ title: 'PR ผ่านการตรวจสอบจัดซื้อ รออนุมัติ', message: 'PR ผ่านการตรวจสอบจัดซื้อ รออนุมัติ: ใบขอซื้อ ' + prNo + ' แผนก ' + d, type: 'PR_SUBMITTED', targetDept: d, targetRole: 'Approver', docRef: prNo }];
+  }
   if (act === 'CREATE') {
     return [{ title: 'มี PR รอการตรวจสอบ / อนุมัติ', message: 'ใบขอซื้อ ' + prNo + ' แผนก ' + d + ' จาก ' + requesterName + ' รอการอนุมัติ', type: 'PR_SUBMITTED', targetDept: d, targetRole: 'Approver', docRef: prNo }];
   }

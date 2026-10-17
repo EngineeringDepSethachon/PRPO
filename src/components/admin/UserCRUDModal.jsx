@@ -14,6 +14,7 @@ const ROLE_OPTIONS = [
   { id: 'ASST_MANAGER', label: 'Reviewer - ผู้ตรวจทาน (Asst. Manager)', level: 2, defaultDept: 'ALL', title: 'Assistant Manager' },
   { id: 'PLANT_MANAGER', label: 'Approver - ผู้อนุมัติ (Plant Manager)', level: 3, defaultDept: 'ALL', title: 'Plant Manager' },
   { id: 'ONLINE_PURCHASER', label: 'Purchaser - เจ้าหน้าที่จัดซื้อออนไลน์ (Online)', level: 2, defaultDept: 'ALL', title: 'Online Purchaser' },
+  { id: 'BUFFER', label: 'ผู้ตรวจสอบจัดซื้อ (พี่สุ)', level: 2, defaultDept: 'ALL', title: 'ผู้ตรวจสอบจัดซื้อ (พี่สุ)' },
   { id: 'ADMIN', label: 'Admin - ผู้ดูแลระบบสูงสุด (System Admin)', level: 99, defaultDept: 'ALL', title: 'System Administrator' },
 ];
 

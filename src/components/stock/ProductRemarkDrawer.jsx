@@ -6,6 +6,7 @@ import {
 } from 'lucide-react';
 import { apiService } from '../../services/apiService';
 import { modalService } from '../../services/modalService';
+import { isBufferRole } from '../../utils/bufferRole';
 
 export default function ProductRemarkDrawer({ isOpen, product, currentRole, onClose, onRefresh }) {
   const [remarkText, setRemarkText] = useState('');
@@ -27,7 +28,8 @@ export default function ProductRemarkDrawer({ isOpen, product, currentRole, onCl
 
   const isOnlinePurchaser = currentRole?.roleId === 'ONLINE_PURCHASER' || currentRole?.id === 'ONLINE_PURCHASER';
 
-  const canEditRemark = !isOnlinePurchaser && (
+  // the purchasing checker (BUFFER, level 2) reads remarks of every department but does not write them
+  const canEditRemark = !isOnlinePurchaser && !isBufferRole(currentRole) && (
     currentRole?.id === 'ADMIN' || 
     currentRole?.roleId === 'ADMIN' || 
     currentRole?.canManageMaster || 

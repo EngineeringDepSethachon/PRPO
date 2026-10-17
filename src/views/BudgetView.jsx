@@ -18,6 +18,7 @@ import { useAppContext } from '../context/AppContext';
 import { useAuth } from '../context/AuthContext';
 import { authService } from '../services/authService';
 import { isAdminUser } from '../utils/adminRule';
+import { isBufferRole } from '../utils/bufferRole';
 import { isCloudflareMode } from '../config/backendMode';
 import { 
   BarChart, Bar, XAxis, YAxis, CartesianGrid, 
@@ -133,6 +134,9 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
 
     // Online Purchaser has no budget management access
     if (roleId === 'ONLINE_PURCHASER' || u.canOnlinePurchase) return false;
+
+    // Purchasing checker "พี่สุ" (BUFFER, level 2) may view the budget but never set / edit it (decision Q7)
+    if (isBufferRole(u)) return false;
 
     if (
       roleId === 'ASST_MANAGER' ||
@@ -406,7 +410,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
         
         if (linkedPOs.length === 0) {
           // Rule 1: No POs -> PR Commitment
-          if (prTotal > 0 && ['SUBMITTED', 'REVIEWED', 'APPROVED'].includes(String(pr.status).toUpperCase())) {
+          if (prTotal > 0 && ['SUBMITTED', 'PENDING_BUFFER', 'REVIEWED', 'APPROVED'].includes(String(pr.status).toUpperCase())) {
             allTxs.push({
               id: `VTX-PR-${prId}`,
               type: 'PR_COMMITMENT',

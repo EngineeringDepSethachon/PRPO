@@ -9,6 +9,7 @@ export const ACTION_MAP = {
   RESUBMIT: { label: 'ส่งใบขอซื้ออีกครั้ง', color: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
   SEND_BACK: { label: 'ส่งกลับเพื่อแก้ไข', color: 'bg-amber-100 text-amber-800 border-amber-200' },
   REVIEW_FORWARD: { label: 'ตรวจสอบผ่าน (ส่งต่อ)', color: 'bg-cyan-100 text-cyan-700 border-cyan-200' },
+  BUFFER_FORWARD: { label: 'ผู้ตรวจสอบจัดซื้อส่งต่อผู้อนุมัติ', color: 'bg-indigo-100 text-indigo-700 border-indigo-200' },
   APPROVE: { label: 'อนุมัติเรียบร้อย', color: 'bg-emerald-100 text-emerald-700 border-emerald-200' },
   CANCEL: { label: 'ยกเลิกคำขอ', color: 'bg-rose-100 text-rose-700 border-rose-200' }
 };

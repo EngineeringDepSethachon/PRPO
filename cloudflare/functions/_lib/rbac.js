@@ -16,6 +16,17 @@ function parseDepts(u) {
   return arr;
 }
 
+// roleId of the purchasing checker : 'BUFFER' trimmed, case-insensitive (the user upsert stores it upper-case ; an older row may hold another case)
+export function isBufferRoleId(roleId) {
+  return String(roleId || '').trim().toUpperCase() === 'BUFFER';
+}
+
+// "this account can sign in / counts as active" : ONE rule for the login, the token check and the BUFFER count (functions/api/[[route]].js isUserActive).
+// A row is active when isActive is true / 1 / 'true' or status is 'ACTIVE' (a row with a blank status but isActive = 1 counts).
+export function isUserRowActive(u) {
+  return !!u && (u.isActive === true || String(u.isActive).toLowerCase() === 'true' || u.isActive === 1 || u.status === 'ACTIVE');
+}
+
 // Same normalization the client sees from login (functions/api/[[route]].js formatSafeUser): admin => level 99
 export function normalizeUser(u) {
   const user = u || {};
@@ -24,12 +35,18 @@ export function normalizeUser(u) {
   const roleStr = String((roleId || '') + ' ' + (user.canonicalRole || '') + ' ' + (user.positionKey || '') + ' ' + (user.title || '')).toUpperCase();
   // T4.6: admin = level >= 99 OR roleId exactly 'ADMIN'. Not the username, and not any title / positionKey / canonicalRole text that merely contains ADMIN
   // (a free-text title must never grant admin). Same rule in formatSafeUser (login response) in functions/api/[[route]].js.
-  const isAdmin = rawLevel >= 99 || String(user.roleId || user.role_id || '') === 'ADMIN';
-  // same online-purchaser formula as formatSafeUser (roleId/positionKey/title text or canonicalRole PURCHASER)
-  const isOnlineServer = !isAdmin && (roleStr.includes('ONLINE_PURCHASER') || user.canonicalRole === 'PURCHASER');
+  // Phase 3 (FR-01): the purchasing checker "พี่สุ" is identified by roleId 'BUFFER' (trimmed, any case) - never by level (level 2 is also the reviewer).
+  // A BUFFER account is ALWAYS level 2 here, whatever the database stores (a stored 99 would make it an admin, a stored 3 an approver) : the clamp lives in
+  // this function, not only in the routes that read the row.
+  const isBuffer = isBufferRoleId(user.roleId || user.role_id);
+  const isAdmin = !isBuffer && (rawLevel >= 99 || String(user.roleId || user.role_id || '') === 'ADMIN');
+  // same online-purchaser formula as formatSafeUser (roleId/positionKey/title text or canonicalRole PURCHASER) ; never the BUFFER role (a positionKey / title
+  // that says ONLINE_PURCHASER must not turn the checker into an online purchaser)
+  const isOnlineServer = !isAdmin && !isBuffer && (roleStr.includes('ONLINE_PURCHASER') || user.canonicalRole === 'PURCHASER');
   return {
-    level: isAdmin ? 99 : rawLevel,
+    level: isAdmin ? 99 : (isBuffer ? 2 : rawLevel),
     isAdmin: Boolean(isAdmin),
+    isBuffer: Boolean(isBuffer),
     isOnlineServer: Boolean(isOnlineServer),
     roleId,
     positionKey: user.positionKey || '',
@@ -47,27 +64,29 @@ export function resolvePermissions(u) {
   const dept = n.department;
   const userDepts = n.departments;
   const isOnline = n.roleId === 'ONLINE_PURCHASER';
+  const isBuffer = Boolean(n.isBuffer);
   return {
     level,
     isAdmin: n.isAdmin,
+    isBuffer, // Phase 3: roleId BUFFER (level 2 but NOT a reviewer / approver / budget writer ; sees every department)
     roleId: n.roleId, // gating-only (STOCK_ADJUST : the screen shows the stock buttons to roleId ASST_MANAGER)
     isOnline,
     // gating-only flag (not part of resolveUserPermissions): any online-purchaser formula used by the client or login response
-    onlineish: Boolean(isOnline || n.isOnlineServer || n.positionKey === 'ONLINE_PURCHASER'),
+    onlineish: Boolean(!isBuffer && (isOnline || n.isOnlineServer || n.positionKey === 'ONLINE_PURCHASER')),
     canCreatePR: level >= 1,
     canSubmitPR: level >= 1,
     canDeleteOwnDraft: level >= 1,
     canReceiveGoods: level === 1 || level >= 99,
     canCloseOwnPO: level === 1 || level >= 99,
-    canManageMaster: level >= 1,
-    canDeleteMaster: level >= 1, // user decision: follow runtime behaviour of resolveUserPermissions
-    canReview: level >= 2,
+    canManageMaster: level >= 1 && !isBuffer, // M10: BUFFER read-only for master data (same as constants.js resolveUserPermissions)
+    canDeleteMaster: level >= 1 && !isBuffer, // user decision: follow runtime behaviour of resolveUserPermissions
+    canReview: level >= 2 && !isBuffer,
     canViewBudget: level >= 2,
     canViewBudgetMenu: level >= 2,
-    canViewAllDepts: level >= 99 || level >= 3 || dept === 'ALL' || userDepts.includes('ALL') || userDepts.includes('*'),
+    canViewAllDepts: isBuffer || level >= 99 || level >= 3 || dept === 'ALL' || userDepts.includes('ALL') || userDepts.includes('*'),
     canFinalApprove: level >= 3,
     canSetBudget: level >= 3,
-    canOnlinePurchase: isOnline || level >= 99
+    canOnlinePurchase: !isBuffer && (isOnline || level >= 99)
   };
 }
 
@@ -76,10 +95,10 @@ function isOnlinePurchaser(p) {
   return p.onlineish || (p.canOnlinePurchase && p.level < 99);
 }
 
-// BudgetView.canAllocateBudget: admin, or not ONLINE_PURCHASER and level >= 2
+// BudgetView.canAllocateBudget: admin, or not ONLINE_PURCHASER and level >= 2 ; Phase 3: never the BUFFER role (views the budget, cannot allocate it)
 export function canWriteBudget(p) {
   if (p.isAdmin) return true;
-  return !p.onlineish && p.level >= 2;
+  return !p.onlineish && !p.isBuffer && p.level >= 2;
 }
 
 // Department gate used by settle (client canAction checks the PO department for non-admin, non-online users)
@@ -155,6 +174,8 @@ export function clientCanAccessDepartmentData(user, targetDepartment) {
 // canViewAllDepts, seeded allowedDepartments ["*"], canAction for IN_PROGRESS_ONLINE does not look at the department)
 export function canAccessDepartment(authUser, dept) {
   const p = resolvePermissions(authUser);
+  // The BUFFER role (Phase 3) is NOT listed here : it SEES every department (scope.buildViewer isGlobal) but WRITES only inside the departments it is
+  // assigned to, like any level-2 user. Its one cross-department write (editing / forwarding a PR parked at PENDING_BUFFER) is allowed by the PR route itself.
   if (p.isAdmin || p.onlineish) return true;
   return clientCanAccessDepartmentData(clientViewOfUser(authUser), dept);
 }
@@ -259,8 +280,14 @@ export function authorize(authUser, method, path) {
   const rule = matchRule(m, path);
   if (!rule) return m === 'GET' || m === 'HEAD';
   const p = resolvePermissions(authUser);
+  // BUFFER (Phase 3 / M10) : allow-list for WRITES. Reads follow the normal rules (it sees every department). It may only write what the client lets the
+  // purchasing checker do : PRs (create / edit own / edit + forward at PENDING_BUFFER : the route narrows it further), mark notifications read,
+  // upload / files, its own session endpoints, and the audit trail the client keeps for its own actions. Anything else (PO, master data, stock, budget
+  // ledger, budgets, signatures ...) is 403 whatever the level-based permission says.
+  if (p.isBuffer && !p.isAdmin && m !== 'GET' && m !== 'HEAD' && !BUFFER_WRITE_RULES.has(rule.id)) return false;
   return Boolean(PERMS[rule.perm](p));
 }
+export const BUFFER_WRITE_RULES = new Set(['prs-write', 'misc-auth', 'audit-write']);
 
 // ───────────────────────── document status flows (table-driven; mirrored in docs/parity.md c.5) ─────────────────────────
 // Derived from every place the client sets a PR/PO status and persists it through the API:
@@ -272,6 +299,8 @@ export function authorize(authUser, method, path) {
 //         | online = online purchaser | notOnline | receiver = canReceiveGoods
 // An admin bypasses every flow (canAction admin). fromStatus undefined = brand-new document.
 const REVIEW_STATUSES = ['SUBMITTED', 'REJECTED_TO_L2', 'waiting_review', 'pending_review', 'รอตรวจทาน', 'รอตรวจสอบ'];
+export const PR_PENDING_BUFFER = 'PENDING_BUFFER';
+export const PR_REVIEW_STATUSES = REVIEW_STATUSES; // read-only view for the route (T3 : which statuses a reviewer passes forward from)
 const PR_DRAFTS = ['DRAFT', 'REJECTED_TO_DRAFT'];
 const PR_APPROVED = ['APPROVED', 'PO_ISSUED', 'IN_PROGRESS_ONLINE'];
 const PR_DONE = ['CLOSED', 'completed', 'COMPLETED', 'received'];
@@ -280,9 +309,15 @@ export const PR_FLOWS = [
   { action: 'create', from: null, to: ['DRAFT', 'SUBMITTED'], actor: 'requester' },
   { action: 'save/resubmit draft', from: PR_DRAFTS, to: ['DRAFT', 'SUBMITTED'], actor: 'requester' },
   { action: 'cancel draft', from: PR_DRAFTS, to: ['CANCELLED'], actor: 'requester' },
-  { action: 'review (L2)', from: REVIEW_STATUSES, to: ['REVIEWED'], actor: 'reviewer' },
+  // Phase 3 (FR-01): reviewer passes the PR either straight to REVIEWED (no active BUFFER user : the route skips the step) or to PENDING_BUFFER
+  { action: 'review (L2)', from: REVIEW_STATUSES, to: ['REVIEWED', 'PENDING_BUFFER'], actor: 'reviewer' },
   { action: 'reject to requester (L2)', from: REVIEW_STATUSES, to: ['REJECTED_TO_DRAFT'], actor: 'reviewer' },
   { action: 'cancel at review (L2)', from: REVIEW_STATUSES, to: ['CANCELLED', 'SUBMITTED'], actor: 'reviewer' },
+  // PENDING_BUFFER = waiting for the purchasing checker (BUFFER). REVIEWED keeps meaning "waiting for approval". The BUFFER role has NO reject / cancel
+  // (decision Q6) ; nobody but an admin (bypass) moves PENDING_BUFFER straight to APPROVED / PO_ISSUED / IN_PROGRESS_ONLINE.
+  { action: 'forward to approval (BUFFER)', from: [PR_PENDING_BUFFER], to: ['REVIEWED'], actor: 'buffer' },
+  { action: 'reject to requester / cancel while at BUFFER (L2 or L3)', from: [PR_PENDING_BUFFER], to: ['REJECTED_TO_DRAFT', 'CANCELLED'], actor: 'reviewerOrApprover' },
+  { action: 'reject back to review while at BUFFER (L3)', from: [PR_PENDING_BUFFER], to: ['REJECTED_TO_L2'], actor: 'approver' },
   { action: 'approve + issue PO (L3)', from: ['REVIEWED'], to: ['APPROVED', 'PO_ISSUED', 'IN_PROGRESS_ONLINE'], actor: 'approver' },
   { action: 'reject (L3)', from: ['REVIEWED'], to: ['REJECTED_TO_DRAFT', 'REJECTED_TO_L2'], actor: 'approver' },
   { action: 'cancel at approval (L3)', from: ['REVIEWED'], to: ['CANCELLED'], actor: 'approver' },
@@ -295,7 +330,8 @@ export const PR_KNOWN_STATUSES = [...new Set([...PR_FLOWS.flatMap((f) => (f.from
 
 // PR content (items / totalAmount) may only change where the client lets it change:
 //  - DRAFT / REJECTED_TO_DRAFT : the requester edits his draft (updatePR)
-//  - SUBMITTED / REVIEWED / REJECTED_TO_L2 : workflowEngine.editPRItems (level >= 2)
+//  - SUBMITTED / REVIEWED / REJECTED_TO_L2 : workflowEngine.editPRItems (level >= 2, but NOT the BUFFER role : Phase 3)
+//  - PENDING_BUFFER : only the BUFFER role (and admin) edits qty / price / link (decision Q9)
 //  - anything later (approved, PO issued, closed, cancelled, unknown) : frozen
 const PR_ITEM_EDIT_REVIEW = ['SUBMITTED', 'REVIEWED', 'REJECTED_TO_L2'];
 export function canEditPrContent(authUser, rawStatus) {
@@ -303,15 +339,19 @@ export function canEditPrContent(authUser, rawStatus) {
   const p = resolvePermissions(authUser);
   if (p.isAdmin) return true;
   if (PR_DRAFTS.includes(status)) return true;
-  if (PR_ITEM_EDIT_REVIEW.includes(status)) return p.level >= 2;
+  if (status === PR_PENDING_BUFFER) return Boolean(p.isBuffer);
+  if (PR_ITEM_EDIT_REVIEW.includes(status)) return p.level >= 2 && !p.isBuffer;
   return false;
 }
 
 const ACTORS = {
   any: () => true,
   requester: (p) => p.canSubmitPR,
-  reviewer: (p) => !isOnlinePurchaser(p) && p.level === 2,
-  approver: (p) => !isOnlinePurchaser(p) && p.level >= 3
+  reviewer: (p) => !isOnlinePurchaser(p) && p.level === 2 && !p.isBuffer, // the BUFFER role is level 2 but never a reviewer
+  buffer: (p) => Boolean(p.isBuffer),
+  approver: (p) => !isOnlinePurchaser(p) && p.level >= 3,
+  // Phase 3 : a PR parked at PENDING_BUFFER can be sent back / cancelled by the reviewer (level 2, not BUFFER), an approver (level >= 3) or an admin (bypass)
+  reviewerOrApprover: (p) => ACTORS.reviewer(p) || ACTORS.approver(p)
 };
 
 export function canTransitionPR(authUser, fromStatus, toStatus) {

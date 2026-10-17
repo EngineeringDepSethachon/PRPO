@@ -14,6 +14,7 @@ import { modalService } from '../services/modalService';
 import Pagination from '../components/common/Pagination';
 import { getUserDepartments, canAccessDepartmentData, matchDepartment } from '../utils/permissions';
 import { safeStringCompare } from '../utils/formatters';
+import { isBufferRole } from '../utils/bufferRole';
 
 export default function StockCardView({ 
   products = [], 
@@ -275,7 +276,8 @@ export default function StockCardView({
         </div>
 
         {/* High-aesthetic Action Hub */}
-        {!isOnlinePurchaser && (currentRole?.canReceiveGoods || currentRole?.roleId === 'ASST_MANAGER' || currentRole?.id === 'ADMIN') && (
+        {/* manual stock adjust / stock-in : not for the purchasing checker (BUFFER) - read only */}
+        {!isOnlinePurchaser && !isBufferRole(currentRole) && (currentRole?.canReceiveGoods || currentRole?.roleId === 'ASST_MANAGER' || currentRole?.id === 'ADMIN') && (
           <div className="flex items-center gap-2 shrink-0">
             {/* Ghost Outline Secondary Button */}
             <button

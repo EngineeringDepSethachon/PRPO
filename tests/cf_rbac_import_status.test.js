@@ -12,6 +12,11 @@ describe('importer PR status mapping', () => {
     for (const s of PR_KNOWN_STATUSES) expect(mapPrStatus(s)).toEqual({ status: s, mapped: false });
   });
 
+  it('Phase 3 : PENDING_BUFFER is a known PR status (kept as it is, not mapped)', () => {
+    expect(PR_KNOWN_STATUSES).toContain('PENDING_BUFFER');
+    expect(mapPrStatus('PENDING_BUFFER')).toEqual({ status: 'PENDING_BUFFER', mapped: false });
+  });
+
   it('odd values map into the known set', () => {
     const cases = {
       submitted: 'SUBMITTED', Approved: 'APPROVED', 'Waiting Approval': 'REVIEWED', pending: 'SUBMITTED', rejected: 'REJECTED_TO_DRAFT', Cancelled: 'CANCELLED',

@@ -12,6 +12,7 @@ import { MEMO_THRESHOLD, DEPARTMENTS, PR_STATUS } from '../config/constants';
 import FileUploader from '../components/common/FileUploader';
 import { uploadAttachmentsForCloudflare, uploadItemImagesForCloudflare } from '../utils/cfAttachments';
 import SearchableSelect from '../components/common/SearchableSelect';
+import ProductRemarkNote from '../components/common/ProductRemarkNote';
 import { modalService } from '../services/modalService';
 import { budgetService } from '../services/budgetService';
 import { isCloudflareMode } from '../config/backendMode';
@@ -386,6 +387,7 @@ export default function PRCreateView({
           overrideUnit: Boolean(it.isUnitOverridden),
           customPurchaseUnit: it.purchaseUnit,
           customStockUnit: it.stockUnit,
+          productRemark: it.productRemark || '',
           images: it.images || it.attachments || [],
           attachments: it.attachments || it.images || []
         };
@@ -709,6 +711,7 @@ export default function PRCreateView({
       const prod = availableProducts.find(p => p.id === value);
       if (prod) {
         updated[index].price = parseFloat(prod.price) || 0;
+        updated[index].productRemark = prod.remark || '';
         if (purchaseChannel === 'SELF' && !selectedVendorId) {
           setSelectedVendorId(getDefaultVendorId(prod));
         }
@@ -961,6 +964,7 @@ export default function PRCreateView({
           productId: prod?.id || item.productId,
           code: prod?.code || item.customCode || 'N/A',
           name: prod?.name || item.customName || 'N/A',
+          productRemark: prod?.remark || item.productRemark || '',
           purchaseUnit: pUnit,
           stockUnit: sUnit,
           conversionRate: rate,
@@ -1620,6 +1624,11 @@ export default function PRCreateView({
                       </div>
 
                     </div>
+
+                    {/* FR-02: หมายเหตุ/สเปกของสินค้า ใต้แถวชื่อสินค้า (ไม่แสดงกับรายการ Non-Catalog) */}
+                    {!item.isCustom && (
+                      <ProductRemarkNote item={item} products={availableProducts} className="mx-0.5" />
+                    )}
 
                     {/* Sub-row: Location Switch, Stock Info & Ghost Action Links (Directives 2 & 3) */}
                     <div className="flex flex-wrap items-center justify-between gap-3 pt-2.5 border-t border-slate-100 text-xs">

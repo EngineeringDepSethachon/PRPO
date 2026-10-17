@@ -699,10 +699,27 @@ export function AppProvider({ children }) {
     return result;
   }, [currentRole, loadAllData]);
 
+  // Reviewer "ตรวจสอบผ่าน" : sent as REVIEWED, but the server (cloudflare) decides whether the PR is REVIEWED (BUFFER step skipped) or parks at
+  // PENDING_BUFFER. The result carries { finalStatus, bufferSkipped, successMessage } and result.pr.status is the status really saved.
   const handleReviewPR = useCallback(async (prId, note = '') => {
     const result = await apiService.updatePRStatus(prId, 'REVIEWED', currentRole, note);
     if (result?.pr) {
-      setPRs(prev => prev.map(p => 
+      setPRs(prev => prev.map(p =>
+        (p.id === prId || p.prNo === prId || (result.pr.id && p.id === result.pr.id) || (result.pr.prNo && p.prNo === result.pr.prNo))
+          ? { ...p, ...result.pr }
+          : p
+      ));
+    }
+    setTimeout(() => { loadAllData(true); }, 1000);
+    return result;
+  }, [currentRole, loadAllData]);
+
+  // BUFFER user (พี่สุ, or admin) : "บันทึกการแก้ไขและส่งต่อผู้อนุมัติ" = PENDING_BUFFER -> REVIEWED with the buffer comment
+  const handleBufferForwardPR = useCallback(async (prId, comment = '') => {
+    const text = String(comment ?? '').trim();
+    const result = await apiService.updatePRStatus(prId, 'REVIEWED', currentRole, text, { bufferComment: text });
+    if (result?.pr) {
+      setPRs(prev => prev.map(p =>
         (p.id === prId || p.prNo === prId || (result.pr.id && p.id === result.pr.id) || (result.pr.prNo && p.prNo === result.pr.prNo))
           ? { ...p, ...result.pr }
           : p
@@ -1672,6 +1689,8 @@ export function AppProvider({ children }) {
     handleUpdatePR: updatePR,
     rejectPR: handleRejectPR,
     reviewPR: handleReviewPR,
+    bufferForwardPR: handleBufferForwardPR,
+    handleBufferForwardPR,
     approvePR: handleApprovePR,
     cancelPR: handleCancelPR,
     receivePOItems: handleReceiveGoods,
@@ -1745,6 +1764,7 @@ export function AppProvider({ children }) {
     handleUpdatePR,
     handleRejectPR,
     handleReviewPR,
+    handleBufferForwardPR,
     handleApprovePR,
     handleCancelPR,
     handleReceiveGoods,

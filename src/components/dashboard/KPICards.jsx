@@ -25,7 +25,7 @@ export default function KPICards({
     return hasDepartmentAccess(currentRole, p.department);
   });
 
-  const pendingPRs = accessiblePRs.filter(p => ['SUBMITTED', 'REVIEWED', 'REJECTED_TO_L2'].includes(p.status)).length;
+  const pendingPRs = accessiblePRs.filter(p => ['SUBMITTED', 'PENDING_BUFFER', 'REVIEWED', 'REJECTED_TO_L2'].includes(p.status)).length;
   const activePOs = accessiblePOs.filter(p => ['ISSUED', 'ORDERED_PENDING_DELIVERY', 'IN_DELIVERY', 'PARTIAL', 'IN_PROGRESS_ONLINE', 'CLAIM_REPORTED', 'CLAIM_IN_PROGRESS'].includes(p.status)).length;
   
   let lowStockItems = propLowStockItems;

@@ -1,5 +1,6 @@
 // Notification Service (In-App Local Caching)
 import { isAdminUser } from '../utils/adminRule';
+import { isBufferRole } from '../utils/bufferRole';
 import { backendFetch, isCloudflareMode } from '../config/backendMode';
 
 // Cloudflare mode : the read mark of the signed-in user is kept on the server too (notification_reads, per user) so it follows the user to another
@@ -27,6 +28,14 @@ export const NOTIFICATION_TYPES = {
     badgeColor: 'bg-amber-100 text-amber-800 border-amber-200',
     icon: 'FileText',
     colorHex: '#D97706',
+    priority: 'URGENT'
+  },
+  PR_PENDING_BUFFER: {
+    id: 'PR_PENDING_BUFFER',
+    label: 'PR รอผู้ตรวจสอบจัดซื้อ',
+    badgeColor: 'bg-purple-100 text-purple-800 border-purple-200',
+    icon: 'FileText',
+    colorHex: '#7C3AED',
     priority: 'URGENT'
   },
   PR_REVIEWED: {
@@ -226,8 +235,12 @@ export const notificationService = {
     const targetDept = String(n.targetDepartment || n.targetDept || n.department || 'ALL').toUpperCase();
     const targetRole = String(n.targetRole || (Array.isArray(n.targetRoles) && n.targetRoles[0]) || 'ALL').toUpperCase();
 
+    // Phase 3 : the purchasing checker (BUFFER, level 2, often filed under department MGT) is NOT a reviewer / approver :
+    // it never counts as "approver or MGT" and never matches the level >= 2 fallback of targetRoles below.
+    const isBuffer = isBufferRole(currentRole);
+
     // 1. Department Filter: ปลดล็อกแผนกสำหรับ Approver และ MGT ให้เห็นงานขออนุมัติทุกแผนก
-    const isApproverOrMGT = roleId.includes('APPROV') || roleId.includes('REVIEW') || roleId.includes('MANAGER') || userDept === 'MGT';
+    const isApproverOrMGT = !isBuffer && (roleId.includes('APPROV') || roleId.includes('REVIEW') || roleId.includes('MANAGER') || userDept === 'MGT');
     const isApproverTarget = targetRole.includes('APPROV') || targetRole.includes('REVIEW') || (Array.isArray(n.targetRoles) && n.targetRoles.some(r => {
       const ru = String(r).toUpperCase();
       return ru.includes('APPROV') || ru.includes('REVIEW') || ru.includes('MANAGER');
@@ -257,9 +270,11 @@ export const notificationService = {
       });
 
       if (!roleMatches) {
-        if (isOnline && n.targetRoles.some(r => String(r).toUpperCase().includes('ONLINE_PURCHASER') || String(r).toUpperCase().includes('PURCHAS'))) {
+        if (isBuffer && n.targetRoles.some(r => String(r).toUpperCase() === 'BUFFER')) {
           roleMatches = true;
-        } else if (!isOnline && (userLevel >= 2 || isApproverOrMGT) && n.targetRoles.some(r => ['ASST_MANAGER', 'REVIEWER', 'APPROVER', 'PLANT_MANAGER'].includes(String(r).toUpperCase()))) {
+        } else if (isOnline && n.targetRoles.some(r => String(r).toUpperCase().includes('ONLINE_PURCHASER') || String(r).toUpperCase().includes('PURCHAS'))) {
+          roleMatches = true;
+        } else if (!isOnline && !isBuffer && (userLevel >= 2 || isApproverOrMGT) && n.targetRoles.some(r => ['ASST_MANAGER', 'REVIEWER', 'APPROVER', 'PLANT_MANAGER'].includes(String(r).toUpperCase()))) {
           roleMatches = true;
         } else if (userLevel === 1 && n.targetRoles.some(r => ['REQUESTER', 'REQUESTER_PD', 'REQUESTER_QC'].includes(String(r).toUpperCase()))) {
           roleMatches = true;
@@ -275,6 +290,9 @@ export const notificationService = {
       if (trUpper !== 'ALL') {
         if (trUpper.includes('REQUEST')) {
           return roleId.includes('REQUEST') || roleId.includes('PD') || roleId.includes('QC') || Number(currentRole.level) === 1;
+        }
+        if (trUpper === 'BUFFER') {
+          return isBuffer;
         }
         if (trUpper.includes('APPROV')) {
           return isApproverOrMGT || roleId.includes('APPROV') || roleId.includes('REVIEW') || roleId.includes('PLANT_MANAGER') || roleId.includes('ASST_MANAGER') || Boolean(currentRole.canReview || currentRole.canFinalApprove);

@@ -213,7 +213,7 @@ export default function ProtectedRoute({
 
     // Resilient Real-Time Fallbacks during State Transitions
     if (!hasPermission && activeUser) {
-      if (requiredPermission === 'BUDGET_MANAGE') {
+      if (requiredPermission === 'BUDGET_MANAGE' || requiredPermission === 'BUDGET_VIEW') {
         hasPermission = Boolean(
           isAdmin ||
           isOnlinePurchaser ||

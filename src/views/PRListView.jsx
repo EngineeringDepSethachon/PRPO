@@ -14,7 +14,7 @@ import { storageService } from '../services/storageService';
 import { sortByNewestFirst } from '../utils/sortUtils';
 const PR_TABS = [
   { id: 'ALL', label: 'ทั้งหมด', filter: () => true },
-  { id: 'PENDING_REVIEW', label: 'รอตรวจสอบ (Asst. Mgr)', filter: pr => ['SUBMITTED', 'REJECTED_TO_L2'].includes(pr.status) },
+  { id: 'PENDING_REVIEW', label: 'รอตรวจสอบ (Asst. Mgr)', filter: pr => ['SUBMITTED', 'PENDING_BUFFER', 'REJECTED_TO_L2'].includes(pr.status) },
   { id: 'PENDING_APPROVE', label: 'รออนุมัติ (Plant Mgr)', filter: pr => pr.status === 'REVIEWED' },
   { id: 'APPROVED', label: 'อนุมัติแล้ว / ออก PO', filter: pr => ['APPROVED', 'PO_ISSUED', 'IN_PROGRESS_ONLINE', 'CLOSED'].includes(pr.status) },
   { id: 'DRAFT_RETURNED', label: 'ร่าง / ส่งกลับแก้ไข', filter: pr => ['DRAFT', 'REJECTED_TO_DRAFT'].includes(pr.status) },
@@ -116,6 +116,8 @@ const getShortPRStatus = (status) => {
       return { label: 'ฉบับร่าง', color: 'bg-slate-100 text-slate-700 border-slate-200' };
     case 'SUBMITTED':
       return { label: 'รอตรวจทาน', color: 'bg-amber-50 text-amber-700 border-amber-200' };
+    case 'PENDING_BUFFER':
+      return { label: 'รอพี่สุตรวจ', color: 'bg-purple-50 text-purple-700 border-purple-200' };
     case 'REVIEWED':
       return { label: 'รออนุมัติ', color: 'bg-blue-50 text-blue-700 border-blue-200' };
     case 'APPROVED':
@@ -268,7 +270,7 @@ export default function PRListView({
 
     const totalCount = baseDocs.length;
     const totalAmount = baseDocs.reduce((sum, pr) => sum + (pr.totalAmount || 0), 0);
-    const pendingPRs = baseDocs.filter(pr => ['SUBMITTED', 'REVIEWED', 'REJECTED_TO_L2'].includes(pr.status));
+    const pendingPRs = baseDocs.filter(pr => ['SUBMITTED', 'PENDING_BUFFER', 'REVIEWED', 'REJECTED_TO_L2'].includes(pr.status));
     const pendingCount = pendingPRs.length;
     const pendingAmount = pendingPRs.reduce((sum, pr) => sum + (pr.totalAmount || 0), 0);
     const approvedCount = baseDocs.filter(pr => ['APPROVED', 'PO_ISSUED', 'IN_PROGRESS_ONLINE', 'CLOSED'].includes(pr.status)).length;

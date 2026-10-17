@@ -9,6 +9,8 @@ import { hasDepartmentAccess } from '../utils/permissions.js';
 import { generateNextPRId, generateNextPOId } from '../utils/idGenerator.js';
 import { generateGRNNumber } from './warehouseService.js';
 import { isPoInOpenClaim, isRequesterUser, isPoDone, isOwnerByRequesterId } from '../utils/claimState.js';
+import { isBufferRole } from '../utils/bufferRole.js';
+import { getProductUrl } from '../utils/urlHelper.js';
 
 // ─── Fallback Mock Attachment Assets (Phase 2) ───
 const GLOVE_PACKAGE_SVG = `data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="100%" height="100%"><rect width="400" height="400" fill="%23f8fafc"/><rect x="50" y="80" width="300" height="240" rx="16" fill="%230284c7" stroke="%230369a1" stroke-width="4"/><rect x="70" y="100" width="260" height="120" rx="10" fill="%2338bdf8" fill-opacity="0.3"/><path d="M120 160 Q150 130 180 160 T240 160 T280 150" fill="none" stroke="%23ffffff" stroke-width="5" stroke-linecap="round"/><circle cx="150" cy="150" r="12" fill="%23ffffff"/><circle cx="180" cy="140" r="14" fill="%23ffffff"/><circle cx="210" cy="145" r="13" fill="%23ffffff"/><circle cx="240" cy="160" r="11" fill="%23ffffff"/><rect x="80" y="235" width="240" height="65" rx="8" fill="%23075985"/><text x="200" y="260" font-family="sans-serif" font-size="16" font-weight="bold" fill="%23ffffff" text-anchor="middle">NITRILE EXAMINATION GLOVES</text><text x="200" y="285" font-family="sans-serif" font-size="13" fill="%23bae6fd" text-anchor="middle">กล่องบรรจุ 100 ชิ้น (Package)</text></svg>`;
@@ -48,8 +50,62 @@ export const getFallbackAttachmentsForCode = (code) => {
   return FALLBACK_SEED_ATTACHMENTS[clean] || [];
 };
 
+// ─── Phase 3 (FR-01) : BUFFER step (PENDING_BUFFER = waiting for the purchasing checker "พี่สุ") ───
+const isAdminRole = (role) => Boolean(role) && (role.id === 'ADMIN' || role.roleId === 'ADMIN' || Number(role.level) >= 99);
+const isOnlinePurchaserRole = (role) => {
+  if (!role) return false;
+  const userLevel = Number(role.level || (isAdminRole(role) ? 99 : 1));
+  return role.roleId === 'ONLINE_PURCHASER' || role.id === 'ONLINE_PURCHASER' || role.positionKey === 'ONLINE_PURCHASER' || Boolean(role.canOnlinePurchase && userLevel < 99);
+};
+
+/** BUFFER user (or admin) may forward a PR parked at PENDING_BUFFER to the approver. Nobody else (reviewer / approver / requester) can. */
+export const canBufferForward = (user, pr) => {
+  if (!user || !pr || pr.status !== 'PENDING_BUFFER') return false;
+  return isAdminRole(user) || isBufferRole(user);
+};
+
+/** Qty / price / link of a PR at PENDING_BUFFER are editable by the BUFFER user and admin only (decision Q9). */
+export const canEditPrAtBuffer = (user, pr) => canBufferForward(user, pr);
+
+/**
+ * Who may send back / cancel a PR parked at PENDING_BUFFER (decision Q6) : reviewer (level 2, not BUFFER, not online),
+ * approver (level >= 3 / canFinalApprove) and admin. The BUFFER user has no reject / cancel button.
+ */
+export const canReturnAtBuffer = (user, pr) => {
+  if (!user || !pr || pr.status !== 'PENDING_BUFFER') return false;
+  if (isAdminRole(user)) return true;
+  if (isBufferRole(user) || isOnlinePurchaserRole(user)) return false;
+  const userLevel = Number(user.level || 1);
+  const isApprover = userLevel >= 3 || Boolean(user.canFinalApprove);
+  const isReviewer = userLevel === 2;
+  return (isApprover || isReviewer) && hasDepartmentAccess(user, pr.department);
+};
+
+const OUTCOME_MESSAGES = {
+  PENDING_BUFFER: 'ส่งต่อผู้ตรวจสอบจัดซื้อแล้ว',
+  REVIEWED: 'ส่งต่อ Plant Mgr แล้ว'
+};
+
+// the first http(s) check for a link typed into an item row (the server checks again). A bare domain gets https://.
+const normalizeItemUrl = (raw) => {
+  const text = typeof raw === 'string' ? raw.trim() : '';
+  if (!text) return '';
+  if (/^https?:\/\//i.test(text)) return text;
+  if (/^[a-z][a-z0-9+.-]*:/i.test(text) && !/^[^/\s]+:\d+(\/|$)/.test(text)) {
+    throw new Error('ลิงก์สินค้าต้องขึ้นต้นด้วย http:// หรือ https:// เท่านั้น');
+  }
+  return `https://${text}`;
+};
+
+const URL_KEYS = ['productUrl', 'onlineUrl', 'link', 'url', 'itemUrl'];
+const money2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+
 export const workflowEngine = {
-  
+
+  canBufferForward,
+  canEditPrAtBuffer,
+  canReturnAtBuffer,
+
   canActionPO(role, po) {
     return this.canAction(role, po);
   },
@@ -138,6 +194,8 @@ export const workflowEngine = {
     if (['SUBMITTED', 'REJECTED_TO_L2', 'waiting_review', 'pending_review', 'รอตรวจทาน', 'รอตรวจสอบ'].includes(pr.status)) {
       if (isAdmin) return true;
       if (isOnlinePurchaser) return false;
+      // Phase 3 : the BUFFER role is level 2 but never a reviewer
+      if (isBufferRole(role)) return false;
       // Disallow Level 3 (Plant Mgr / Approvers) and Level 1 (Requesters)
       if (userLevel >= 3 || role.canFinalApprove || userLevel <= 1) return false;
 
@@ -145,11 +203,18 @@ export const workflowEngine = {
       return isLevel2Reviewer && matchesDept(pr.department);
     }
 
+    // 2b. PENDING_BUFFER (Phase 3 - waiting for the purchasing checker "พี่สุ"): only the BUFFER role (and admin) may act on it.
+    // Reviewer / approver can only send it back or cancel it (see canReturnAtBuffer / canCancelPR).
+    if (pr.status === 'PENDING_BUFFER') {
+      return canBufferForward(role, pr);
+    }
+
     // 3. REVIEWED (Final Approval - Plant Manager):
     // Only Level 3 Approvers / Plant Managers (strictly NOT Level 2 Asst Managers, NOT Requesters Level 1, NOT Online Purchaser)
     if (pr.status === 'REVIEWED') {
       if (isAdmin) return true;
       if (isOnlinePurchaser) return false;
+      if (isBufferRole(role)) return false;
       const isLevel3Approver = userLevel >= 3 || role.canFinalApprove || role.id === 'PLANT_MANAGER' || role.id === 'APPROVER' || role.positionKey === 'APPROVER' || role.roleId === 'PLANT_MANAGER';
       return isLevel3Approver && matchesDept(pr.department);
     }
@@ -162,6 +227,10 @@ export const workflowEngine = {
     if (!role || !pr) return false;
     if (['APPROVED', 'PO_ISSUED', 'IN_PROGRESS_ONLINE', 'CLOSED', 'CANCELLED'].includes(pr.status)) {
       return false;
+    }
+    // Phase 3 : at PENDING_BUFFER the task is the BUFFER user's, but reviewer / approver / admin may send it back or cancel it (BUFFER may not)
+    if (pr.status === 'PENDING_BUFFER') {
+      return canReturnAtBuffer(role, pr);
     }
     return this.canAction(role, pr);
   },
@@ -202,9 +271,9 @@ export const workflowEngine = {
     };
 
     const waitingStatusesFor = {
-      plantMgr: [],
-      asstMgr: ['REVIEWED'],
-      requester: ['SUBMITTED', 'REJECTED_TO_L2', 'REVIEWED', 'waiting_review', 'pending_review', 'รอตรวจทาน', 'รอตรวจสอบ'],
+      plantMgr: ['PENDING_BUFFER'], // Phase 3 : the approver follows a PR parked at the purchasing checker as "in progress" (never a To-Do)
+      asstMgr: ['REVIEWED', 'PENDING_BUFFER'],
+      requester: ['SUBMITTED', 'REJECTED_TO_L2', 'PENDING_BUFFER', 'REVIEWED', 'waiting_review', 'pending_review', 'รอตรวจทาน', 'รอตรวจสอบ'],
       onlinePurchaser: ['ORDERED', 'ORDERED_PENDING_DELIVERY', 'IN_DELIVERY', 'PARTIAL'],
     };
 
@@ -239,7 +308,7 @@ export const workflowEngine = {
         if (isAdmin) {
           isWaiting = true;
         } else if (isPlantMgr) {
-          isWaiting = false;
+          isWaiting = waitingStatusesFor.plantMgr.includes(pr.status);
         } else if (isAsstMgr) {
           isWaiting = actedOn && waitingStatusesFor.asstMgr.includes(pr.status);
         } else if (isOnlinePurchaser) {
@@ -390,26 +459,52 @@ export const workflowEngine = {
   },
 
   // Edit PR items by Approver (Level 2+) before approval
+  // Phase 3 : also edits the product link (productUrl / onlineUrl) and recomputes totalAmount + financials (same discount / VAT settings as the PR had).
+  //           At PENDING_BUFFER only the BUFFER user (and admin) may edit ; the BUFFER user may edit nothing else.
   async editPRItems(prId, updatedItems, user, editReason = '') {
     const prs = storageService.getPRs();
     const pr = prs.find(p => p.id === prId);
     if (!pr) throw new Error('ไม่พบเอกสาร PR ในระบบ');
 
-    if (user.level < 2 && user.id !== 'ADMIN') {
-      throw new Error('เฉพาะผู้อนุมัติตั้งแต่ Level 2 ขึ้นไปเท่านั้นที่สามารถแก้ไขรายการได้');
-    }
+    const isAdmin = isAdminRole(user);
+    const isBuffer = isBufferRole(user);
+    const atBuffer = pr.status === 'PENDING_BUFFER';
 
-    if (!['SUBMITTED', 'REVIEWED', 'REJECTED_TO_L2'].includes(pr.status)) {
-      throw new Error('ไม่สามารถแก้ไขรายการในสถานะปัจจุบันของ PR นี้ได้');
+    if (atBuffer) {
+      if (!canEditPrAtBuffer(user, pr)) {
+        throw new Error('PR ที่รอผู้ตรวจสอบจัดซื้อ แก้ไขรายการได้เฉพาะผู้ตรวจสอบจัดซื้อ (พี่สุ) หรือผู้ดูแลระบบเท่านั้น');
+      }
+    } else {
+      if (user.level < 2 && user.id !== 'ADMIN') {
+        throw new Error('เฉพาะผู้อนุมัติตั้งแต่ Level 2 ขึ้นไปเท่านั้นที่สามารถแก้ไขรายการได้');
+      }
+      if (isBuffer && !isAdmin) {
+        throw new Error('ผู้ตรวจสอบจัดซื้อ (พี่สุ) แก้ไขรายการได้เฉพาะ PR ที่อยู่ในสถานะรอพี่สุตรวจสอบ');
+      }
+      if (!['SUBMITTED', 'REVIEWED', 'REJECTED_TO_L2'].includes(pr.status)) {
+        throw new Error('ไม่สามารถแก้ไขรายการในสถานะปัจจุบันของ PR นี้ได้');
+      }
     }
 
     const oldTotal = pr.totalAmount || 0;
-    const formattedItems = updatedItems.map(item => {
+    const oldItems = Array.isArray(pr.items) ? pr.items : [];
+    const keyOf = (it) => it?.id || it?.code || it?.productId || it?.name;
+    const oldByKey = new Map(oldItems.map((it) => [keyOf(it), it]));
+
+    const changeNotes = [];
+    const formattedItems = updatedItems.map((item, idx) => {
       const pQty = Number(item.purchaseQty ?? item.qty) || 1;
       const rate = Number(item.conversionRate) > 0 ? Number(item.conversionRate) : 1;
       const sQty = Number(item.stockQty) || (pQty * rate);
       const price = Number(item.price) || 0;
-      return {
+      const gross = price * pQty;
+      const discountPercent = parseFloat(item.discountPercent) || 0;
+      const discountAmount = discountPercent > 0
+        ? money2(gross * (discountPercent / 100))
+        : Math.min(gross, Math.max(0, parseFloat(item.discountAmount) || 0));
+
+      const orig = oldByKey.get(keyOf(item)) || oldItems[idx] || null;
+      const next = {
         ...item,
         purchaseUnit: item.purchaseUnit || item.unit || 'ชิ้น',
         stockUnit: item.stockUnit || item.unit || 'ชิ้น',
@@ -418,11 +513,85 @@ export const workflowEngine = {
         stockQty: sQty,
         qty: pQty,
         price,
-        total: price * pQty
+        total: Math.max(0, gross - discountAmount)
       };
+      if (discountAmount > 0 || item.discountAmount !== undefined) next.discountAmount = discountAmount;
+
+      // ── link : the key the caller changed wins (productUrl is read first by getProductUrl, so keep every url key in step) ──
+      // compare with the effective old link (getProductUrl) - an older row may keep it only in onlineUrl / link / url / itemUrl,
+      // so comparing key by key would miss "productUrl: ''" as a clear
+      const oldUrl = orig ? getProductUrl(orig) : '';
+      const changedKey = URL_KEYS.find((k) => orig && k in item && item[k] !== undefined && String(item[k] ?? '').trim() !== oldUrl);
+      let newUrl = oldUrl;
+      if (changedKey) {
+        newUrl = normalizeItemUrl(item[changedKey]);
+      } else if (!orig) {
+        newUrl = normalizeItemUrl(getProductUrl(item));
+      }
+      if (changedKey || (!orig && newUrl)) {
+        next.productUrl = newUrl;
+        next.onlineUrl = newUrl;
+        URL_KEYS.forEach((k) => { if (k !== 'productUrl' && k !== 'onlineUrl' && k in next) next[k] = newUrl; });
+      }
+
+      if (orig) {
+        const label = item.name || orig.name || keyOf(item) || `รายการที่ ${idx + 1}`;
+        const diffs = [];
+        const oQty = Number(orig.purchaseQty ?? orig.qty);
+        if (Number.isFinite(oQty) && oQty !== pQty) diffs.push(`จำนวน ${oQty} → ${pQty}`);
+        const oPrice = Number(orig.price);
+        if (Number.isFinite(oPrice) && oPrice !== price) diffs.push(`ราคา ${oPrice} → ${price}`);
+        if (newUrl !== oldUrl) diffs.push(`ลิงก์ ${oldUrl || '(ไม่มี)'} → ${newUrl || '(ไม่มี)'}`);
+        if (diffs.length) changeNotes.push(`${label}: ${diffs.join(', ')}`);
+      }
+      return next;
     });
 
-    const newTotal = formattedItems.reduce((sum, it) => sum + it.total, 0);
+    const rowsTotal = formattedItems.reduce((sum, it) => sum + it.total, 0);
+    const subtotal = formattedItems.reduce((sum, it) => sum + (it.purchaseQty * it.price), 0);
+    const itemDiscountTotal = formattedItems.reduce((sum, it) => sum + (parseFloat(it.discountAmount) || 0), 0);
+
+    let newTotal = rowsTotal;
+    if (pr.financials && typeof pr.financials === 'object') {
+      // same discount / VAT / rounding / shipping settings the PR already had -> new grand total (mirrors createPR / updatePR)
+      const fin = pr.financials;
+      const netAfterItemDiscount = Math.max(0, subtotal - itemDiscountTotal);
+      const combinedDiscountType = fin.combinedDiscountType || 'fixed';
+      const combinedDiscountValue = parseFloat(fin.combinedDiscountValue) || 0;
+      const combinedDiscountAmount = combinedDiscountType === 'percent'
+        ? (netAfterItemDiscount * (combinedDiscountValue / 100))
+        : combinedDiscountValue;
+      const totalDiscount = itemDiscountTotal + combinedDiscountAmount;
+      const netAfterAllDiscount = Math.max(0, subtotal - totalDiscount);
+      const vatMode = fin.vatMode || 'NONE';
+      const vatApplies = vatMode !== 'NONE' && fin.hasVat !== false && (fin.hasVat === true || (Number(fin.vatAmount) || 0) > 0);
+      const vatBase = vatMode === 'BEFORE_DISCOUNT' ? subtotal : netAfterAllDiscount;
+      const vatAmount = vatApplies ? (parseFloat((vatBase * 0.07).toFixed(2)) || 0) : 0;
+      const roundingAdj = parseFloat(fin.roundingAdj) || 0;
+      const shippingCost = parseFloat(fin.shippingCost) || 0;
+      const grandTotal = vatMode === 'BEFORE_DISCOUNT'
+        ? parseFloat((subtotal + vatAmount - totalDiscount + roundingAdj + shippingCost).toFixed(2))
+        : parseFloat((netAfterAllDiscount + vatAmount + roundingAdj + shippingCost).toFixed(2));
+
+      pr.financials = {
+        ...fin,
+        subtotal,
+        itemDiscountTotal,
+        combinedDiscountType,
+        combinedDiscountValue,
+        combinedDiscountAmount,
+        totalDiscount,
+        vatMode,
+        vatAmount,
+        roundingAdj,
+        shippingCost,
+        grandTotal
+      };
+      newTotal = grandTotal;
+    } else {
+      newTotal = money2(rowsTotal);
+    }
+
     pr.items = formattedItems;
     pr.totalAmount = newTotal;
 
@@ -430,12 +599,13 @@ export const workflowEngine = {
     if (!Array.isArray(pr.activityLog)) {
       pr.activityLog = [];
     }
+    const actorLabel = atBuffer ? 'ผู้ตรวจสอบจัดซื้อ' : 'ผู้อนุมัติ';
     pr.activityLog.push({
-      action: 'แก้ไขรายการสินค้า (Approver Item Edit)',
+      action: atBuffer ? 'แก้ไขรายการสินค้า (Buffer Item Edit)' : 'แก้ไขรายการสินค้า (Approver Item Edit)',
       user: user.name,
       role: user.title,
       timestamp,
-      note: `ผู้อนุมัติแก้ไขรายการสินค้า (ยอดเดิม ฿${oldTotal.toLocaleString()} → ยอดใหม่ ฿${newTotal.toLocaleString()})${editReason ? ` เหตุผล: ${editReason}` : ''}`
+      note: `${actorLabel}แก้ไขรายการสินค้า (ยอดเดิม ฿${oldTotal.toLocaleString()} → ยอดใหม่ ฿${newTotal.toLocaleString()})${changeNotes.length ? ` [${changeNotes.join(' ; ')}]` : ''}${editReason ? ` เหตุผล: ${editReason}` : ''}`
     });
 
     storageService.savePRs(prs);
@@ -453,6 +623,11 @@ export const workflowEngine = {
     const prs = storageService.getPRs();
     const pr = prs.find(p => p.id === prId);
     if (!pr) throw new Error('ไม่พบเอกสาร PR ในระบบ');
+
+    // Phase 3 : a PR parked at the purchasing checker can be sent back by the reviewer / approver / admin only - never by the BUFFER user (decision Q6)
+    if (pr.status === 'PENDING_BUFFER' && !canReturnAtBuffer(user, pr)) {
+      throw new Error('ไม่มีสิทธิ์ส่งกลับ PR ที่รอผู้ตรวจสอบจัดซื้อ (เฉพาะผู้ตรวจทาน ผู้อนุมัติ หรือผู้ดูแลระบบ)');
+    }
 
     const timestamp = new Date().toLocaleString('th-TH');
     let nextStatus = 'REJECTED_TO_DRAFT';
@@ -827,7 +1002,8 @@ export const workflowEngine = {
     }
 
     // Must be actionable by the current user at their stage (Task must currently be at this user)
-    if (!this.canAction(user, pr)) {
+    // (PENDING_BUFFER : the task is the BUFFER user's, but reviewer / approver / admin may cancel ; BUFFER may not - canCancelPR knows)
+    if (!this.canCancelPR(user, pr)) {
       throw new Error('ไม่สามารถยกเลิกได้ เนื่องจากเอกสารไม่ได้อยู่ในขั้นตอนที่ท่านต้องดำเนินการในขณะนี้ (งานไม่ได้อยู่ที่ท่าน)');
     }
 
@@ -1032,7 +1208,7 @@ export const workflowEngine = {
 
     // Sum PR commitments
     prs.forEach(pr => {
-      if (['SUBMITTED', 'REVIEWED', 'APPROVED'].includes(pr.status)) {
+      if (['SUBMITTED', 'PENDING_BUFFER', 'REVIEWED', 'APPROVED'].includes(pr.status)) {
         if (!pos.some(po => po.prId === pr.id)) {
           const prMonth = pr.requestedDate ? pr.requestedDate.substring(0, 7) : targetMonth;
           const tMonth = getTrendMonth(prMonth);
@@ -1612,7 +1788,10 @@ export const workflowEngine = {
   },
 
   // Update Status & Handle Workflow Transitions
-  async updatePRStatus(prId, nextStatus, user, note = '') {
+  // options.bufferComment : the BUFFER user's comment when forwarding from PENDING_BUFFER (nextStatus 'REVIEWED')
+  // NOTE (Phase 3, cloudflare mode) : the reviewer's "pass" is sent as REVIEWED ; the SERVER decides whether the PR goes on to REVIEWED or parks at
+  // PENDING_BUFFER. apiService.updatePRStatus reconciles the local PR with the saved status (reconcileReviewOutcome) and raises the notification then.
+  async updatePRStatus(prId, nextStatus, user, note = '', options = {}) {
     const prs = storageService.getPRs();
     const index = prs.findIndex(p => p.id === prId);
     if (index === -1) throw new Error('PR not found');
@@ -1620,9 +1799,11 @@ export const workflowEngine = {
     const pr = prs[index];
     const previousStatus = pr.status;
     const timestamp = new Date().toLocaleString('th-TH');
+    const isBufferForward = nextStatus === 'REVIEWED' && previousStatus === 'PENDING_BUFFER';
+    const bufferComment = isBufferForward ? String((options && options.bufferComment) ?? note ?? '').trim() : '';
 
     let actionLabel = 'อัพเดทสถานะ';
-    if (nextStatus === 'REVIEWED') actionLabel = 'ตรวจสอบแล้ว (Level 1 - Asst Mgr)';
+    if (nextStatus === 'REVIEWED') actionLabel = isBufferForward ? 'ผู้ตรวจสอบจัดซื้อส่งต่อผู้อนุมัติ (Buffer Forward)' : 'ตรวจสอบแล้ว (Level 1 - Asst Mgr)';
     if (nextStatus === 'APPROVED') actionLabel = 'อนุมัติ (Final Approval - Plant Mgr)';
     if (nextStatus === 'REJECTED_TO_DRAFT') actionLabel = 'ไม่อนุมัติ / ตีกลับให้แก้ไข (Rejected to Draft)';
     if (nextStatus === 'CANCELLED') actionLabel = 'ยกเลิกเอกสาร (Cancelled)';
@@ -1646,8 +1827,14 @@ export const workflowEngine = {
       comment: note || ''
     });
 
-    if (nextStatus === 'REVIEWED') {
-      const reviewerSig = user?.signature || 
+    if (isBufferForward) {
+      // the BUFFER stamp never overwrites the reviewer's (reviewedBy) ; the server stamps its own copy
+      pr.bufferReviewedBy = user?.employeeName || user?.name || '';
+      pr.bufferReviewedById = user?.id || user?.userId || '';
+      pr.bufferReviewedAt = new Date().toISOString();
+      pr.bufferComment = bufferComment;
+    } else if (nextStatus === 'REVIEWED') {
+      const reviewerSig = user?.signature ||
         storageService.getSignatureByRole?.(user?.roleId || user?.id)?.signatureUrl || 
         storageService.getSignatures?.()?.[user?.roleId || 'ASST_MANAGER']?.signatureUrl || 
         null;
@@ -1682,7 +1869,7 @@ export const workflowEngine = {
 
       const currentNorm = String(previousStatus || '').toLowerCase();
       // State Machine Guard: Cannot approve or issue PO if PR has not been reviewed
-      if (['waiting_review', 'submitted', 'draft', 'rejected_to_draft', 'rejected_to_l2', 'waiting_approval'].includes(currentNorm)) {
+      if (['waiting_review', 'submitted', 'draft', 'rejected_to_draft', 'rejected_to_l2', 'waiting_approval', 'pending_buffer'].includes(currentNorm)) {
         throw new Error(`ไม่อนุญาตให้อนุมัติออกใบสั่งซื้อ (PO): ใบขอซื้อ ${pr.prNo || pr.id} อยู่ในสถานะ "${previousStatus}" ซึ่งยังไม่ผ่านการตรวจทาน (ต้องผ่านการตรวจทานเป็นสถานะ REVIEWED ก่อนเท่านั้น)`);
       }
       pr.status = 'APPROVED';
@@ -1735,18 +1922,9 @@ export const workflowEngine = {
 
     // Dispatch In-App Notification for Review / Reject
     if (nextStatus === 'REVIEWED') {
-      notificationService.dispatch({
-        type: 'PR_REVIEWED',
-        title: 'PR ผ่านการตรวจสอบแล้ว รออนุมัติสั่งซื้อ (Final Approve)',
-        message: `ใบขอซื้อเลขที่ ${pr.prNo} แผนก ${pr.department} ยอดเงิน ฿${(pr.totalAmount || 0).toLocaleString()} ผ่านการตรวจ Level 1 แล้ว รอคุณประเสริฐ (Plant Manager) อนุมัติ`,
-        docNo: pr.prNo,
-        refDocType: 'PR',
-        refDocId: pr.id,
-        department: pr.department,
-        targetRoles: ['PLANT_MANAGER', 'ADMIN'],
-        amount: pr.totalAmount,
-        actor: user.name
-      });
+      // mock / gas : there is no server that could park the PR at PENDING_BUFFER, so REVIEWED is final -> notify the approver now.
+      // cloudflare : the server decides (REVIEWED or PENDING_BUFFER) -> apiService calls notifyReviewOutcome with the saved status.
+      if (!isCloudflareMode()) this.notifyReviewOutcome(pr, user, 'REVIEWED');
     } else if (nextStatus === 'REJECTED_TO_DRAFT') {
       notificationService.dispatch({
         type: 'PR_REJECTED',
@@ -1764,7 +1942,79 @@ export const workflowEngine = {
       });
     }
 
-    return { pr, po: generatedPO };
+    return { pr, po: generatedPO, previousStatus, isBufferForward };
+  },
+
+  // In-app notification for the outcome of a "review pass" / "buffer forward" : only the FINAL status notifies.
+  //  REVIEWED -> PLANT_MANAGER / ADMIN (also when the BUFFER step was skipped, and after a BUFFER forward)
+  //  PENDING_BUFFER -> BUFFER / ADMIN (local only ; in cloudflare mode the server creates this notification itself)
+  notifyReviewOutcome(pr, user, finalStatus) {
+    if (!pr) return null;
+    if (finalStatus === 'REVIEWED') {
+      return notificationService.dispatch({
+        type: 'PR_REVIEWED',
+        title: 'PR ผ่านการตรวจสอบแล้ว รออนุมัติสั่งซื้อ (Final Approve)',
+        message: `ใบขอซื้อเลขที่ ${pr.prNo} แผนก ${pr.department} ยอดเงิน ฿${(pr.totalAmount || 0).toLocaleString()} ผ่านการตรวจ Level 1 แล้ว รอคุณประเสริฐ (Plant Manager) อนุมัติ`,
+        docNo: pr.prNo,
+        refDocType: 'PR',
+        refDocId: pr.id,
+        department: pr.department,
+        targetRoles: ['PLANT_MANAGER', 'ADMIN'],
+        amount: pr.totalAmount,
+        actor: user?.name
+      });
+    }
+    if (finalStatus === 'PENDING_BUFFER' && !isCloudflareMode()) {
+      return notificationService.dispatch({
+        type: 'PR_PENDING_BUFFER',
+        title: 'PR รอผู้ตรวจสอบจัดซื้อ (พี่สุ) ตรวจสอบ',
+        message: `ใบขอซื้อเลขที่ ${pr.prNo} แผนก ${pr.department} ยอดเงิน ฿${(pr.totalAmount || 0).toLocaleString()} ผ่านการตรวจ Level 1 แล้ว รอผู้ตรวจสอบจัดซื้อ (พี่สุ) ตรวจสอบและส่งต่อผู้อนุมัติ`,
+        docNo: pr.prNo,
+        refDocType: 'PR',
+        refDocId: pr.id,
+        department: pr.department,
+        targetRoles: ['BUFFER', 'ADMIN'],
+        amount: pr.totalAmount,
+        actor: user?.name
+      });
+    }
+    return null;
+  },
+
+  /**
+   * cloudflare mode : the server answers a review pass with the status it really saved (REVIEWED, or PENDING_BUFFER when an active BUFFER
+   * account exists ; `bufferSkipped` = the step was skipped because there is none). Bring the local PR (the object updatePRStatus returned
+   * AND the stored copy) in line with it, fix the log text that assumed REVIEWED, and raise the notification for the FINAL status only.
+   * Returns { finalStatus, bufferSkipped, successMessage }.
+   */
+  reconcileReviewOutcome(pr, saved, user) {
+    const sentStatus = pr?.status;
+    const savedStatus = saved && typeof saved.status === 'string' && saved.status ? saved.status : null;
+    const finalStatus = (savedStatus === 'PENDING_BUFFER' || savedStatus === 'REVIEWED') ? savedStatus : (sentStatus || 'REVIEWED');
+    const bufferSkipped = Boolean(saved && saved.bufferSkipped === true);
+
+    if (pr && finalStatus !== sentStatus) {
+      pr.status = finalStatus;
+      pr.workflowStatus = finalStatus;
+      if (finalStatus === 'PENDING_BUFFER' && Array.isArray(pr.activityLog) && pr.activityLog.length > 0) {
+        const last = pr.activityLog[pr.activityLog.length - 1];
+        if (last && String(last.action || '').startsWith('ตรวจสอบแล้ว')) {
+          last.action = 'ตรวจสอบแล้ว ส่งต่อผู้ตรวจสอบจัดซื้อ (Level 1 → Buffer)';
+          if (typeof last.note === 'string' && last.note.startsWith('เปลี่ยนสถานะเป็น')) last.note = `เปลี่ยนสถานะเป็น ${PR_STATUS.PENDING_BUFFER?.label || 'PENDING_BUFFER'}`;
+        }
+      }
+    }
+    if (pr && bufferSkipped) pr.bufferSkipped = true;
+    if (pr) {
+      try {
+        const all = storageService.getPRs() || [];
+        const at = all.findIndex((p) => p && (p.id === pr.id));
+        if (at !== -1) { all[at] = { ...all[at], ...pr }; storageService.savePRs(all); }
+      } catch { /* the local copy is a cache ; the server holds the truth */ }
+    }
+    // mock / gas : updatePRStatus already notified (REVIEWED is final there) ; only cloudflare mode defers the notification to here
+    if (isCloudflareMode()) this.notifyReviewOutcome(pr, user, finalStatus);
+    return { finalStatus, bufferSkipped, successMessage: OUTCOME_MESSAGES[finalStatus] || null };
   },
 
   // Auto Create PO from PR (Workflow Engine Logic)

@@ -37,8 +37,9 @@ export function buildViewer(authUser) {
   const roleId = String(n.roleId || authUser.id || '').toUpperCase();
   const depts = userDeptList(authUser);
   const isGlobal = n.isAdmin || n.level >= 99 || roleId === 'ADMIN' || n.level >= 3
-    || roleId === 'PLANT_MANAGER' || roleId === 'PURCHASER' || roleId === 'ONLINE_PURCHASER';
-  const isReviewer = roleId === 'ASST_MANAGER' || roleId === 'REVIEWER' || n.level === 2;
+    || roleId === 'PLANT_MANAGER' || roleId === 'PURCHASER' || roleId === 'ONLINE_PURCHASER'
+    || Boolean(n.isBuffer); // Phase 3: BUFFER (พี่สุ) sees every department's PR / PO / stock
+  const isReviewer = !n.isBuffer && (roleId === 'ASST_MANAGER' || roleId === 'REVIEWER' || n.level === 2);
   // DashboardView.isMultiDeptUser (the role text there is the session role : 'admin' or the lower-cased roleId)
   const dashRole = n.isAdmin ? 'ADMIN' : roleId;
   const dashMulti = depts.length > 1 || ['ADMIN', 'ASST_MANAGER', 'PLANT_MANAGER', 'MANAGER'].includes(dashRole)

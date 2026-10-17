@@ -16,6 +16,21 @@ const jsonInit = (method, body) => ({
   body: JSON.stringify(body)
 });
 
+// Phase 3 : what the server really saved for a PR write { status, bufferSkipped } (null when the answer carries no PR status).
+// Tolerates { pr: {...}, bufferSkipped } and a bare PR object ; never throws.
+const readSavedPrOutcome = async (res) => {
+  try {
+    if (!res || typeof res.json !== 'function') return null;
+    const body = await (typeof res.clone === 'function' ? res.clone() : res).json();
+    if (!body || typeof body !== 'object') return null;
+    const pr = body.pr && typeof body.pr === 'object' ? body.pr : null;
+    const status = typeof pr?.status === 'string' ? pr.status : (typeof body.status === 'string' ? body.status : null);
+    const bufferSkipped = body.bufferSkipped === true || pr?.bufferSkipped === true;
+    if (!status && !bufferSkipped) return null;
+    return { status, bufferSkipped };
+  } catch { return null; }
+};
+
 // id of the signed-in user (the pending goods-receipt stock queue is per user : an entry is only replayed by the user who made it)
 const pendingUserId = () => {
   try { const s = JSON.parse(localStorage.getItem('prpo_auth_session') || 'null'); return (s && (s.id || s.userId || s.username)) || ''; } catch { return ''; }
@@ -866,8 +881,11 @@ export const apiService = {
     return result;
   },
 
-  async updatePRStatus(prId, nextStatus, user, note = '') {
-    const result = await workflowEngine.updatePRStatus(prId, nextStatus, user, note);
+  // options.bufferComment : the BUFFER user's comment (PENDING_BUFFER -> REVIEWED). The result also carries
+  // { finalStatus, bufferSkipped, successMessage } for a review pass / buffer forward : finalStatus is what the server really saved
+  // (PENDING_BUFFER or REVIEWED) and successMessage the text to show ("ส่งต่อผู้ตรวจสอบจัดซื้อแล้ว" / "ส่งต่อ Plant Mgr แล้ว").
+  async updatePRStatus(prId, nextStatus, user, note = '', options = {}) {
+    const result = await workflowEngine.updatePRStatus(prId, nextStatus, user, note, options);
     if (isGAS()) {
       try {
         if (result?.pr) {
@@ -904,10 +922,18 @@ export const apiService = {
         modalService.error('ปรับสถานะ PR ไม่สำเร็จ', e.message);
         throw e;
       }
+      // GAS has no BUFFER step : a review pass is REVIEWED
+      if (nextStatus === 'REVIEWED' && result?.pr) Object.assign(result, workflowEngine.reconcileReviewOutcome(result.pr, null, user));
       return result;
     }
     if (result?.pr) {
-      await cfWrite('ปรับสถานะ PR ไม่สำเร็จ', `/api/prs/${prId}`, jsonInit('PUT', result.pr));
+      // (BUFFER forward : result.pr.bufferComment travels in the PUT body ; the server stamps who/when itself and drops client-sent stamps)
+      const res = await cfWrite('ปรับสถานะ PR ไม่สำเร็จ', `/api/prs/${prId}`, jsonInit('PUT', result.pr));
+      if (nextStatus === 'REVIEWED') {
+        // cloudflare : the server decides REVIEWED vs PENDING_BUFFER (and bufferSkipped) -> follow the status it saved
+        const saved = await readSavedPrOutcome(res);
+        Object.assign(result, workflowEngine.reconcileReviewOutcome(result.pr, saved, user));
+      }
     }
     if (result?.po) {
       const poList = Array.isArray(result.po) ? result.po : [result.po];

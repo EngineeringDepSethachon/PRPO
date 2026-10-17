@@ -20,6 +20,8 @@ const PERSONAS = {
   L1: { id: 'U-L1', username: 'req.pd', name: 'Req', department: 'PD', roleId: 'REQUESTER_PD', canonicalRole: 'REQUESTER', level: 1 },
   L2: { id: 'U-L2', username: 'asst.am', name: 'Asst', department: 'PD', roleId: 'ASST_MANAGER', canonicalRole: 'REVIEWER', level: 2 },
   ONLINE: { id: 'U-ON', username: 'nat.on', name: 'Nat', department: 'PUR', roleId: 'ONLINE_PURCHASER', canonicalRole: 'PURCHASER', level: 2 },
+  // Phase 3 : the purchasing checker "พี่สุ" (level 2, department ALL, role BUFFER) - not a reviewer, not an approver
+  BUFFER: { id: 'U-BF', username: 'p.su', name: 'Su', department: 'ALL', allowedDepartments: '["ALL"]', roleId: 'BUFFER', canonicalRole: 'BUFFER', level: 2 },
   // like the seeded accounts: managers / admin carry allowedDepartments ["*"] (the department gate mirrors the client, level alone does not widen it)
   L3: { id: 'U-L3', username: 'plant.pm', name: 'Plant', department: 'MGT', allowedDepartments: '["*"]', roleId: 'PLANT_MANAGER', canonicalRole: 'APPROVER', level: 3 },
   L4: { id: 'U-L4', username: 'exec.dir', name: 'Exec', department: 'MGT', allowedDepartments: '["*"]', roleId: 'EXECUTIVE', canonicalRole: 'APPROVER', level: 4 },
@@ -229,7 +231,12 @@ describe.skipIf(!DatabaseSync)('T4.5 functional (onRequest + migrated sqlite)', 
     expect((await call('L1', 'PUT', '/api/prs/PR1', { status: 'REVIEWED' })).status).toBe(403);
     expect(one('SELECT status FROM prs WHERE id = ?', 'PR1').status).toBe('SUBMITTED');
     expect((await call('L1', 'POST', '/api/prs', { id: 'PR1', prNumber: 'PR-1', status: 'APPROVED' })).status).toBe(403);
-    expect((await call('L2', 'PUT', '/api/prs/PR1', { status: 'REVIEWED' })).status).toBe(200);
+    // Phase 3 : an ACTIVE BUFFER user exists in this suite, so the reviewer's pass is parked at PENDING_BUFFER and the BUFFER role forwards it to the approver
+    const rv = await call('L2', 'PUT', '/api/prs/PR1', { status: 'REVIEWED' });
+    expect(rv.status).toBe(200);
+    expect(rv.json.status).toBe('PENDING_BUFFER');
+    expect((await call('L3', 'PUT', '/api/prs/PR1', { status: 'PO_ISSUED' })).status).toBe(403); // the approver cannot skip the BUFFER step
+    expect((await call('BUFFER', 'PUT', '/api/prs/PR1', { status: 'REVIEWED' })).status).toBe(200);
     expect((await call('L2', 'PUT', '/api/prs/PR1', { status: 'PO_ISSUED' })).status).toBe(403);
     expect((await call('L3', 'PUT', '/api/prs/PR1', { status: 'PO_ISSUED' })).status).toBe(200);
     expect((await call('L1', 'DELETE', '/api/prs/PR1')).status).toBe(403);
@@ -260,9 +267,11 @@ describe.skipIf(!DatabaseSync)('T4.5 functional (onRequest + migrated sqlite)', 
 
   it('PR_FLOWS / PO_RULES table: every client action is allowed for the roles the client allows, denied for the others', async () => {
     const who = (flow) => ({
-      any: ['L1', 'L2', 'ONLINE', 'L3', 'L4', 'ADMIN'],
-      requester: ['L1', 'L2', 'ONLINE', 'L3', 'L4', 'ADMIN'],
-      reviewer: ['L2', 'ADMIN'],
+      any: ['L1', 'L2', 'ONLINE', 'BUFFER', 'L3', 'L4', 'ADMIN'],
+      requester: ['L1', 'L2', 'ONLINE', 'BUFFER', 'L3', 'L4', 'ADMIN'],
+      reviewer: ['L2', 'ADMIN'], // the BUFFER role is level 2 but is NOT a reviewer
+      buffer: ['BUFFER', 'ADMIN'],
+      reviewerOrApprover: ['L2', 'L3', 'L4', 'ADMIN'],
       approver: ['L3', 'L4', 'ADMIN']
     })[flow.actor];
     for (const f of PR_FLOWS) {
@@ -273,7 +282,7 @@ describe.skipIf(!DatabaseSync)('T4.5 functional (onRequest + migrated sqlite)', 
       }
     }
     // rows of the PO table (parity.md c.5) : [from, to, personas allowed]
-    const NOT_ONLINE = ['L1', 'L2', 'L3', 'L4', 'ADMIN'];
+    const NOT_ONLINE = ['L1', 'L2', 'BUFFER', 'L3', 'L4', 'ADMIN'];
     const ALLP = Object.keys(PERSONAS);
     const PO_TABLE = [
       ['IN_PROGRESS_ONLINE', 'ORDERED', ['ONLINE', 'ADMIN']],
@@ -329,9 +338,14 @@ describe.skipIf(!DatabaseSync)('T4.5 functional (onRequest + migrated sqlite)', 
     expect((await call('L2', 'PUT', '/api/prs/PRN', { status: 'APPROVED' })).status).toBe(403);
     expect((await call('L2', 'PUT', '/api/prs/PRN', { status: 'REJECTED_TO_DRAFT' })).status).toBe(200);
     expect((await call('L1', 'PUT', '/api/prs/PRN', { status: 'SUBMITTED' })).status).toBe(200);
+    // Phase 3 : SUBMITTED -> (reviewer) PENDING_BUFFER -> (BUFFER) REVIEWED -> (approver) ... ; no step can be skipped
     expect((await call('L2', 'PUT', '/api/prs/PRN', { status: 'REVIEWED' })).status).toBe(200);
+    expect(one('SELECT status FROM prs WHERE id = ?', 'PRN').status).toBe('PENDING_BUFFER');
+    expect((await call('L3', 'PUT', '/api/prs/PRN', { status: 'IN_PROGRESS_ONLINE' })).status).toBe(403);
+    expect((await call('BUFFER', 'PUT', '/api/prs/PRN', { status: 'REVIEWED' })).status).toBe(200);
     expect((await call('L3', 'PUT', '/api/prs/PRN', { status: 'REJECTED_TO_L2' })).status).toBe(200);
     expect((await call('L2', 'PUT', '/api/prs/PRN', { status: 'REVIEWED' })).status).toBe(200);
+    expect((await call('BUFFER', 'PUT', '/api/prs/PRN', { status: 'REVIEWED' })).status).toBe(200);
     expect((await call('L3', 'PUT', '/api/prs/PRN', { status: 'IN_PROGRESS_ONLINE' })).status).toBe(200);
     expect((await call('L3', 'PUT', '/api/prs/PRN', { status: 'DRAFT' })).status).toBe(403);
     expect((await call('ADMIN', 'PUT', '/api/prs/PRN', { status: 'DRAFT' })).status).toBe(200);
@@ -674,6 +688,9 @@ describe.skipIf(!DatabaseSync)('T4.5 functional (onRequest + migrated sqlite)', 
     expect((await call('L2', 'PUT', '/api/prs/FL1', { status: 'REJECTED_TO_DRAFT', reason: 'แก้จำนวน', items: item(3, 50), totalAmount: 150 })).status).toBe(200);
     expect((await call('L1', 'PUT', '/api/prs/FL1', { status: 'SUBMITTED', items: item(2, 60), totalAmount: 120 })).status).toBe(200); // fixed & resubmitted
     expect((await call('L2', 'PUT', '/api/prs/FL1', { status: 'REVIEWED', items: item(2, 60), totalAmount: 120 })).status).toBe(200);
+    expect(one("SELECT status FROM prs WHERE id = 'FL1'").status).toBe('PENDING_BUFFER'); // Phase 3 : parked at the BUFFER (an ACTIVE BUFFER user exists)
+    expect((await call('L2', 'PUT', '/api/prs/FL1', { items: item(2, 55), totalAmount: 110 })).status).toBe(403); // only the BUFFER role / admin edits there (Q9)
+    expect((await call('BUFFER', 'PUT', '/api/prs/FL1', { status: 'REVIEWED', items: item(2, 60), totalAmount: 120 })).status).toBe(200);
     // reviewer may adjust items before approval (workflowEngine.editPRItems, level >= 2) ; requester may not
     expect((await call('L2', 'PUT', '/api/prs/FL1', { items: item(2, 55), totalAmount: 110 })).status).toBe(200);
     expect((await call('L2', 'PUT', '/api/prs/FL1', { items: item(2, 60), totalAmount: 120 })).status).toBe(200);

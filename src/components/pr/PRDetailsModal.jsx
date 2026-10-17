@@ -25,6 +25,11 @@ import { sanitizeExternalUrl, getProductUrl } from '../../utils/urlHelper';
 import { driveFileIdOf, openProxiedFile } from '../../utils/cfAttachments';
 import AttachmentThumbnail from '../common/AttachmentThumbnail';
 import LoadingOverlay from '../common/LoadingOverlay';
+import ProductRemarkNote from '../common/ProductRemarkNote';
+import { isBufferRole } from '../../utils/bufferRole';
+
+// Phase 3 (FR-01) : comment limit of the BUFFER user's note to the approver (the server cuts at the same length)
+const BUFFER_COMMENT_MAX = 2000;
 
 const formatDateTime = (dateVal) => {
   if (!dateVal) return '-';
@@ -49,8 +54,23 @@ const formatDateTime = (dateVal) => {
 export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onClose, onRefresh, onSelectPO, onEditPR }) {
   const context = useAppContext();
   const allPRs = context?.prs || storageService.getPRs() || [];
-  const selectedPR = allPRs.find(p => p.id === initialPR?.id || p.prNo === initialPR?.prNo) || initialPR;
+  const basePR = allPRs.find(p => p.id === initialPR?.id || p.prNo === initialPR?.prNo) || initialPR;
+  // The PR as just saved by "edit items" : shown at once, so a failed follow-up (e.g. forward) never leaves the window on the old qty / price / link
+  const [savedPR, setSavedPR] = useState(null);
+  const selectedPR = (savedPR && basePR && savedPR.id === basePR.id)
+    ? {
+        ...basePR,
+        items: savedPR.items,
+        totalAmount: savedPR.totalAmount,
+        ...(savedPR.financials ? { financials: savedPR.financials } : {}),
+        ...(Array.isArray(savedPR.activityLog) ? { activityLog: savedPR.activityLog } : {})
+      }
+    : basePR;
   const allPOs = context?.pos || storageService.getPOs() || [];
+  // หมายเหตุสินค้า (FR-02): products จาก context ; ถ้ายังว่างใช้ cache ใน storage
+  const productMaster = (Array.isArray(context?.products) && context.products.length > 0)
+    ? context.products
+    : (storageService.getProducts?.() || []);
 
   // Safe Guard: Declare relatedPOs at the top of the component before any hook or JSX uses it
   const relatedPOs = React.useMemo(() => {
@@ -161,6 +181,10 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
   const [editItems, setEditItems] = useState(() => (selectedPR.items || []).map(it => ({ ...it })));
   const [editReason, setEditReason] = useState('');
   const [isSavingItems, setIsSavingItems] = useState(false);
+  // Phase 3 (FR-01) : product link typed per item row at PENDING_BUFFER ({ rowIndex: text }) ; kept apart from editItems so an untouched
+  // row never gets a productUrl stamped onto it. bufferComment = the BUFFER user's note to the approver.
+  const [urlEdits, setUrlEdits] = useState({});
+  const [bufferComment, setBufferComment] = useState('');
 
   // Safe Timeline Aggregator
   const timelineList = useMemo(() => {
@@ -197,7 +221,15 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
     // เรียงจากเก่าไปใหม่ เพื่อให้เห็น Step การเดินทางของเอกสาร
     return unique.sort((a, b) => new Date(a.timestamp || a.createdAt || a.date || a.time || 0) - new Date(b.timestamp || b.createdAt || b.date || b.time || 0));
   }, [selectedPR]);
-  const canApproverEdit = currentRole.level >= 2 && ['SUBMITTED', 'REVIEWED', 'REJECTED_TO_L2'].includes(selectedPR.status);
+  // Phase 3 (FR-01) : at PENDING_BUFFER only the BUFFER user (and admin) edits (decision Q9 - reviewer / approver cannot) ;
+  // at the other statuses the rule is unchanged, except that the BUFFER user edits nothing there.
+  const isBufferUser = isBufferRole(currentRole);
+  const isAtBuffer = selectedPR.status === 'PENDING_BUFFER';
+  const canApproverEdit = isAtBuffer
+    ? workflowEngine.canEditPrAtBuffer(currentRole, selectedPR)
+    : (currentRole.level >= 2 && !isBufferUser && ['SUBMITTED', 'REVIEWED', 'REJECTED_TO_L2'].includes(selectedPR.status));
+  const canForwardFromBuffer = workflowEngine.canBufferForward(currentRole, selectedPR);
+  const canReturnFromBuffer = workflowEngine.canReturnAtBuffer(currentRole, selectedPR);
 
   const handleItemFieldChange = (index, field, value) => {
     setEditItems(prev => {
@@ -228,6 +260,59 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
     });
   };
 
+  // The link shown in a row while editing : what the user typed, else the PR's current link
+  const editedUrlOf = (index, item) => (index in urlEdits ? urlEdits[index] : getProductUrl(item));
+
+  // True when the open edit form differs from the saved PR (qty / price / link) - used to keep the BUFFER "save and forward" lossless
+  const hasPendingItemEdits = () => {
+    const origItems = selectedPR.items || [];
+    if (editItems.length !== origItems.length) return true;
+    return editItems.some((it, i) => {
+      const o = origItems[i] || {};
+      if (Number(it.purchaseQty ?? it.qty) !== Number(o.purchaseQty ?? o.qty)) return true;
+      if ((Number(it.price) || 0) !== (Number(o.price) || 0)) return true;
+      return i in urlEdits && String(urlEdits[i] ?? '').trim() !== getProductUrl(o);
+    });
+  };
+
+  // Sends the open edit form through the existing apiService.editPRItems (the reason must already be checked by the caller)
+  const persistItemEdits = async () => {
+    // Data Integrity Guard: Ensure master unit conversion and units are locked from original PR items
+    const originalItemsMap = new Map((selectedPR.items || []).map(it => [it.id || it.code || it.name, it]));
+    const sanitizedItems = editItems.map((item, index) => {
+      const orig = originalItemsMap.get(item.id || item.code || item.name);
+      const originalRate = Number(orig?.conversionRate ?? item.conversionRate) > 0 ? Number(orig?.conversionRate ?? item.conversionRate) : 1;
+      const pQty = Number(item.purchaseQty ?? item.qty) || 1;
+      const price = Number(item.price) || 0;
+      const sanitized = {
+        ...item,
+        purchaseUnit: orig?.purchaseUnit || orig?.unit || item.purchaseUnit || item.unit || 'ชิ้น',
+        stockUnit: orig?.stockUnit || orig?.unit || item.stockUnit || item.unit || 'ชิ้น',
+        conversionRate: originalRate,
+        purchaseQty: pQty,
+        qty: pQty,
+        stockQty: pQty * originalRate,
+        price: price,
+        total: pQty * price
+      };
+      // link typed at PENDING_BUFFER : send it only when it really changed (editPRItems then keeps every url key in step)
+      if (index in urlEdits) {
+        const typed = String(urlEdits[index] ?? '').trim();
+        if (typed !== getProductUrl(orig || item)) sanitized.productUrl = typed;
+      }
+      return sanitized;
+    });
+
+    const savedResult = await apiService.editPRItems(selectedPR.id, sanitizedItems, currentRole, editReason.trim());
+    // the edit is saved : show it in this window and tell the parent to reload right away (before any follow-up action that may fail)
+    if (savedResult && typeof savedResult === 'object' && Array.isArray(savedResult.items)) setSavedPR(savedResult);
+    setIsEditingItems(false);
+    setEditReason('');
+    setUrlEdits({});
+    if (onRefresh) onRefresh();
+    return savedResult;
+  };
+
   const handleSaveItemsEdit = async () => {
     if (!editReason.trim()) {
       modalService.warning('กรุณาระบุเหตุผลการแก้ไขรายการสินค้า');
@@ -235,36 +320,61 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
     }
     setIsSavingItems(true);
     try {
-      // Data Integrity Guard: Ensure master unit conversion and units are locked from original PR items
-      const originalItemsMap = new Map((selectedPR.items || []).map(it => [it.id || it.code || it.name, it]));
-      const sanitizedItems = editItems.map(item => {
-        const orig = originalItemsMap.get(item.id || item.code || item.name);
-        const originalRate = Number(orig?.conversionRate ?? item.conversionRate) > 0 ? Number(orig?.conversionRate ?? item.conversionRate) : 1;
-        const pQty = Number(item.purchaseQty ?? item.qty) || 1;
-        const price = Number(item.price) || 0;
-        return {
-          ...item,
-          purchaseUnit: orig?.purchaseUnit || orig?.unit || item.purchaseUnit || item.unit || 'ชิ้น',
-          stockUnit: orig?.stockUnit || orig?.unit || item.stockUnit || item.unit || 'ชิ้น',
-          conversionRate: originalRate,
-          purchaseQty: pQty,
-          qty: pQty,
-          stockQty: pQty * originalRate,
-          price: price,
-          total: pQty * price
-        };
-      });
-
-      await apiService.editPRItems(selectedPR.id, sanitizedItems, currentRole, editReason.trim());
-      setIsEditingItems(false);
-      setEditReason('');
-      onRefresh();
+      await persistItemEdits(); // also calls onRefresh once the edit is saved
       modalService.success('บันทึกสำเร็จ', 'บันทึกการแก้ไขรายการสินค้าเรียบร้อย');
     } catch (err) {
       console.error('[Workflow Error Stack]:', err.stack || err);
       modalService.error('เกิดข้อผิดพลาด', err.message);
     } finally {
       setIsSavingItems(false);
+    }
+  };
+
+  // BUFFER user (พี่สุ) : "บันทึกการแก้ไขและส่งต่อผู้อนุมัติ". An open edit form with real changes is saved first (nothing is lost) ;
+  // if saving fails the status is NOT forwarded and the form stays open.
+  const handleBufferForward = async () => {
+    if (isProcessing || isSavingItems) return;
+    const comment = bufferComment.trim();
+    if (comment.length > BUFFER_COMMENT_MAX) {
+      modalService.warning(`บันทึกถึงผู้อนุมัติยาวเกินไป (สูงสุด ${BUFFER_COMMENT_MAX} ตัวอักษร)`);
+      return;
+    }
+    const pendingEdits = isEditingItems && hasPendingItemEdits();
+    if (pendingEdits && !editReason.trim()) {
+      modalService.warning('กรุณาระบุเหตุผลการแก้ไขรายการสินค้า ก่อนบันทึกและส่งต่อ');
+      return;
+    }
+
+    const confirmed = await modalService.confirm({
+      title: 'ยืนยันการดำเนินการ',
+      message: `ต้องการ "บันทึกการแก้ไขและส่งต่อผู้อนุมัติ" สำหรับใบขอซื้อเลขที่ ${selectedPR.prNo} หรือไม่?`,
+      confirmText: 'ยืนยันดำเนินการ',
+      cancelText: 'ยกเลิก',
+      type: 'info'
+    });
+    if (!confirmed) return;
+
+    setProcessingAction('กำลังบันทึกและส่งต่อผู้อนุมัติ...');
+    setIsProcessing(true);
+    try {
+      if (pendingEdits) {
+        await persistItemEdits();
+      } else if (isEditingItems) {
+        setIsEditingItems(false);
+        setUrlEdits({});
+      }
+      const result = context?.bufferForwardPR
+        ? await context.bufferForwardPR(selectedPR.id, comment)
+        : await apiService.updatePRStatus(selectedPR.id, 'REVIEWED', currentRole, comment, { bufferComment: comment });
+      modalService.success('ดำเนินการสำเร็จ', result?.successMessage || 'ส่งต่อผู้อนุมัติแล้ว');
+      setBufferComment('');
+      onClose();
+      if (onRefresh) onRefresh();
+    } catch (err) {
+      console.error('[Workflow Error Stack]:', err.stack || err);
+      modalService.error('เกิดข้อผิดพลาด', err.message);
+    } finally {
+      setIsProcessing(false);
     }
   };
 
@@ -310,8 +420,9 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
         await apiService.submitPR(selectedPR.id, currentRole);
         modalService.success('ส่งใบขอซื้อสำเร็จ', `ใบขอซื้อ ${selectedPR.prNo} ถูกส่งเข้าสู่ระบบแล้ว`);
       } else if (nextStatus === 'REVIEWED' && context?.reviewPR) {
-        await context.reviewPR(selectedPR.id, actionNote);
-        modalService.success('ดำเนินการสำเร็จ', `อัปเดตสถานะใบขอซื้อ ${selectedPR.prNo} เรียบร้อยแล้ว`);
+        // Phase 3 : the server decides the next stop (BUFFER user or Plant Mgr) ; the result says which
+        const reviewResult = await context.reviewPR(selectedPR.id, actionNote);
+        modalService.success('ดำเนินการสำเร็จ', reviewResult?.successMessage || `อัปเดตสถานะใบขอซื้อ ${selectedPR.prNo} เรียบร้อยแล้ว`);
       } else if (nextStatus === 'APPROVED' && context?.approvePR) {
         await context.approvePR(selectedPR.id, actionNote);
         modalService.success('ดำเนินการสำเร็จ', `อัปเดตสถานะใบขอซื้อ ${selectedPR.prNo} เรียบร้อยแล้ว`);
@@ -380,6 +491,14 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
     }
   };
 
+  // bufferReviewedBy is the stamped name (the server writes a string ; an object is tolerated like workspaceService does)
+  const bufferReviewerName = (() => {
+    const raw = selectedPR.bufferReviewedBy;
+    if (!raw) return '';
+    if (typeof raw === 'object') return String(raw.name || raw.id || '').trim();
+    return String(raw).trim();
+  })();
+
   const displayedItems = isEditingItems ? editItems : (selectedPR.items || []);
   const calculatedTotal = displayedItems.reduce((sum, it) => sum + (Number(it.total) || ((Number(it.purchaseQty ?? it.qty) || 1) * (Number(it.price) || 0))), 0);
 
@@ -425,6 +544,7 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
     if (lower === 'po_issued' || lower === 'ordered') return 'PO_ISSUED';
     if (lower === 'in_progress_online') return 'IN_PROGRESS_ONLINE';
     if (lower === 'reviewed') return 'REVIEWED';
+    if (lower === 'pending_buffer') return 'PENDING_BUFFER';
     if (lower === 'completed' || lower === 'closed') return 'CLOSED';
     if (lower === 'waiting_review') return 'WAITING_REVIEW';
     if (lower === 'submitted') return 'SUBMITTED';
@@ -442,7 +562,8 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
   // State Guard: PR must be approved or in PO-linked state to consider related POs
   const _isPRApproved = ['approved', 'ordered', 'completed', 'closed', 'po_issued', 'in_progress_online'].includes(resolvedStatusKey.toLowerCase());
 
-  const isPRCancellable = workflowEngine.canCancelPR(currentRole, selectedPR);
+  // the BUFFER user (พี่สุ) never cancels or sends back, at any status (decision Q6)
+  const isPRCancellable = !isBufferUser && workflowEngine.canCancelPR(currentRole, selectedPR);
   const statusInfo = PR_STATUS[resolvedStatusKey] || { 
     label: selectedPR.status || resolvedStatusKey, 
     color: 'bg-slate-100 text-slate-700 border-slate-200' 
@@ -601,18 +722,20 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
                           type="button"
                           onClick={() => {
                             setEditItems((selectedPR.items || []).map(it => ({ ...it })));
+                            setUrlEdits({});
                             setIsEditingItems(true);
                           }}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-amber-50 hover:bg-amber-100 text-amber-800 border border-amber-200 rounded-lg text-xs font-semibold transition-all cursor-pointer shadow-2xs"
                         >
                           <Edit3 className="w-3.5 h-3.5" />
-                          <span>แก้ไขจำนวน/ราคา</span>
+                          <span>{isAtBuffer ? 'แก้ไขจำนวน/ราคา/ลิงก์' : 'แก้ไขจำนวน/ราคา'}</span>
                         </button>
                       ) : (
                         <button
                           type="button"
                           onClick={() => {
                             setEditItems((selectedPR.items || []).map(it => ({ ...it })));
+                            setUrlEdits({});
                             setIsEditingItems(false);
                           }}
                           className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 rounded-lg text-xs font-semibold transition-all cursor-pointer"
@@ -683,6 +806,28 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
                                 <div className="font-bold text-slate-800 text-sm leading-snug break-words w-full" title={item.name}>
                                   {item.name}
                                 </div>
+
+                                {/* FR-02: หมายเหตุ/สเปกของสินค้าใต้ชื่อ */}
+                                <ProductRemarkNote item={item} products={productMaster} className="mt-1 w-full" />
+
+                                {/* Phase 3 (FR-01) : ช่องแก้ลิงก์สั่งซื้อออนไลน์ - เฉพาะโหมดแก้ไขที่ PENDING_BUFFER (พี่สุ/แอดมิน) ทั้ง PR จัดซื้อเองและออนไลน์ */}
+                                {isEditingItems && isAtBuffer && (
+                                  <div className="mt-1.5 w-full">
+                                    <label className="text-[11px] font-semibold text-amber-800 block mb-0.5" htmlFor={`pr-item-url-${idx}`}>
+                                      ลิงก์สั่งซื้อออนไลน์
+                                    </label>
+                                    <input
+                                      id={`pr-item-url-${idx}`}
+                                      type="text"
+                                      inputMode="url"
+                                      placeholder="https://..."
+                                      aria-label={`ลิงก์สั่งซื้อออนไลน์ รายการที่ ${idx + 1}`}
+                                      value={editedUrlOf(idx, item)}
+                                      onChange={e => setUrlEdits(prev => ({ ...prev, [idx]: e.target.value }))}
+                                      className="w-full border border-amber-300 rounded p-1 text-xs bg-white focus:ring-2 focus:ring-amber-500 font-mono"
+                                    />
+                                  </div>
+                                )}
 
                                 {/* แถวย่อย Badges: SKU, สถานที่ใช้งาน, ลิงก์ร้านค้าออนไลน์ (flex-nowrap overflow-hidden) */}
                                 <div className="flex items-center gap-2 mt-1 flex-nowrap overflow-hidden max-w-full">
@@ -913,6 +1058,21 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
                       </p>
                     </div>
                   )}
+
+                  {/* Phase 3 (FR-01) : ผลตรวจสอบจัดซื้อของพี่สุ (แสดงต่อเมื่อพี่สุส่งต่อแล้ว ; ไม่อยู่ใน PDF) */}
+                  {bufferReviewerName && (
+                    <div className="col-span-2 pt-1 border-t border-slate-100" data-testid="buffer-review-info">
+                      <span className="text-[11px] font-medium text-slate-400 uppercase tracking-wider block">ผู้ตรวจสอบจัดซื้อ (พี่สุ)</span>
+                      <p className="text-xs font-semibold text-slate-800 mt-0.5 break-words">
+                        ตรวจสอบจัดซื้อโดย {bufferReviewerName}{selectedPR.bufferReviewedAt ? ` (${formatDateTime(selectedPR.bufferReviewedAt)})` : ''}
+                      </p>
+                      {selectedPR.bufferComment && (
+                        <p className="mt-1 text-xs text-slate-700 leading-relaxed whitespace-pre-wrap break-words bg-slate-50/70 p-2.5 rounded-xl border border-slate-100">
+                          {selectedPR.bufferComment}
+                        </p>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -1060,7 +1220,7 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
                         if (selectedPR.status === 'REVIEWED') {
                           handleWorkflowAction({ actionText: 'อนุมัติสั่งซื้อและสร้าง PO', nextStatus: 'APPROVED' });
                         } else {
-                          handleWorkflowAction({ actionText: 'ตรวจสอบและส่งต่อให้ Plant Manager', nextStatus: 'REVIEWED' });
+                          handleWorkflowAction({ actionText: 'ตรวจสอบและส่งต่อขั้นถัดไป', nextStatus: 'REVIEWED' });
                         }
                       }
                     }}
@@ -1090,6 +1250,28 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
                     </button>
                   ))}
                 </div>
+              </div>
+            )}
+
+            {/* Phase 3 (FR-01) : ขั้นพี่สุ (PENDING_BUFFER) - บันทึกถึงผู้อนุมัติ */}
+            {canForwardFromBuffer && (
+              <div className="space-y-2" data-testid="buffer-forward-panel">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+                    <MessageSquare className="w-3.5 h-3.5 text-slate-400" />
+                    <span>บันทึกถึงผู้อนุมัติ (พี่สุ)</span>
+                  </span>
+                  <span className="text-[10px] text-slate-400 font-mono">{bufferComment.length}/{BUFFER_COMMENT_MAX}</span>
+                </div>
+                <textarea
+                  rows={2}
+                  maxLength={BUFFER_COMMENT_MAX}
+                  aria-label="บันทึกถึงผู้อนุมัติ (พี่สุ)"
+                  placeholder="ระบุบันทึกถึงผู้อนุมัติ (ไม่บังคับ) เช่น ผลการเช็คราคา/ลิงก์สินค้า..."
+                  className="w-full bg-white border border-slate-200/90 rounded-2xl p-3.5 text-xs text-slate-800 placeholder:text-slate-400 focus:outline-none focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all resize-none shadow-xs min-h-[68px]"
+                  value={bufferComment}
+                  onChange={e => setBufferComment(e.target.value)}
+                />
               </div>
             )}
 
@@ -1159,13 +1341,43 @@ export default function PRDetailsModal({ selectedPR: initialPR, currentRole, onC
 
                     {/* ปุ่มหลัก: ตรวจสอบผ่าน */}
                     <button 
-                      onClick={() => handleWorkflowAction({ actionText: 'ตรวจสอบและส่งต่อให้ Plant Manager', nextStatus: 'REVIEWED' })}
+                      onClick={() => handleWorkflowAction({ actionText: 'ตรวจสอบและส่งต่อขั้นถัดไป', nextStatus: 'REVIEWED' })}
                       disabled={isProcessing}
                       className={`bg-slate-950 hover:bg-slate-900 text-white rounded-xl px-5 py-2.5 font-semibold text-xs shadow-lg shadow-slate-950/20 active:scale-[0.98] transition-all flex items-center gap-2 ${isProcessing ? 'opacity-40 cursor-not-allowed pointer-events-none' : 'cursor-pointer'}`}
                     >
                       <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                      <span>ตรวจสอบผ่าน (ส่งต่อ Plant Mgr)</span>
+                      <span>ตรวจสอบผ่าน (ส่งต่อขั้นถัดไป)</span>
                     </button>
+                  </>
+                )}
+
+                {/* Phase 3 (FR-01) : PENDING_BUFFER - ผู้ตรวจทาน/ผู้อนุมัติ/แอดมิน ตีกลับได้ ; พี่สุ/แอดมิน บันทึกและส่งต่อ (พี่สุไม่มีปุ่มตีกลับ) */}
+                {selectedPR.status === 'PENDING_BUFFER' && (
+                  <>
+                    {canReturnFromBuffer && !isBufferUser && (
+                      <button
+                        type="button"
+                        onClick={() => { if (!isProcessing) setShowRejectModal(true); }}
+                        disabled={isProcessing}
+                        className={`px-4 py-2.5 bg-rose-50/60 hover:bg-rose-100/70 text-rose-700 border border-rose-200/80 font-semibold text-xs rounded-xl transition-all flex items-center gap-1.5 shadow-2xs ${isProcessing ? 'opacity-40 cursor-not-allowed pointer-events-none' : 'cursor-pointer'}`}
+                        title="ส่งกลับให้ผู้ขอซื้อแก้ไข"
+                      >
+                        <XCircle className="w-3.5 h-3.5 text-rose-600" />
+                        <span>ส่งกลับแก้ไข (Reject)</span>
+                      </button>
+                    )}
+
+                    {canForwardFromBuffer && (
+                      <button
+                        type="button"
+                        onClick={handleBufferForward}
+                        disabled={isProcessing || isSavingItems}
+                        className={`bg-slate-950 hover:bg-slate-900 text-white rounded-xl px-5 py-2.5 font-semibold text-xs shadow-lg shadow-slate-950/20 active:scale-[0.98] transition-all flex items-center gap-2 ${isProcessing || isSavingItems ? 'opacity-40 cursor-not-allowed pointer-events-none' : 'cursor-pointer'}`}
+                      >
+                        <Send className="w-3.5 h-3.5 text-emerald-400" />
+                        <span>บันทึกการแก้ไขและส่งต่อผู้อนุมัติ</span>
+                      </button>
+                    )}
                   </>
                 )}
 
