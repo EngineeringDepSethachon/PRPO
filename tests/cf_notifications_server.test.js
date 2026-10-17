@@ -301,7 +301,7 @@ d('server notifications (M7-2)', () => {
     let gate;
     const held = new Promise((r) => { gate = r; });
     env.DB = { ...real, prepare: (q) => { const o = real.prepare(q); if (/SELECT id, prNumber, status, department, totalAmount, itemsJson/.test(q)) return { ...o, bind: (...a) => { const b = o.bind(...a); return { ...b, first: async () => { const row = await b.first(); await held; return row; } }; } }; return o; } };
-    const second = call('req', 'POST', '/api/prs', newPr({ totalAmount: 777 })); // read: no PR-N1 yet, waits
+    const second = call('req', 'POST', '/api/prs', newPr({ totalAmount: 777, items: [{ id: 'i1', name: 'x', qty: 1, price: 777 }] })); // read: no PR-N1 yet, waits (its total must match its lines : kla round 2)
     await new Promise((r) => setTimeout(r, 30));
     env.DB = real;
     expect((await call('req', 'POST', '/api/prs', newPr())).status).toBe(200);

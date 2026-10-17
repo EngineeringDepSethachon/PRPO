@@ -85,7 +85,11 @@ function itemFingerprint(items) {
 }
 function prContentChanged(curRow, body) {
   const hasTotal = (body.totalAmount !== undefined && body.totalAmount !== null) || (body.total !== undefined && body.total !== null);
-  if (hasTotal && Math.abs(Number(body.totalAmount ?? body.total) - Number(curRow.totalAmount || 0)) > 0.005) return true;
+  if (hasTotal) {
+    // a total that is not a finite number (NaN compares as "no difference" : kla round 2) counts as a change
+    const n = Number(body.totalAmount ?? body.total);
+    if (!Number.isFinite(n) || Math.abs(n - Number(curRow.totalAmount || 0)) > 0.005) return true;
+  }
   if (Array.isArray(body.items)) {
     let old = [];
     try { old = JSON.parse(curRow.itemsJson || '[]'); } catch { old = []; }
@@ -144,6 +148,13 @@ async function resolveReviewTarget(db, authUser, curStatus, requested) {
 const prLineKey2 = (it) => String((it && (it.productId || it.id || it.code)) || '');
 const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 const lineQty = (it) => Number(it && (it.purchaseQty ?? it.qty ?? it.quantity ?? 1));
+// unit price of a line : price, else the aliases the BUFFER edit keeps in step (unitPrice / estimatedPrice) ; '' / null count as "not there"
+const linePrice = (it) => {
+  if (!it || typeof it !== 'object') return 0;
+  for (const k of PR_PRICE_ALIASES_ORDER) if (it[k] !== undefined && it[k] !== null && it[k] !== '') return parseFloat(it[k]) || 0;
+  return 0;
+};
+const PR_PRICE_ALIASES_ORDER = ['price', 'unitPrice', 'estimatedPrice'];
 const PR_URL_KEYS = ['productUrl', 'onlineUrl']; // the two links the BUFFER may set (every alias is locked for everybody else : PR_URL_ALIASES)
 const urlOf = (it, k) => (it && typeof it[k] === 'string' ? it[k].trim() : '');
 // a link the BUFFER may set : empty, or http(s) only (the link is later shown as an <a href>) - at most 2000 chars
@@ -229,11 +240,12 @@ function attachmentsNotStored(sent, stored) {
 // the amounts of a PR from its lines and the PR's stored financials (workflowEngine.createPR / updatePR formula) : subtotal - line discounts - combined discount
 // (+ VAT 7% + rounding + shipping). The discount PARAMETERS (combined type / value, vat mode, rounding, shipping) always come from the stored PR, never the body.
 // discs[i] = the discount of line i (prLineDiscount : ONE formula chosen from the stored line).
-function prExpectedAmounts(lines, discs, fin) {
+// vatOnOverride (boolean) : the caller already decided whether VAT applies (a body-sourced write) ; undefined = the stored-PR heuristic below
+function prExpectedAmounts(lines, discs, fin, vatOnOverride) {
   const f = fin && typeof fin === 'object' ? fin : {};
   let subtotal = 0; let itemDisc = 0;
   lines.forEach((it, i) => {
-    subtotal += lineQty(it) * (parseFloat(it.price) || 0);
+    subtotal += lineQty(it) * linePrice(it);
     itemDisc += Number(discs[i]) || 0;
   });
   const net = Math.max(0, subtotal - itemDisc);
@@ -244,14 +256,15 @@ function prExpectedAmounts(lines, discs, fin) {
   const netAll = Math.max(0, subtotal - totalDiscount);
   const vatMode = f.vatMode || 'NONE';
   // the stored financials do not keep hasVat : VAT counts as off when the stored VAT is 0 on a positive subtotal
-  const vatOn = vatMode !== 'NONE' && !((parseFloat(f.vatAmount) || 0) === 0 && (parseFloat(f.subtotal) || 0) > 0);
+  const vatOn = vatMode !== 'NONE' && (typeof vatOnOverride === 'boolean' ? vatOnOverride : !((parseFloat(f.vatAmount) || 0) === 0 && (parseFloat(f.subtotal) || 0) > 0));
   const vatBase = vatMode === 'BEFORE_DISCOUNT' ? subtotal : netAll;
   const vatAmount = vatOn ? (parseFloat((vatBase * 0.07).toFixed(2)) || 0) : 0;
   const rounding = parseFloat(f.roundingAdj) || 0;
   const shipping = parseFloat(f.shippingCost) || 0;
-  const grandTotal = vatMode === 'BEFORE_DISCOUNT'
+  // never below 0 (BEFORE_DISCOUNT can go negative when the discount is larger than the rest)
+  const grandTotal = Math.max(0, vatMode === 'BEFORE_DISCOUNT'
     ? parseFloat((subtotal + vatAmount - totalDiscount + rounding + shipping).toFixed(2))
-    : parseFloat((netAll + vatAmount + rounding + shipping).toFixed(2));
+    : parseFloat((netAll + vatAmount + rounding + shipping).toFixed(2)));
   return { subtotal, itemDiscountTotal: itemDisc, combinedDiscountAmount: cAmount, totalDiscount, vatAmount, grandTotal };
 }
 // the discount of one line from the STORED line (never the body's) : a stored discountPercent re-derives it from the new amount, otherwise the stored absolute
@@ -350,7 +363,10 @@ function prBufferEdit(curRow, p, rawLinks) {
 }
 function applyBufferEdit(p, be) {
   if (be.items) p.items = be.items;
-  if (be.totalAmount !== undefined) { p.totalAmount = be.totalAmount; delete p.total; }
+  // the total is the server's alone : the client's figure (it may be up to 0.01 away from the stored one and repeat that every save) is never kept ;
+  // not set -> not written (POST / PUT keep the stored total)
+  delete p.total; delete p.totalAmount;
+  if (be.totalAmount !== undefined) p.totalAmount = be.totalAmount;
   // `financials` is the server's alone from PENDING_BUFFER on : the client's copy is dropped whatever it says, only the server's recomputation is stored
   delete p.financials;
   if (be.financials) p.financials = be.financials;
@@ -376,12 +392,187 @@ function guardAtBufferNonOwner(cur, p, base) {
     if (!sameSentFields(p.financials, stored)) return FORBID;
   }
   delete p.financials;
+  return lockReasonAndAttachments(cur, p);
+}
+// the reason and the attachments of a PR at PENDING_BUFFER are nobody's to change here : the body may repeat what is stored (403 otherwise) and the stored
+// ones are what gets written (a POST without a reason would otherwise blank it)
+function lockReasonAndAttachments(cur, p) {
+  const FORBID = { status: 403, message: FORBIDDEN_MSG };
   for (const k of ['reason', 'purpose']) {
     if (p[k] !== undefined && p[k] !== null && cur.reason !== undefined && trimVal(p[k]) !== trimVal(cur.reason)) return FORBID;
   }
   if (p.attachments !== undefined && p.attachments !== null) {
     if (attachmentsNotStored(p.attachments, parseJsonSafe(cur.attachmentsJson, []))) return FORBID;
     delete p.attachments; // keep the stored list exactly
+  }
+  delete p.purpose;
+  if (cur.reason !== undefined && cur.reason !== null) p.reason = cur.reason; else delete p.reason;
+  return null;
+}
+// the body of the BUFFER (not an admin) at PENDING_BUFFER : an ALLOW-LIST. The BUFFER sees every department, so what it may write into another department's PR
+// is only what its step is for : the lines (qty / price / links, already rebuilt by prBufferEdit), the total, the status (-> REVIEWED), its comment, and the log
+// entries the server stamps itself (timeline / activity log / approval history - mergeLog / prApprovalPatch). Every other key is dropped, so the stored value stays :
+// purchaseChannel / poNumber / approvalWorkflow / attachments / reason are real columns that are not written, and no extra key reaches extraJson.
+function restrictBufferBody(cur, p) {
+  const locked = lockReasonAndAttachments(cur, p);
+  if (locked) return locked;
+  // the comment may arrive as `note` (the client sends the whole PR back) : it counts only when it differs from the stored note
+  const storedNote = trimVal(parseExtra(cur.extraJson).note);
+  if (typeof p.note === 'string' && p.note.trim() !== storedNote && !(typeof p.bufferComment === 'string' && p.bufferComment)) p.bufferComment = p.note;
+  const keep = new Set(['id', 'prNumber', 'prNo', 'status', 'items', 'totalAmount', 'financials', 'bufferComment', 'action', 'isResubmit', 'timeline', 'approvalHistory', 'reason', ...PR_LOG_KEYS]);
+  for (const k of Object.keys(p)) if (!keep.has(k)) delete p[k];
+  return null;
+}
+// ── PR write validation + the server's own amounts (kla round 2) ──
+// 1. SHAPE (prShapeError, every write, every role, every status) : `items` is an array of objects ; a total (totalAmount / total / grandTotal) is a finite number >= 0.
+// 2. AMOUNTS (prEnforceAmounts, a NEW PR and an existing PR whose caller may edit the content - an admin editing an existing PR is not restricted, as before) : when the content changed - a line figure (qty / price / conversion /
+//    discount), the total, or the financials settings - the server computes the total from the lines + the financials settings (the body's, else the stored ones)
+//    with ONE formula (workflowEngine createPR / updatePR / editPRItems, line by line) and WRITES ITS OWN figures over totalAmount / financials :
+//    the body's total is only checked against it (> 0.01 apart -> 400, so the client learns); not sent -> the computed one is used.
+//    Limits : line qty 0..1e7, price 0..1e9, discountPercent 0..100, discountAmount 0..qty*price ; financials : vatMode NONE / AFTER_DISCOUNT / BEFORE_DISCOUNT,
+//    combined discount percent 0..100 / fixed 0..subtotal, shippingCost >= 0, |roundingAdj| <= 1 ; grandTotal never below 0.
+//    Content NOT changed -> the stored total / financials stay (the body's figure is dropped : no 0.01 drift).
+// Accepted as before (cannot be checked, reported): a PR with no lines (nothing to compute from) keeps the total as sent.
+const PR_VAT_MODES = new Set(['NONE', 'AFTER_DISCOUNT', 'BEFORE_DISCOUNT']);
+const PR_ERR_ITEMS = { status: 400, message: 'รายการสินค้าไม่ถูกต้อง' };
+const PR_ERR_TOTAL = { status: 400, message: 'ยอดรวมไม่ถูกต้อง' };
+const PR_ERR_FIN = { status: 400, message: 'ข้อมูลส่วนลด ภาษี หรือค่าขนส่งไม่ถูกต้อง' };
+const PR_ERR_MISMATCH = { status: 400, message: 'ยอดรวมไม่ตรงกับรายการสินค้า' };
+const isObj = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+const hasVal = (v) => v !== undefined && v !== null && v !== '';
+const numOf = (v) => (typeof v === 'number' ? v : (typeof v === 'string' && v.trim() !== '' ? Number(v) : NaN));
+const boolOf = (v) => (v === true || v === 1 || v === '1' || v === 'true' ? true : (v === false || v === 0 || v === '0' || v === 'false' ? false : null));
+const PR_FIN_AMOUNT_KEYS = ['subtotal', 'itemDiscountTotal', 'combinedDiscountAmount', 'totalDiscount', 'vatAmount', 'grandTotal'];
+const PR_FIN_PARAM_DEFAULTS = { combinedDiscountType: 'fixed', combinedDiscountValue: 0, vatMode: 'NONE', roundingAdj: 0, shippingCost: 0 };
+const PR_FIGURE_KEYS = [...PR_QTY_ALIASES, ...PR_PRICE_ALIASES, 'conversionRate', 'conversionRatio', ...PR_DISCOUNT_KEYS];
+function prShapeError(p) {
+  if (!isObj(p)) return null;
+  if (p.items !== undefined && p.items !== null) {
+    if (!Array.isArray(p.items) || p.items.some((it) => !isObj(it))) return PR_ERR_ITEMS;
+  }
+  for (const k of ['totalAmount', 'total', 'grandTotal']) {
+    if (p[k] === undefined || p[k] === null) continue;
+    const n = numOf(p[k]);
+    if (!Number.isFinite(n) || n < 0) return PR_ERR_TOTAL;
+  }
+  if (p.financials !== undefined && p.financials !== null && !isObj(p.financials)) return PR_ERR_FIN;
+  return null;
+}
+const sentTotalOf = (p) => (hasVal(p.totalAmount) ? numOf(p.totalAmount) : (hasVal(p.total) ? numOf(p.total) : null));
+// did a line figure of the body differ from the stored line (same position) ?
+function prFiguresChanged(base, items) {
+  if (items.length !== base.length) return true;
+  for (let i = 0; i < items.length; i += 1) {
+    const s = base[i]; const it = items[i];
+    if (!isObj(s) || !isObj(it)) return true;
+    if (prLineKey2(s) !== prLineKey2(it)) return true;
+    for (const k of PR_FIGURE_KEYS) if (k in it && !looseEq(it[k], s[k])) return true;
+  }
+  return false;
+}
+// did the body's financials differ from the stored ones (settings, and the stored amounts when the stored PR has them) ?
+function prFinChanged(storedFin, bodyFin) {
+  for (const [k, def] of Object.entries(PR_FIN_PARAM_DEFAULTS)) {
+    if (!hasVal(bodyFin[k])) continue;
+    if (!looseEq(bodyFin[k], storedFin && hasVal(storedFin[k]) ? storedFin[k] : def)) return true;
+  }
+  if (storedFin) {
+    const b = boolOf(bodyFin.hasVat); const s = boolOf(storedFin.hasVat);
+    if (b !== null && s !== null && b !== s) return true;
+    for (const k of PR_FIN_AMOUNT_KEYS) if (hasVal(bodyFin[k]) && hasVal(storedFin[k]) && !looseEq(bodyFin[k], storedFin[k])) return true;
+  }
+  return false;
+}
+// the figures of one line, validated when it comes from the body (strict) ; -> { qty, price, pct, da } | null (invalid)
+function prLineFigures(it, strict) {
+  if (!isObj(it)) return strict ? null : { qty: 0, price: 0, pct: 0, da: 0 };
+  const qRaw = it.purchaseQty ?? it.qty ?? it.quantity ?? 1;
+  const qty = Number(qRaw);
+  const pRaw = PR_PRICE_ALIASES_ORDER.map((k) => it[k]).find(hasVal);
+  const price = pRaw === undefined ? 0 : parseFloat(pRaw);
+  const pct = hasVal(it.discountPercent) ? parseFloat(it.discountPercent) : 0;
+  const da = hasVal(it.discountAmount) ? parseFloat(it.discountAmount) : 0;
+  if (!strict) return { qty: Number.isFinite(qty) ? qty : 0, price: Number.isFinite(price) ? price : 0, pct: Number.isFinite(pct) ? pct : 0, da: Number.isFinite(da) ? da : 0 };
+  const scalar = (v) => typeof v === 'number' || typeof v === 'string';
+  if (!scalar(qRaw) || !Number.isFinite(qty) || qty < 0 || qty > 1e7) return null;
+  if (pRaw !== undefined && (!scalar(pRaw) || !Number.isFinite(price) || price < 0 || price > 1e9)) return null;
+  if (hasVal(it.discountPercent) && (!scalar(it.discountPercent) || !Number.isFinite(pct) || pct < 0 || pct > 100)) return null;
+  if (hasVal(it.discountAmount) && (!scalar(it.discountAmount) || !Number.isFinite(da) || da < 0 || da > qty * price + 0.01)) return null;
+  return { qty, price, pct, da };
+}
+/**
+ * The amounts of a write that may change the content of a PR (see the block comment above). cur = the stored row (null = a new PR), p = the body (mutated).
+ * -> null (go on) | { status, message }
+ */
+function prEnforceAmounts(cur, p) {
+  const storedExtra = cur ? parseExtra(cur.extraJson) : {};
+  const storedFin = isObj(storedExtra.financials) ? storedExtra.financials : null;
+  const bodyFin = isObj(p.financials) ? p.financials : null;
+  const storedItems = cur ? parseItemsJson(cur.itemsJson) : [];
+  const sent = sentTotalOf(p);
+  if (cur) {
+    const changed = (sent !== null && Math.abs(sent - Number(cur.totalAmount || 0)) > 0.005)
+      || (Array.isArray(p.items) && prFiguresChanged(storedItems, p.items))
+      || (bodyFin !== null && prFinChanged(storedFin, bodyFin));
+    if (!changed) { delete p.total; delete p.totalAmount; delete p.financials; return null; } // nothing changed : the stored total / financials stay
+  }
+  if (bodyFin) for (const k of PR_FIN_AMOUNT_KEYS) if (hasVal(bodyFin[k]) && !(Number.isFinite(numOf(bodyFin[k])) && numOf(bodyFin[k]) >= 0)) return PR_ERR_TOTAL;
+  const bodyItems = Array.isArray(p.items);
+  const lines = bodyItems ? p.items : storedItems;
+  // settings : the body's financials, else the body's top-level keys (createPR reads those too), else the stored ones. Only a value from the BODY is range-checked
+  // (a stored one is history : an old PR with a odd setting can still have a line edited)
+  const pick = (k) => {
+    for (const [src, fromBody] of [[bodyFin, true], [p, true], [storedFin, false], [storedExtra, false]]) if (src && hasVal(src[k])) return { v: src[k], fromBody };
+    return null;
+  };
+  const num = (k, fallback) => { const x = pick(k); if (!x) return { n: fallback, bad: false }; const n = numOf(x.v); return { n: Number.isFinite(n) ? n : 0, bad: x.fromBody && !Number.isFinite(n) }; };
+  const vm = pick('vatMode'); const vatMode = vm ? String(vm.v) : 'NONE';
+  if (vm && vm.fromBody && !PR_VAT_MODES.has(vatMode)) return PR_ERR_FIN;
+  const cv =num('combinedDiscountValue', 0); const ship = num('shippingCost', 0); const rnd = num('roundingAdj', 0);
+  if (cv.bad || ship.bad || rnd.bad) return PR_ERR_FIN;
+  const ct = pick('combinedDiscountType'); const cType = ct ? String(ct.v) : (cv.n > 0 ? 'percent' : 'fixed');
+  if (ct && ct.fromBody && cType !== 'percent' && cType !== 'fixed') return PR_ERR_FIN;
+  const fromBody = (k) => { const x = pick(k); return Boolean(x && x.fromBody); };
+  if ((fromBody('combinedDiscountValue') && (cv.n < 0 || (cType === 'percent' && cv.n > 100))) || (fromBody('shippingCost') && (ship.n < 0 || ship.n > 1e9)) || (fromBody('roundingAdj') && Math.abs(rnd.n) > 1)) return PR_ERR_FIN;
+  const hv = pick('hasVat'); const hvFlag = hv ? boolOf(hv.v) : null;
+  if (hv && hv.fromBody && hvFlag === null) return PR_ERR_FIN;
+  if (lines.length === 0) return null; // no line to compute from : the total stays as sent (it was checked for its shape)
+  const figs = lines.map((it) => prLineFigures(it, bodyItems));
+  if (figs.some((f) => f === null)) return PR_ERR_ITEMS;
+  const pseudo = figs.map((f) => ({ purchaseQty: f.qty, price: f.price }));
+  const subtotal = figs.reduce((s, f) => s + f.qty * f.price, 0);
+  if (fromBody('combinedDiscountValue') && cType === 'fixed' && cv.n > subtotal + 0.005) return PR_ERR_FIN;
+  // VAT applies when the mode says so and nobody switched it off (hasVat) ; with no flag at all, a sent VAT of 0 on a positive subtotal means "off" (the stored-PR rule)
+  const sv = pick('vatAmount');
+  const vatOn = vatMode !== 'NONE' && (hvFlag !== null ? hvFlag : !(sv && numOf(sv.v) === 0 && subtotal > 0));
+  const settings = { combinedDiscountType: cType, combinedDiscountValue: cv.n, vatMode, roundingAdj: rnd.n, shippingCost: ship.n };
+  // the line discount : the createPR / updatePR rule (a given amount, else from the percent) and the editPRItems rule (the percent wins) - both capped at the line amount
+  const discA = figs.map((f) => Math.min(f.qty * f.price, Math.max(0, f.da || (f.pct > 0 ? f.qty * f.price * (f.pct / 100) : 0))));
+  const discB = figs.map((f) => (f.pct > 0 ? r2(f.qty * f.price * (f.pct / 100)) : Math.min(f.qty * f.price, Math.max(0, f.da))));
+  const cands = [prExpectedAmounts(pseudo, discA, settings, vatOn)];
+  if (discB.some((d, i) => Math.abs(d - discA[i]) > 0.000001)) cands.push(prExpectedAmounts(pseudo, discB, settings, vatOn));
+  // a PR that is not a SELF one has no VAT / shipping / rounding and the create view sends its total as the plain subtotal (item discounts not taken off)
+  const chRaw = trimVal(p.purchaseChannel ?? p.channel ?? (cur && cur.purchaseChannel) ?? storedExtra.channel).toUpperCase();
+  if (chRaw !== 'SELF' && !vatOn && ship.n === 0 && rnd.n === 0) cands.push({ ...cands[0], grandTotal: r2(subtotal) });
+  const finGrand = bodyFin && hasVal(bodyFin.grandTotal) ? numOf(bodyFin.grandTotal) : null;
+  let chosen = cands[0];
+  if (sent !== null) {
+    chosen = cands.find((c) => Math.abs(c.grandTotal - sent) <= 0.01);
+    if (!chosen) return PR_ERR_MISMATCH;
+  } else if (finGrand !== null) {
+    chosen = cands.find((c) => Math.abs(c.grandTotal - finGrand) <= 0.01);
+    if (!chosen) return PR_ERR_MISMATCH;
+  }
+  if (finGrand !== null && Math.abs(chosen.grandTotal - finGrand) > 0.01) return { status: 400, message: 'ยอดรวมใน financials ไม่ตรงกับรายการสินค้า' };
+  delete p.total;
+  p.totalAmount = chosen.grandTotal;
+  delete p.financials;
+  if (bodyFin || storedFin) {
+    p.financials = {
+      subtotal: r2(chosen.subtotal), itemDiscountTotal: r2(chosen.itemDiscountTotal), combinedDiscountType: cType, combinedDiscountValue: cv.n,
+      combinedDiscountAmount: r2(chosen.combinedDiscountAmount), totalDiscount: r2(chosen.totalDiscount), vatMode, vatAmount: chosen.vatAmount,
+      roundingAdj: rnd.n, shippingCost: ship.n, grandTotal: chosen.grandTotal
+    };
   }
   return null;
 }
@@ -398,7 +589,10 @@ const PR_LINK_LOCK_STATUSES = new Set(['PENDING_BUFFER', 'REVIEWED', 'APPROVED',
 function guardPrWrite(authUser, cur, p, rawLinks) {
   const FORBID = { status: 403, message: FORBIDDEN_MSG };
   const perms = resolvePermissions(authUser);
-  // an admin is not restricted, except that his edit of a PR parked at the BUFFER step is checked like the BUFFER's (the total must match the lines)
+  // the shape of the body first, for everybody (an admin too) : items must be an array of objects, a total must be a finite number >= 0
+  const shape = prShapeError(p);
+  if (shape) return shape;
+  // an admin is not restricted (beyond the shape above), except that his edit of a PR parked at the BUFFER step is checked like the BUFFER's (the total must match the lines)
   if (perms.isAdmin && cur.status !== PR_PENDING_BUFFER) return null;
   const canEdit = canEditPrContent(authUser, cur.status);
   if (prContentChanged(cur, p) && !canEdit) return FORBID;
@@ -408,9 +602,13 @@ function guardPrWrite(authUser, cur, p, rawLinks) {
       const be = prBufferEdit(cur, p, rawLinks);
       if (be.status) return be;
       applyBufferEdit(p, be);
-      return null;
+      // the BUFFER (not an admin) writes only what its step is for : allow-list
+      return perms.isAdmin ? null : restrictBufferBody(cur, p);
     }
-    return guardAtBufferNonOwner(cur, p, base);
+    const g = guardAtBufferNonOwner(cur, p, base);
+    if (g) return g;
+    delete p.total; delete p.totalAmount; // unchanged within 0.005 : the stored total stays
+    return null;
   }
   const statusKey = String(cur.status ?? '').trim().toUpperCase();
   if (Array.isArray(p.items)) {
@@ -423,8 +621,12 @@ function guardPrWrite(authUser, cur, p, rawLinks) {
       if (!lockPrLinks(base, p.items)) return FORBID; // e.g. REVIEWED edited by the reviewer / approver : qty / price yes, links no
     }
   }
-  if (!canEdit && p.financials !== undefined) delete p.financials;
-  return null;
+  if (!canEdit) {
+    // content that could not be changed (prContentChanged above) : the stored amounts stay, whatever the body repeats (within 0.005)
+    delete p.financials; delete p.total; delete p.totalAmount;
+    return null;
+  }
+  return prEnforceAmounts(cur, p);
 }
 // what the BUFFER changed, line by line (qty / price / link, before -> after) : the detail of the BUFFER_FORWARD audit row
 function prItemChanges(storedItemsJson, newItems) {
@@ -852,6 +1054,9 @@ BUFFER_STAMP_KEYS.forEach((k) => PR_EXTRA_RESERVED.add(k));
 const BUFFER_COMMENT_MAX = 2000;
 // amounts shown by BudgetView (pr.totalEstimate || pr.totalAmount) : only the server / importer may set them, never a client save ; refPrNo is copied from the PR
 ['totalEstimate', 'estimatedTotal'].forEach((k) => PR_EXTRA_RESERVED.add(k));
+// the top-level copies of the financials (the PR's `financials` object is the server's : prEnforceAmounts) are never stored as extra fields either
+['vatMode', 'combinedDiscountType', 'combinedDiscountValue', 'combinedDiscountAmount', 'roundingAdj', 'shippingCost', 'hasVat', 'subtotal', 'vat', 'vatAmount',
+  'grandTotal', 'itemDiscountTotal', 'totalDiscount'].forEach((k) => PR_EXTRA_RESERVED.add(k));
 PO_EXTRA_RESERVED.add('refPrNo');
 // claim records : written ONLY through docServerPatch (claimPatch) so the server merges, stamps who / when and never lets a save delete them
 ['claimData', 'claimDetails', 'inlineClaimData', 'storeClaims', 'claimEvidence', 'disputeInfo', 'claimResolution', 'grAttachments', 'claimPhoto', 'refundAmount', 'totalRefunded'].forEach((k) => PO_EXTRA_RESERVED.add(k));
@@ -2528,11 +2733,12 @@ async function handleRequest(context, state) {
         const seenPr = new Set();
         for (const p of prList) {
           if (!p || typeof p !== 'object') return errorResponse('ข้อมูลไม่ถูกต้อง', 400);
+          { const shape = prShapeError(p); if (shape) return errorResponse(shape.message, shape.status); } // items = array of objects, totals finite >= 0 (any status, any role)
           if (!p.id) p.id = `PR-${Date.now()}-${uid()}`; // server-made id, fixed once so the checks and the insert agree
           const batchKeys = [String(p.id), String(p.prNumber || p.prNo || p.id)];
           if (batchKeys.some((k) => seenPr.has(k))) return errorResponse('รหัส/เลขที่ PR ซ้ำกันในคำขอเดียวกัน', 400);
           batchKeys.forEach((k) => seenPr.add(k));
-          const cur = p.id ? await lookupStatus(db, 'SELECT id, prNumber, status, department, totalAmount, itemsJson, reason, timelineJson, attachmentsJson, approvalWorkflowJson, extraJson FROM prs WHERE id = ? LIMIT 1', p.id) : null;
+          const cur = p.id ? await lookupStatus(db, 'SELECT id, prNumber, status, department, totalAmount, itemsJson, reason, timelineJson, attachmentsJson, approvalWorkflowJson, purchaseChannel, extraJson FROM prs WHERE id = ? LIMIT 1', p.id) : null;
           prCur.set(p, cur);
           if (cur) {
             // an existing PR: caller must reach its department, and its content (items / total) is frozen once the client freezes it
@@ -2553,6 +2759,8 @@ async function handleRequest(context, state) {
             }
             p.department = deptCode; // stored canonical (upper-case, no DEPT-)
             if (!canAccessDepartment(authUser, p.department)) return errorResponse(FORBIDDEN_MSG, 403);
+            // the amounts of a new PR are the server's : total + financials computed from the lines (a total that does not match them is a 400)
+            { const amt = prEnforceAmounts(null, p); if (amt) return errorResponse(amt.message, amt.status); }
             // a new PR's id must not be another PR's number (lookups are "id = ? OR prNumber = ?")
             if (await lookupStatus(db, 'SELECT id FROM prs WHERE prNumber = ? LIMIT 1', p.id)) return errorResponse('เลขที่/รหัส PR ซ้ำกับเอกสารที่มีอยู่', 409);
             // number (T3.3): the client's own number is kept when it is free. Not sent, or already taken by another PR -> the server issues the
@@ -2588,9 +2796,10 @@ async function handleRequest(context, state) {
           const status = p.status || (curRow ? curRow.status : 'SUBMITTED');
           // existing PR + field not sent => keep the stored value (an upsert must not zero the total)
           const hasTotal = (p.totalAmount !== undefined && p.totalAmount !== null) || (p.total !== undefined && p.total !== null);
-          const total = curRow && !hasTotal ? Number(curRow.totalAmount || 0) : Number(p.totalAmount || p.total || 0);
-          const reason = p.reason || p.purpose || '';
-          const itemsJson = curRow && !Array.isArray(p.items) ? (curRow.itemsJson || '[]') : JSON.stringify(p.items || []);
+          const total = curRow && !hasTotal ? Number(curRow.totalAmount || 0) : Number(p.totalAmount ?? p.total ?? 0);
+          // an upsert that sends no reason keeps the stored one (it must not blank it)
+          const reason = p.reason || p.purpose || (curRow && p.reason === undefined && p.purpose === undefined ? (curRow.reason || '') : '');
+          const itemsJson = curRow && !Array.isArray(p.items) ? (curRow.itemsJson || '[]') : JSON.stringify(Array.isArray(p.items) ? p.items : []);
           // timeline is append-only (entries added by the client get the token's identity / the server's time)
           const timelineJson = JSON.stringify(mergeLog(curRow ? parseJsonSafe(curRow.timelineJson, []) : [], withoutAuditEntries(p.timeline) || [], actorOf(authUser)));
           // existing PR + not sent => keep the stored value (an upsert must not wipe them) ; a final status only accepts ADDED attachments
@@ -2699,10 +2908,11 @@ async function handleRequest(context, state) {
         { const shape = checkBodyShape(p); if (shape) return errorResponse(shape.message, shape.status); }
         const putRawLinks = rawLinksOf(p);
         { const bad = await sanitizeWriteBody(db, p, authUser, { docKey: subId }); if (bad) return errorResponse(bad.message, bad.status); }
+        { const shape = prShapeError(p); if (shape) return errorResponse(shape.message, shape.status); } // items = array of objects, totals finite >= 0 (any status, any role)
         let status = p.status || null;
         let putSkipped = false;
         // resolve ONE row (exact id first, then prNumber) ; the UPDATE below targets that id only
-        const curRow = await lookupStatus(db, 'SELECT id, status, department, totalAmount, itemsJson, reason, timelineJson, attachmentsJson, extraJson FROM prs WHERE id = ? OR prNumber = ? ORDER BY (id = ?) DESC LIMIT 1', subId, subId, subId);
+        const curRow = await lookupStatus(db, 'SELECT id, status, department, totalAmount, itemsJson, reason, timelineJson, attachmentsJson, purchaseChannel, extraJson FROM prs WHERE id = ? OR prNumber = ? ORDER BY (id = ?) DESC LIMIT 1', subId, subId, subId);
         if (curRow) {
           if (!canAccessDepartment(authUser, curRow.department) && !(curRow.status === PR_PENDING_BUFFER && resolvePermissions(authUser).isBuffer)) return errorResponse(FORBIDDEN_MSG, 403);
           { const g = guardPrWrite(authUser, curRow, p, putRawLinks); if (g) return errorResponse(g.message, g.status); }
@@ -2716,12 +2926,12 @@ async function handleRequest(context, state) {
         }
         if (status && curRow && !canTransitionPR(authUser, curRow.status, status)) return errorResponse(FORBIDDEN_MSG, 403);
         const targetId = curRow && curRow.id ? curRow.id : subId;
-        const itemsJson = p.items ? JSON.stringify(p.items) : null;
+        const itemsJson = Array.isArray(p.items) ? JSON.stringify(p.items) : null; // (a non-array was refused above)
         const timelineJson = Array.isArray(p.timeline) ? JSON.stringify(mergeLog(curRow ? parseJsonSafe(curRow.timelineJson, []) : [], withoutAuditEntries(p.timeline), actorOf(authUser))) : null;
         const attachmentsJson = p.attachments ? JSON.stringify(guardedDocBlob(curRow ? parseJsonSafe(curRow.attachmentsJson, []) : undefined, p.attachments, Boolean(curRow), curRow && curRow.status, [])) : null;
         const approvalWorkflowJson = p.approvalWorkflow ? JSON.stringify(p.approvalWorkflow) : null;
         const reason = p.reason || p.purpose || null;
-        const totalAmount = (p.totalAmount !== undefined && p.totalAmount !== null) ? Number(p.totalAmount) : null;
+        const totalAmount = (p.totalAmount !== undefined && p.totalAmount !== null && Number.isFinite(Number(p.totalAmount))) ? Number(p.totalAmount) : null;
         // fields without a column -> merged into extraJson ; the creator (requestedBy / applicantName1) is never rewritten
         const putExtra = pickExtra(p, PR_EXTRA_RESERVED, PR_IDENTITY_KEYS);
         // RESUBMIT only on the client's marker (apiUpdatePR / submitPR) and never on top of a review / approve / send-back / cancel in the same PUT

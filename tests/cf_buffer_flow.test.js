@@ -434,7 +434,10 @@ d('BUFFER step (M10 T3)', () => {
     setBuffer('INACTIVE');
     const id = await submitted();
     const items = [LINE({ qty: 4, purchaseQty: 4 }), LINES()[1]];
-    expect((await call('asst', 'PUT', `/api/prs/${id}`, { items, totalAmount: 1234 })).status).toBe(200); // no total check outside PENDING_BUFFER (unchanged behaviour)
+    // kla round 2 : the total is checked against the lines at every editable status (a wrong total is a 400), the BUFFER-only rules (links ...) still apply only at PENDING_BUFFER
+    expect((await call('asst', 'PUT', `/api/prs/${id}`, { items, totalAmount: 1234 })).status).toBe(400);
+    expect((await call('asst', 'PUT', `/api/prs/${id}`, { items, totalAmount: 450 })).status).toBe(200);
+    expect(row(id).totalAmount).toBe(450);
     expect((await call('asst', 'PUT', `/api/prs/${id}`, { status: 'REVIEWED' })).json.bufferSkipped).toBe(true);
     expect((await call('asst', 'PUT', `/api/prs/${id}`, { items: LINES(), totalAmount: 250 })).status).toBe(200);
   });

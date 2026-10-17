@@ -80,10 +80,12 @@ describe('P4c PR / PO extra fields through the real routes', () => {
       const pr = view.find((x) => x.id === 'PR-EX-1');
       expect(pr).toMatchObject({
         requestedBy: 'Pim Requester', applicantName1: 'Pim Requester', requestedByRole: 'Requester (PD)', requestedDept: 'PD',
-        note: 'ขอซื้อด่วน', memo: 'memo-x', specUrl: 'https://example.com/spec', hasVat: true, vendor: { id: 'V1', name: 'ร้านค้า', taxId: '123' },
+        note: 'ขอซื้อด่วน', memo: 'memo-x', specUrl: 'https://example.com/spec', vendor: { id: 'V1', name: 'ร้านค้า', taxId: '123' },
         financials: { subtotal: 1234, vatAmount: 0, grandTotal: 1234 }, approvalHistory: [{ actorName: 'Pim Requester', action: 'SUBMITTED' }],
         activityLog: [{ action: 'created' }], submittedAt: '2026-01-01T00:00:00.000Z', purchaseChannel: 'SELF', requesterSignature: 'data:image/png;base64,AAAA'
       });
+      // kla round 2 : the top-level copies of the financials (hasVat / vatMode / subtotal ...) are no longer stored as extra fields - `financials` is the server's own
+      expect(pr.hasVat).toBeUndefined();
       expect(pr.requesterId).toBe('REQUESTER_PD'); // role key from the token, not 'FORGED-ID'
       expect(pr.x).toBeUndefined(); // the client cannot smuggle an extraJson of its own
       expect(pr.approvedTotal).toBeUndefined();
@@ -324,7 +326,7 @@ describe('P4c PR / PO extra fields through the real routes', () => {
   it('P4f the server receive endpoint writes receivingInfo / grnHistory / timeline from the token and the PO line\'s product', async () => {
     sdb.prepare("INSERT INTO products (id, code, name, category, department, currentStock, isDeleted) VALUES ('P-REC', 'REC-1', 'rec item', 'PD', 'PD', 1, 0)").run();
     sdb.prepare("UPDATE users SET signature='data:image/png;base64,SIG-L1' WHERE id='U-L1'").run();
-    await call('U-L1', 'POST', '/api/prs', newPr({ items: [{ id: 'i1', productId: 'P-REC', code: 'REC-1', name: 'rec item', qty: 2 }] }));
+    await call('U-L1', 'POST', '/api/prs', newPr({ items: [{ id: 'i1', productId: 'P-REC', code: 'REC-1', name: 'rec item', qty: 2, price: 617 }] }));
     sdb.prepare("UPDATE prs SET status='APPROVED' WHERE id='PR-EX-1'").run();
     await call('U-L3', 'POST', '/api/pos', { id: 'PO-REC', poNo: `PO-PD-${YEAR}-061`, prId: 'PR-EX-1', prNo: `PD001/${YEAR}`, department: 'PD', status: 'ISSUED', totalAmount: 1, grandTotal: 1, items: [{ id: 'i1', productId: 'P-REC', code: 'REC-1', name: 'rec item', qty: 2 }] });
     const r = await call('U-L1', 'POST', '/api/pos/PO-REC/receive', { receivingItems: [{ productId: 'P-REC', goodQty: 2, name: 'Forged name' }], note: 'รับครบ', grNumber: 'GRN-REC-1', user: { name: 'Forged' } });
@@ -492,7 +494,7 @@ describe('P4c PR / PO extra fields through the real routes', () => {
 
     it('/receive on an old row seals only grnHistory ; the other keys keep their legacy first save', async () => {
       sdb.prepare("INSERT INTO products (id, code, name, category, department, currentStock, isDeleted) VALUES ('P-LG', 'LG-1', 'lg item', 'PD', 'PD', 1, 0)").run();
-      await call('U-L1', 'POST', '/api/prs', newPr({ items: [{ id: 'i1', productId: 'P-LG', code: 'LG-1', name: 'lg item', qty: 2 }] }));
+      await call('U-L1', 'POST', '/api/prs', newPr({ items: [{ id: 'i1', productId: 'P-LG', code: 'LG-1', name: 'lg item', qty: 2, price: 617 }] }));
       sdb.prepare("UPDATE prs SET status='APPROVED' WHERE id='PR-EX-1'").run();
       await call('U-L3', 'POST', '/api/pos', { id: 'PO-LG', poNo: `PO-PD-${YEAR}-072`, prId: 'PR-EX-1', prNo: `PD001/${YEAR}`, department: 'PD', status: 'ISSUED', totalAmount: 1, grandTotal: 1, items: [{ id: 'i1', productId: 'P-LG', code: 'LG-1', name: 'lg item', qty: 2 }] });
       // make it an old row : the server holds none of the logs
@@ -538,7 +540,7 @@ describe('P4c PR / PO extra fields through the real routes', () => {
     it('receivedBy in grnHistory / activityLog keeps the old "name (position)" look ; plain name when the user has no position', async () => {
       sdb.prepare("UPDATE users SET title='Warehouse Supervisor' WHERE id='U-L1'").run();
       sdb.prepare("INSERT INTO products (id, code, name, category, department, currentStock, isDeleted) VALUES ('P-RB', 'RB-1', 'rb item', 'PD', 'PD', 1, 0)").run();
-      await call('U-L1', 'POST', '/api/prs', newPr({ items: [{ id: 'i1', productId: 'P-RB', code: 'RB-1', name: 'rb item', qty: 2 }] }));
+      await call('U-L1', 'POST', '/api/prs', newPr({ items: [{ id: 'i1', productId: 'P-RB', code: 'RB-1', name: 'rb item', qty: 2, price: 617 }] }));
       sdb.prepare("UPDATE prs SET status='APPROVED' WHERE id='PR-EX-1'").run();
       await call('U-L3', 'POST', '/api/pos', { id: 'PO-RB', poNo: `PO-PD-${YEAR}-071`, prId: 'PR-EX-1', prNo: `PD001/${YEAR}`, department: 'PD', status: 'ISSUED', totalAmount: 1, grandTotal: 1, items: [{ id: 'i1', productId: 'P-RB', code: 'RB-1', name: 'rb item', qty: 2 }] });
       await call('U-L1', 'PUT', '/api/pos/PO-RB', {
