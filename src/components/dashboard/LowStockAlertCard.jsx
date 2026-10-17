@@ -15,7 +15,7 @@ export default function LowStockAlertCard({
             <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0"></span>
             <span className="truncate">สินค้าใกล้หมด ({lowStockItems.length} รายการ)</span>
           </div>
-          <p className="text-[11px] text-slate-500 truncate">คงเหลือต่ำกว่าจุดสั่งซื้อซ้ำ (ROP)</p>
+          <p className="text-xs text-slate-500 truncate">คงเหลือต่ำกว่าจุดสั่งซื้อซ้ำ (ROP)</p>
         </div>
 
         {/* ปุ่มพระเอก: ขอซื้อทั้งหมดในคลิกเดียว */}
@@ -23,7 +23,7 @@ export default function LowStockAlertCard({
           <button
             type="button"
             onClick={onBatchQuickPR}
-            className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-[11px] font-bold rounded-lg shadow-2xs transition-all flex items-center gap-1 shrink-0 cursor-pointer"
+            className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold rounded-lg shadow-2xs transition-all flex items-center gap-1 shrink-0 cursor-pointer"
             title="สร้างใบขอซื้อ (PR) รวมสินค้าที่ต้องสั่งซื้อซ้ำทั้งหมดในทันที"
           >
             <span>⚡</span>
@@ -39,7 +39,7 @@ export default function LowStockAlertCard({
             <CheckCircle2 className="w-5 h-5" />
           </div>
           <p className="text-xs font-semibold text-slate-800">ไม่มีสินค้าแตะจุดสั่งซื้อซ้ำในขณะนี้</p>
-          <p className="text-[11px] text-slate-400">ระดับสต็อกสินค้าทุกรายการอยู่ในเกณฑ์ปกติ</p>
+          <p className="text-xs text-slate-400">ระดับสต็อกสินค้าทุกรายการอยู่ในเกณฑ์ปกติ</p>
         </div>
       ) : (
         <div className="space-y-2.5 max-h-[460px] overflow-y-auto custom-scrollbar pr-0.5">
@@ -55,7 +55,7 @@ export default function LowStockAlertCard({
                 >
                   {item.name || 'สินค้าไม่มีชื่อ'}
                 </div>
-                <div className="flex items-center gap-2 mt-0.5 text-[11px] font-mono">
+                <div className="flex items-center gap-2 mt-0.5 text-xs font-mono">
                   <span className="text-slate-400 font-normal">{item.sku || item.code || '-'}</span>
                   <span className="text-rose-600 font-semibold font-sans">
                     เหลือ {Number(item.currentStock ?? item.stock ?? 0).toLocaleString()} / ROP: {Number(item.rop ?? item.reorderPoint ?? 0).toLocaleString()} {item.unit || 'ชิ้น'}

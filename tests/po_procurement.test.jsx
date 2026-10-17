@@ -549,6 +549,21 @@ describe('Domain Suite: Purchase Order (PO) & Procurement Operations', () => {
       expect(html).toContain('padding-top:12px');
     });
 
+    it('locks print font sizes to fixed px (no Tailwind scale classes text-xs/sm/base/lg/xl)', () => {
+      const html = renderToStaticMarkup(<PrintablePO po={samplePO} />);
+      const classAttrs = [...html.matchAll(/class="([^"]*)"/g)].map((m) => m[1]);
+      const scaleClass = /(^|\s)text-(xs|sm|base|lg|xl|[2-9]xl)(\s|$)/;
+      expect(classAttrs.filter((c) => scaleClass.test(c))).toEqual([]);
+
+      // Former text-sm (root) / text-xs (header, remarks) are pinned at the old px values.
+      expect(html).toContain('text-[14px] leading-[20px] thai-doc-container');
+      expect(html).toContain('text-[12px]');
+      expect(html).toContain('text-[16px]');
+
+      const src = fs.readFileSync(path.resolve(process.cwd(), 'src/components/po/PrintablePO.jsx'), 'utf-8');
+      expect(src).not.toMatch(/(^|[\s"'`])text-(xs|sm|base|lg|xl|[2-9]xl)(?=[\s"'`])/m);
+    });
+
     it('verifies generatePoPdf.js has scaled down size 9 and size 10 in PDF engine with comfortable vertical spacing', async () => {
       const pdfFilePath = path.resolve(process.cwd(), 'src/utils/generatePoPdf.js');
       const content = fs.readFileSync(pdfFilePath, 'utf-8');
@@ -2022,7 +2037,7 @@ describe('Domain Suite: Purchase Order (PO) & Procurement Operations', () => {
       );
 
       expect(html).not.toContain('px-3.5 py-1.5 bg-slate-50/40');
-      expect(html).toContain('px-3 py-1 bg-emerald-50/50 border-b border-emerald-100 flex items-center justify-between text-[11px] text-emerald-800');
+      expect(html).toContain('px-3 py-1 bg-emerald-50/50 border-b border-emerald-100 flex items-center justify-between text-xs text-emerald-800');
       expect(html).toContain('✓ เคลมสำเร็จ: ได้รับเงินคืน ฿246.00 เข้าแผนกแล้ว');
       expect(html).toContain('✓ ได้รับเงินคืน ฿246.00 เข้าแผนกแล้ว (16:39)');
     });

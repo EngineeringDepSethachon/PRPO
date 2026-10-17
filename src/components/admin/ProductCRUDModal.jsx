@@ -360,7 +360,7 @@ export default function ProductCRUDModal({
                               const next = generateNextProductCode(allProducts, currentDept);
                               setItemCode(next);
                             }}
-                            className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
                             title="รันรหัสสินค้าอัตโนมัติตามแผนก"
                           >
                             <Sparkles className="w-3 h-3 text-amber-500" />
@@ -368,7 +368,7 @@ export default function ProductCRUDModal({
                           </button>
                         )}
                         {isSkuDuplicate && (
-                          <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1 animate-pulse">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1 animate-pulse">
                             <AlertTriangle className="w-3 h-3 text-rose-500" /> รหัสซ้ำ!
                           </span>
                         )}
@@ -397,7 +397,7 @@ export default function ProductCRUDModal({
                     {isSkuDuplicate && (
                       <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1 font-medium">
                         <span>⚠️ รหัสนี้ถูกใช้งานแล้วในแผนก {currentDept}</span>
-                        {duplicateItem && <span className="text-[11px] text-rose-500 font-normal">({duplicateItem.name})</span>}
+                        {duplicateItem && <span className="text-xs text-rose-500 font-normal">({duplicateItem.name})</span>}
                       </p>
                     )}
                   </div>
@@ -418,7 +418,7 @@ export default function ProductCRUDModal({
                             })()}
                           </span>
                         </div>
-                        <span className="px-2 py-0.5 rounded-md text-[10px] font-bold border bg-indigo-50 text-indigo-700 border-indigo-200">
+                        <span className="px-2 py-0.5 rounded-md text-xs font-bold border bg-indigo-50 text-indigo-700 border-indigo-200">
                           {lockedCategory}
                         </span>
                       </div>
@@ -530,7 +530,7 @@ export default function ProductCRUDModal({
                     <Repeat className="w-4 h-4 text-indigo-600" />
                     <span>2. ระบบแปลงหน่วยนับ (Unit Conversion)</span>
                   </div>
-                  <span className="text-[11px] text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full font-semibold border border-indigo-100">
+                  <span className="text-xs text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full font-semibold border border-indigo-100">
                     รองรับหน่วยซื้อ & ตัดสต็อกย่อย
                   </span>
                 </div>
@@ -708,7 +708,7 @@ export default function ProductCRUDModal({
                         <Sparkles className="w-4 h-4 text-indigo-600" />
                         จำนวนสต็อกเริ่มต้น (Opening Stock Balance)
                       </span>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5">
                         ระบุจำนวนคงเหลือในคลังจริงเริ่มต้น (หน่วย: {stockUnit || 'หน่วยสต็อก'})
                       </p>
                     </div>

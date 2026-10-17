@@ -271,7 +271,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
               <h1 className="text-xl font-bold text-slate-900 tracking-tight">
                 บันทึกประวัติระบบ (Audit Logs)
               </h1>
-              <span className="text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
                 Security & Compliance
               </span>
             </div>
@@ -327,7 +327,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-black font-mono text-slate-900">{stats.total}</span>
-            <span className="text-[11px] text-slate-400 font-medium">รายการ</span>
+            <span className="text-xs text-slate-400 font-medium">รายการ</span>
           </div>
         </div>
 
@@ -340,7 +340,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-black font-mono text-blue-600">{stats.purchaseCount}</span>
-            <span className="text-[11px] text-slate-400 font-medium">กิจกรรม</span>
+            <span className="text-xs text-slate-400 font-medium">กิจกรรม</span>
           </div>
         </div>
 
@@ -353,7 +353,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-black font-mono text-teal-600">{stats.inventoryCount}</span>
-            <span className="text-[11px] text-slate-400 font-medium">กิจกรรม</span>
+            <span className="text-xs text-slate-400 font-medium">กิจกรรม</span>
           </div>
         </div>
 
@@ -366,7 +366,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
           </div>
           <div className="mt-2 flex items-baseline gap-2">
             <span className="text-2xl font-black font-mono text-purple-600">{stats.masterRbacCount}</span>
-            <span className="text-[11px] text-slate-400 font-medium">กิจกรรม</span>
+            <span className="text-xs text-slate-400 font-medium">กิจกรรม</span>
           </div>
         </div>
       </div>
@@ -430,7 +430,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pt-2 border-t border-slate-100">
           {/* Module Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            <span className="text-[11px] font-semibold text-slate-400 mr-1 uppercase tracking-wider">หมวดหมู่:</span>
+            <span className="text-xs font-semibold text-slate-400 mr-1 uppercase tracking-wider">หมวดหมู่:</span>
             {['ALL', 'PURCHASE', 'INVENTORY', 'MASTER', 'RBAC'].map((modKey) => {
               const active = selectedModule === modKey;
               return (
@@ -452,7 +452,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
 
           {/* Time Range Filter */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-            <span className="text-[11px] font-semibold text-slate-400 mr-1 uppercase tracking-wider">ช่วงเวลา:</span>
+            <span className="text-xs font-semibold text-slate-400 mr-1 uppercase tracking-wider">ช่วงเวลา:</span>
             {[
               { id: 'ALL', label: 'ทั้งหมด' },
               { id: 'TODAY', label: 'วันนี้' },
@@ -505,7 +505,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+              <tr className="bg-slate-50/80 border-b border-slate-200/80 text-xs font-bold text-slate-500 uppercase tracking-wider">
                 <th className="py-3.5 px-4 font-mono">เวลาบันทึก</th>
                 <th className="py-3.5 px-4">ผู้ดำเนินการ</th>
                 <th className="py-3.5 px-4">หมวดหมู่</th>
@@ -550,7 +550,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
                       className="hover:bg-slate-50/70 transition-colors group cursor-default"
                     >
                       {/* 1. Timestamp */}
-                      <td className="py-3 px-4 font-mono text-[11px] text-slate-500 whitespace-nowrap">
+                      <td className="py-3 px-4 font-mono text-xs text-slate-500 whitespace-nowrap">
                         <div className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                           <span>{formatLocalTimestamp(log.timestamp || log.createdAt || log.timeFormatted)}</span>
@@ -568,11 +568,11 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
                               {log.actor?.name || 'System'}
                             </div>
                             <div className="flex items-center gap-1.5 mt-0.5">
-                              <span className="text-[10px] text-slate-400 truncate max-w-[100px]">
+                              <span className="text-xs text-slate-400 truncate max-w-[100px]">
                                 {log.actor?.role || 'Staff'}
                               </span>
                               {log.actor?.department && (
-                                <span className="text-[9px] font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
+                                <span className="text-xs font-bold px-1.5 py-0.2 rounded bg-slate-100 text-slate-600 border border-slate-200">
                                   {log.actor.department}
                                 </span>
                               )}
@@ -583,14 +583,14 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
 
                       {/* 3. Module */}
                       <td className="py-3 px-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-[10px] font-semibold border ${moduleInfo.color}`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-lg text-xs font-semibold border ${moduleInfo.color}`}>
                           {moduleInfo.label}
                         </span>
                       </td>
 
                       {/* 4. Action */}
                       <td className="py-3 px-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-bold border ${actionBadge}`}>
+                        <span className={`inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-bold border ${actionBadge}`}>
                           {actionIcon}
                           <span>{log.action}</span>
                         </span>
@@ -598,7 +598,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
 
                       {/* 5. Target Ref */}
                       <td className="py-3 px-4 font-mono whitespace-nowrap">
-                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-semibold text-[11px] border border-slate-200/80">
+                        <span className="px-2 py-0.5 rounded-md bg-slate-100 text-slate-800 font-semibold text-xs border border-slate-200/80">
                           {log.targetRef || '-'}
                         </span>
                       </td>
@@ -625,7 +625,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
                           <button
                             type="button"
                             onClick={() => handleOpenDiff(log)}
-                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 text-[11px] font-medium border border-slate-200 transition-all cursor-pointer"
+                            className="inline-flex items-center gap-1 px-2 py-1 rounded-lg bg-slate-50 hover:bg-slate-100 text-slate-500 text-xs font-medium border border-slate-200 transition-all cursor-pointer"
                           >
                             <Eye className="w-3 h-3" />
                             <span>ดูบันทึก</span>
@@ -666,7 +666,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
                   <h3 className="text-sm font-bold text-slate-900">
                     รายละเอียดบันทึกการเปลี่ยนแปลง (Visual Diff)
                   </h3>
-                  <p className="text-[11px] font-mono text-slate-400">
+                  <p className="text-xs font-mono text-slate-400">
                     ID: {selectedDiffLog.id}
                   </p>
                 </div>
@@ -707,31 +707,31 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
               {/* Event Metadata Card */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 text-xs">
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">วันและเวลา</span>
+                  <span className="text-xs uppercase font-bold text-slate-400">วันและเวลา</span>
                   <p className="font-mono font-medium text-slate-700 mt-0.5">
                     {formatLocalTimestamp(selectedDiffLog.timestamp || selectedDiffLog.createdAt || selectedDiffLog.timeFormatted)}
                   </p>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">เอกสารอ้างอิง</span>
+                  <span className="text-xs uppercase font-bold text-slate-400">เอกสารอ้างอิง</span>
                   <p className="font-mono font-bold text-indigo-700 mt-0.5">
                     {selectedDiffLog.targetRef || '-'}
                   </p>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">กิจกรรม</span>
+                  <span className="text-xs uppercase font-bold text-slate-400">กิจกรรม</span>
                   <div className="mt-0.5">
-                    <span className={`inline-block px-2 py-0.5 rounded text-[10px] font-bold border ${getActionBadgeClass(selectedDiffLog.action)}`}>
+                    <span className={`inline-block px-2 py-0.5 rounded text-xs font-bold border ${getActionBadgeClass(selectedDiffLog.action)}`}>
                       {selectedDiffLog.action}
                     </span>
                   </div>
                 </div>
                 <div>
-                  <span className="text-[10px] uppercase font-bold text-slate-400">ผู้ดำเนินการ</span>
+                  <span className="text-xs uppercase font-bold text-slate-400">ผู้ดำเนินการ</span>
                   <p className="font-semibold text-slate-800 mt-0.5 truncate">
                     {selectedDiffLog.actor?.name || 'System'}
                   </p>
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-xs text-slate-400">
                     {selectedDiffLog.actor?.role} ({selectedDiffLog.actor?.department || 'ALL'})
                   </span>
                 </div>
@@ -754,7 +754,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
                   <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
                     <table className="w-full text-xs text-left border-collapse">
                       <thead>
-                        <tr className="bg-slate-100/80 border-b border-slate-200 text-[11px] font-bold text-slate-600">
+                        <tr className="bg-slate-100/80 border-b border-slate-200 text-xs font-bold text-slate-600">
                           <th className="py-2.5 px-4 w-1/4">ข้อมูลที่มีการแก้ไข</th>
                           <th className="py-2.5 px-4 w-1/3 text-rose-700">ค่าเดิม (Before)</th>
                           <th className="py-2.5 px-2 text-center w-12 text-slate-400"></th>
@@ -771,7 +771,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
 
                             {/* Before Value (Red crossed out) */}
                             <td className="py-3 px-4">
-                              <span className="inline-block px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 line-through border border-rose-200/80 font-mono text-[11px] break-all">
+                              <span className="inline-block px-2.5 py-1 rounded-lg bg-rose-50 text-rose-700 line-through border border-rose-200/80 font-mono text-xs break-all">
                                 {change.before || '-'}
                               </span>
                             </td>
@@ -783,7 +783,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
 
                             {/* After Value (Green bold) */}
                             <td className="py-3 px-4">
-                              <span className="inline-block px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/80 font-mono text-[11px] break-all">
+                              <span className="inline-block px-2.5 py-1 rounded-lg bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/80 font-mono text-xs break-all">
                                 {change.after || '-'}
                               </span>
                             </td>

@@ -827,7 +827,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                     <div key={idx} className="flex justify-between items-center text-slate-600 py-1">
                       <span className="truncate max-w-sm"><strong className="font-mono text-slate-800">[{item.code || '-'}]</strong> {item.name}</span>
                       <span className="font-mono shrink-0 ml-2 font-semibold text-slate-700">
-                        {claimableQty} {item.unit || item.purchaseUnit || 'ชิ้น'} <span className="text-[10px] text-slate-400 font-sans">(ค้างรับ/ชำรุด)</span>
+                        {claimableQty} {item.unit || item.purchaseUnit || 'ชิ้น'} <span className="text-xs text-slate-400 font-sans">(ค้างรับ/ชำรุด)</span>
                       </span>
                     </div>
                   )})}
@@ -1060,7 +1060,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                             ) : (
                               <span className="w-2 h-2 rounded-full bg-slate-300 shrink-0"></span>
                             )}
-                            <span className={`text-[11px] truncate ${
+                            <span className={`text-xs truncate ${
                               isStepCurrent 
                                 ? 'text-indigo-700 font-bold' 
                                 : isStepDone 
@@ -1106,7 +1106,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                 {/* Vendor + Delivery 2-col grid */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2.5 shadow-2xs">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest">
                       <Store className="w-3.5 h-3.5 text-indigo-500" />
                       ผู้ขาย / Vendor
                     </div>
@@ -1116,7 +1116,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                           <span>🏪</span>
                           <span>{displayVendor || getVendorDisplayName(selectedPO.vendorName) || selectedPO.vendorId}</span>
                         </div>
-                        <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                        <p className="text-xs text-slate-400 font-mono mt-0.5">
                           {selectedPO.purchaseChannel === 'ONLINE' ? 'สั่งซื้อออนไลน์' : (selectedPO.vendorId || 'ผู้ขาย')}
                         </p>
                       </div>
@@ -1150,7 +1150,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                   </div>
 
                   <div className="bg-white rounded-xl border border-slate-200 p-4 space-y-2.5 shadow-2xs">
-                    <div className="flex items-center gap-1.5 text-[11px] font-bold text-slate-500 uppercase tracking-widest">
+                    <div className="flex items-center gap-1.5 text-xs font-bold text-slate-500 uppercase tracking-widest">
                       <Truck className="w-3.5 h-3.5 text-indigo-500" />
                       การจัดส่ง & อ้างอิง
                     </div>
@@ -1170,7 +1170,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                           <ExternalLink className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                           <div className="min-w-0">
                             <p className="text-xs font-semibold text-indigo-800">ดูเอกสารอ้างอิง PR</p>
-                            <p className="text-[10px] text-indigo-400 truncate">{selectedPO.specUrl}</p>
+                            <p className="text-xs text-indigo-400 truncate">{selectedPO.specUrl}</p>
                           </div>
                         </button>
                       )}
@@ -1190,13 +1190,13 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                           <p className="text-xs font-bold text-rose-900">
                             🚨 พบสินค้ามีปัญหา: {selectedPO.claimData.reason}
                             {selectedPO.claimRound > 0 && (
-                              <span className="ml-2 text-[10px] font-bold bg-rose-200 text-rose-800 px-2 py-0.5 rounded-full font-mono">รอบที่ {selectedPO.claimRound}</span>
+                              <span className="ml-2 text-xs font-bold bg-rose-200 text-rose-800 px-2 py-0.5 rounded-full font-mono">รอบที่ {selectedPO.claimRound}</span>
                             )}
                           </p>
                           <p className="text-xs text-rose-700 mt-0.5">{selectedPO.claimData.description}</p>
                         </div>
                       </div>
-                      <div className="text-right text-[10px] text-rose-400 shrink-0">
+                      <div className="text-right text-xs text-rose-400 shrink-0">
                         <span>{selectedPO.claimData.reportedBy || '-'}</span>
                         <span className="block font-mono mt-0.5">{selectedPO.claimData.reportedAt || '-'}</span>
                       </div>
@@ -1212,7 +1212,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                         <div className="p-1.5 bg-rose-100 rounded-lg"><ShieldAlert className="w-4 h-4 text-rose-600" /></div>
                         <div>
                           <h3 className="text-sm font-bold text-slate-900">🔧 จัดการเคสสินค้ามีปัญหา</h3>
-                          <p className="text-[11px] text-slate-400 mt-0.5">เลือกแนวทางแก้ไขและระบุรายละเอียด</p>
+                          <p className="text-xs text-slate-400 mt-0.5">เลือกแนวทางแก้ไขและระบุรายละเอียด</p>
                         </div>
                       </div>
                       <button type="button" onClick={() => setShowSelfClaimResolution(false)}
@@ -1238,7 +1238,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                                   className="w-3.5 h-3.5 mt-0.5 cursor-pointer text-rose-600" />
                                 <div>
                                   <p className="text-xs font-bold text-slate-800">{opt.icon} {opt.label}</p>
-                                  <p className="text-[10px] text-slate-400 mt-0.5 leading-snug">{opt.desc}</p>
+                                  <p className="text-xs text-slate-400 mt-0.5 leading-snug">{opt.desc}</p>
                                 </div>
                               </div>
                             </label>
@@ -1261,7 +1261,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                                 placeholder={`0.00 (รวม PO: ฿${(selectedPO.grandTotal || 0).toLocaleString()})`}
                                 className="w-full pl-7 pr-3 py-2 bg-white border border-emerald-300 rounded-lg text-xs font-mono font-medium outline-none focus:ring-2 focus:ring-emerald-400/20 focus:border-emerald-500" />
                             </div>
-                            <p className="text-[10px] text-emerald-700 font-medium">ยอดนี้จะถูกคืนกลับเข้างบประมาณฝ่าย {selectedPO.department} อัตโนมัติ</p>
+                            <p className="text-xs text-emerald-700 font-medium">ยอดนี้จะถูกคืนกลับเข้างบประมาณฝ่าย {selectedPO.department} อัตโนมัติ</p>
                           </div>
                         )}
                         <div>
@@ -1294,7 +1294,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                         <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                         <div>
                           <p className="text-xs font-bold text-amber-900">อยู่ระหว่างผู้จัดซื้อดำเนินการแก้ไข</p>
-                          <p className="text-[11px] text-amber-700 mt-0.5">PO นี้อยู่ในสถานะ CLAIM — รอผู้จัดซื้อต้นทางประสานงานแก้ไขปัญหา</p>
+                          <p className="text-xs text-amber-700 mt-0.5">PO นี้อยู่ในสถานะ CLAIM — รอผู้จัดซื้อต้นทางประสานงานแก้ไขปัญหา</p>
                         </div>
                       </div>
                     )}
@@ -1307,7 +1307,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                     <span className="text-xs font-bold text-slate-800 flex items-center gap-2">
                       <Package className="w-4 h-4 text-indigo-500" />
                       <span>รายการสินค้าที่สั่งซื้อ</span>
-                      <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full font-mono">
+                      <span className="text-xs font-bold text-indigo-700 bg-indigo-50 border border-indigo-200/80 px-2 py-0.5 rounded-full font-mono">
                         {selectedPO.items?.length || 0} รายการ
                       </span>
                     </span>
@@ -1355,7 +1355,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                             {/* Platform Tag, Dual-UOM badge & External Link */}
                             <div className="flex items-center gap-2 flex-wrap text-xs pt-0.5">
                               {item.storePlatform && (
-                                <span className={`px-2 py-0.5 rounded-md font-semibold text-[11px] ${
+                                <span className={`px-2 py-0.5 rounded-md font-semibold text-xs ${
                                   String(item.storePlatform).toLowerCase().includes('shopee')
                                     ? 'bg-orange-50 text-orange-700 border border-orange-200'
                                     : String(item.storePlatform).toLowerCase().includes('lazada')
@@ -1366,12 +1366,12 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                                 </span>
                               )}
                               {ratio > 1 && (
-                                <span className="px-2 py-0.5 rounded-md font-semibold text-[11px] bg-indigo-50 text-indigo-700 border border-indigo-200">
+                                <span className="px-2 py-0.5 rounded-md font-semibold text-xs bg-indigo-50 text-indigo-700 border border-indigo-200">
                                   1 {purchaseUom} = {ratio.toLocaleString()} {baseUom}
                                 </span>
                               )}
                               {(item.actualStoreName || item.storeName) && (
-                                <span className="text-slate-500 font-medium text-[11px] truncate">
+                                <span className="text-slate-500 font-medium text-xs truncate">
                                   ร้าน: <strong className="text-slate-700 font-semibold">{item.actualStoreName || item.storeName}</strong>
                                 </span>
                               )}
@@ -1384,7 +1384,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                                     target="_blank"
                                     rel="noopener noreferrer"
                                     onClick={(e) => e.stopPropagation()}
-                                    className="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors shrink-0"
+                                    className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline transition-colors shrink-0"
                                     title="เปิดลิงก์หน้าร้านค้าภายนอก"
                                   >
                                     <span>เปิดร้านค้า</span>
@@ -1401,16 +1401,16 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                               {/* Receipt & Refund Badges */}
                               {refundedQty > 0 ? (
                                 <div className="flex items-center gap-1.5 flex-wrap sm:justify-end">
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-[11px] font-semibold">
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-semibold">
                                     รับแล้ว: {receivedQty.toLocaleString()}
                                   </span>
-                                  <span className="text-slate-400 font-bold text-[11px]">+</span>
-                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-[11px] font-semibold">
+                                  <span className="text-slate-400 font-bold text-xs">+</span>
+                                  <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-amber-50 text-amber-800 border border-amber-200 text-xs font-semibold">
                                     คืนเงินแล้ว: {refundedQty.toLocaleString()} {purchaseUom} (ปิดรับ)
                                   </span>
                                 </div>
                               ) : (
-                                <div className="text-slate-500 text-[11px]">
+                                <div className="text-slate-500 text-xs">
                                   สั่ง: <span className="font-bold text-slate-800">{pQty.toLocaleString()}</span> {purchaseUom}
                                   <span className="mx-1.5 text-slate-300">|</span>
                                   รับแล้ว: <span className={`font-bold ${isFullyReceived ? 'text-emerald-700' : 'text-slate-700'}`}>
@@ -1422,22 +1422,22 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
 
                               {/* Item Specifications: Dual-UOM if applicable */}
                               {ratio > 1 ? (
-                                <div className="text-[11px] text-slate-600 font-sans sm:text-right">
+                                <div className="text-xs text-slate-600 font-sans sm:text-right">
                                   <span className="font-semibold text-slate-800">{pQty.toLocaleString()} {purchaseUom}</span>{' '}
                                   <span className="text-indigo-600 font-mono font-medium">({baseStockQty.toLocaleString()} {baseUom})</span>{' '}
                                   <span className="text-slate-400">@</span>{' '}
                                   <span className="font-mono text-slate-700 font-semibold">฿{price.toLocaleString()} / {purchaseUom}</span>{' '}
-                                  <span className="text-slate-500 font-mono text-[11px]">(฿{baseUnitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {baseUom})</span>
+                                  <span className="text-slate-500 font-mono text-xs">(฿{baseUnitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {baseUom})</span>
                                 </div>
                               ) : (
-                                <div className="text-[11px] text-slate-400">
+                                <div className="text-xs text-slate-400">
                                   @ ฿{price.toLocaleString()} / {purchaseUom}
                                 </div>
                               )}
                             </div>
 
                             <div className="text-right shrink-0 pl-3 sm:border-l sm:border-slate-100">
-                              <span className="text-[10px] text-slate-400 block uppercase font-sans font-medium">รวม</span>
+                              <span className="text-xs text-slate-400 block uppercase font-sans font-medium">รวม</span>
                               <span className="font-mono text-sm font-bold text-slate-900">
                                 ฿{lineTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                               </span>
@@ -1505,11 +1505,11 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
 
                         return (
                           <div className="bg-slate-100/90 border border-slate-200 rounded-lg p-2.5 mt-2 space-y-1 text-xs">
-                            <div className="text-[11px] font-bold text-slate-700 flex items-center justify-between">
+                            <div className="text-xs font-bold text-slate-700 flex items-center justify-between">
                               <span>กระทบยอดงบประมาณ (Reconciliation):</span>
                               <span className="text-emerald-700 font-bold font-mono">ประหยัดงบ PR ฿{totalRefundVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             </div>
-                            <div className="text-[11px] font-mono text-slate-600 flex items-center justify-between gap-1 flex-wrap pt-0.5 border-t border-slate-200/60">
+                            <div className="text-xs font-mono text-slate-600 flex items-center justify-between gap-1 flex-wrap pt-0.5 border-t border-slate-200/60">
                               <span>งบเดิม ฿{originalBudgetVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                               <span className="text-slate-400">→</span>
                               <span className="font-bold text-slate-800">จ่ายจริง ฿{actualSpentVal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
@@ -1522,7 +1522,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                       {/* Online Settlement Breakdown */}
                       {hasSettlement && (
                         <div className="bg-emerald-50/90 border border-emerald-300 rounded-lg p-2.5 mt-2 space-y-1.5 text-xs">
-                          <div className="text-[11px] font-bold text-emerald-900 flex items-center justify-between">
+                          <div className="text-xs font-bold text-emerald-900 flex items-center justify-between">
                             <span className="flex items-center gap-1">
                               <Receipt className="w-3.5 h-3.5 text-emerald-700" />
                               สรุปการปิดยอดจ่ายจริง (Settlement):
@@ -1533,7 +1533,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                               </span>
                             )}
                           </div>
-                          <div className="text-[11px] font-mono text-slate-700 flex items-center justify-between gap-1 flex-wrap pt-1 border-t border-emerald-200/70">
+                          <div className="text-xs font-mono text-slate-700 flex items-center justify-between gap-1 flex-wrap pt-1 border-t border-emerald-200/70">
                             <span>ยอดอนุมัติ: ฿{grandTotalAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
                             <span className="text-slate-400">→</span>
                             <span className="font-bold text-emerald-900">
@@ -1541,7 +1541,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                             </span>
                           </div>
                           {selectedPO.settlementNote && (
-                            <div className="text-[11px] text-emerald-800 pt-0.5">
+                            <div className="text-xs text-emerald-800 pt-0.5">
                               <span className="font-semibold">หมายเหตุ:</span> {selectedPO.settlementNote}
                             </div>
                           )}
@@ -1551,7 +1551,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                                 href={selectedPO.settlementProofUrl} 
                                 target="_blank" 
                                 rel="noopener noreferrer" 
-                                className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-700 hover:text-emerald-900 underline"
+                                className="inline-flex items-center gap-1 text-xs font-bold text-emerald-700 hover:text-emerald-900 underline"
                               >
                                 <ExternalLink className="w-3 h-3" /> ดูหลักฐาน/สลิปโอนเงิน
                               </a>
@@ -1591,7 +1591,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                               <span className="font-semibold font-mono">[{ng.code || ng.productCode || ng.productId}]</span> {ng.name}
                               <span className="text-rose-600 ml-2 font-mono">{ng.qty} {ng.unit}</span>
                             </div>
-                            <div className="text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-rose-200/70 text-[11px]">
+                            <div className="text-slate-700 bg-white px-2.5 py-1 rounded-lg border border-rose-200/70 text-xs">
                               <span className="text-rose-700 font-semibold">อาการ:</span> {ng.defectReason}
                             </div>
                           </div>
@@ -1632,7 +1632,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                           <Camera className="w-4 h-4 text-indigo-500" />
                           <span>ภาพถ่ายและเอกสารการตรวจรับ / หลักฐานเคลม</span>
                         </div>
-                        <span className="text-[11px] text-slate-400 font-mono">
+                        <span className="text-xs text-slate-400 font-mono">
                           {uniqueAttachments.length + claimPhotos.length} ไฟล์
                         </span>
                       </div>
@@ -1643,7 +1643,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                             className="group bg-slate-50 border border-slate-200 rounded-xl p-1.5 hover:border-indigo-300 hover:shadow-sm transition-all cursor-pointer flex flex-col items-center">
                             {att.type === 'application/pdf' ? (
                               <div className="w-full h-16 bg-rose-50 rounded-lg flex flex-col items-center justify-center text-rose-500">
-                                <FileText className="w-5 h-5" /><span className="text-[9px] font-bold mt-0.5">PDF</span>
+                                <FileText className="w-5 h-5" /><span className="text-xs font-bold mt-0.5">PDF</span>
                               </div>
                             ) : (
                               <ProxiedImg
@@ -1654,7 +1654,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                                 className="w-full h-16 object-cover rounded-lg group-hover:scale-105 transition-transform"
                               />
                             )}
-                            <p className="text-[10px] font-medium text-slate-600 truncate w-full mt-1 text-center font-mono">{att.name || att.fileName || `เอกสาร #${i + 1}`}</p>
+                            <p className="text-xs font-medium text-slate-600 truncate w-full mt-1 text-center font-mono">{att.name || att.fileName || `เอกสาร #${i + 1}`}</p>
                           </button>
                         ))}
                         {claimPhotos.map((att, i) => (
@@ -1668,7 +1668,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                               alt={att.name || 'claim evidence'}
                               className="w-full h-16 object-cover rounded-lg group-hover:scale-105 transition-transform"
                             />
-                            <p className="text-[10px] font-medium text-rose-700 truncate w-full mt-1 text-center font-mono">{att.name || `หลักฐาน #${i + 1}`}</p>
+                            <p className="text-xs font-medium text-rose-700 truncate w-full mt-1 text-center font-mono">{att.name || `หลักฐาน #${i + 1}`}</p>
                           </button>
                         ))}
                       </div>

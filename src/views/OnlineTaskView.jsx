@@ -455,7 +455,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
         <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
           <div className="flex items-center gap-3 px-3 py-1.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
             <div className="text-right">
-              <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">มูลค่าคำขอในมือ</span>
+              <span className="text-xs uppercase font-bold text-slate-400 block tracking-wider">มูลค่าคำขอในมือ</span>
               <span className="font-mono font-bold text-slate-800 text-sm">
                 ฿{metrics.totalAmount.toLocaleString()}
               </span>
@@ -483,7 +483,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
           >
             <Clock className={`w-3.5 h-3.5 ${activeTab === 'PENDING' || metrics.pending > 0 ? 'text-indigo-600' : 'text-slate-400'}`} />
             <span>รอดำเนินการ</span>
-            <span className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] font-bold ${
+            <span className={`px-1.5 py-0.2 rounded-full font-mono text-xs font-bold ${
               metrics.pending > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200/60 text-slate-400'
             }`}>
               {metrics.pending}
@@ -502,7 +502,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
           >
             <Truck className={`w-3.5 h-3.5 ${activeTab === 'ORDERED' ? 'text-indigo-600' : 'text-slate-400'}`} />
             <span>สั่งซื้อแล้ว</span>
-            <span className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] font-bold ${
+            <span className={`px-1.5 py-0.2 rounded-full font-mono text-xs font-bold ${
               metrics.ordered > 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-200/60 text-slate-400'
             }`}>
               {metrics.ordered}
@@ -544,7 +544,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
           >
             <CheckCircle2 className={`w-3.5 h-3.5 ${activeTab === 'CLOSED' ? 'text-emerald-600' : 'text-slate-400'}`} />
             <span>ปิดงานสำเร็จ</span>
-            <span className={`px-1.5 py-0.2 rounded-full font-mono text-[10px] font-bold ${
+            <span className={`px-1.5 py-0.2 rounded-full font-mono text-xs font-bold ${
               metrics.closed > 0 ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200/60 text-slate-400'
             }`}>
               {metrics.closed}
@@ -562,7 +562,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
             }`}
           >
             <span>ทั้งหมด</span>
-            <span className="font-mono text-[10px] text-slate-400 font-semibold">({metrics.total})</span>
+            <span className="font-mono text-xs text-slate-400 font-semibold">({metrics.total})</span>
           </button>
         </div>
 
@@ -679,7 +679,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
               </div>
             </div>
 
-            <div className="text-[11px] text-slate-400">รอบบัญชี: {formatThaiMonth(selectedMonth)}</div>
+            <div className="text-xs text-slate-400">รอบบัญชี: {formatThaiMonth(selectedMonth)}</div>
           </div>
 
           {/* Monthly Procurement KPI Summary Chip */}
@@ -701,7 +701,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
                 </>
               )}
             </div>
-            <div className="text-[11px] text-slate-400">รอบบัญชี: {formatThaiMonth(selectedMonth)}</div>
+            <div className="text-xs text-slate-400">รอบบัญชี: {formatThaiMonth(selectedMonth)}</div>
           </div>
         </div>
       )}

@@ -73,7 +73,7 @@ export default function LoginView({ onLoginSuccess }) {
           </p>
 
           {/* Localhost Environment Badge */}
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/70 border border-emerald-800/60 text-emerald-400 text-[11px] font-bold mt-3 shadow-inner">
+          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-emerald-950/70 border border-emerald-800/60 text-emerald-400 text-xs font-bold mt-3 shadow-inner">
             <Monitor className="w-3.5 h-3.5 text-emerald-400" />
             <span>Localhost Testing Mode (เข้าสู่ระบบตาม Position)</span>
           </div>
@@ -123,7 +123,7 @@ export default function LoginView({ onLoginSuccess }) {
                 <Sparkles className="w-3.5 h-3.5 text-indigo-400" />
                 คลิกเลือกตำแหน่งเพื่อเข้าใช้งานระบบทันที:
               </span>
-              <span className="text-[10px] text-slate-500 font-medium">6 ตำแหน่งทดสอบ</span>
+              <span className="text-xs text-slate-500 font-medium">6 ตำแหน่งทดสอบ</span>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
@@ -151,14 +151,14 @@ export default function LoginView({ onLoginSuccess }) {
                           <span className="font-bold text-sm text-slate-100 group-hover:text-white truncate">
                             {acc.name}
                           </span>
-                          <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border ${badgeColor}`}>
+                          <span className={`text-xs font-extrabold px-1.5 py-0.5 rounded border ${badgeColor}`}>
                             {acc.department}
                           </span>
                         </div>
                         <div className="text-xs font-semibold text-indigo-400 mt-0.5 truncate">
                           {acc.title}
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-1 line-clamp-1 leading-snug">
+                        <p className="text-xs text-slate-400 mt-1 line-clamp-1 leading-snug">
                           {acc.description}
                         </p>
                       </div>
@@ -242,7 +242,7 @@ export default function LoginView({ onLoginSuccess }) {
               )}
             </button>
 
-            {!IS_CLOUDFLARE_BUILD && (<div className="p-3 bg-slate-950/60 rounded-sm border border-slate-800 text-[11px] text-slate-400 flex items-start gap-1.5">
+            {!IS_CLOUDFLARE_BUILD && (<div className="p-3 bg-slate-950/60 rounded-sm border border-slate-800 text-xs text-slate-400 flex items-start gap-1.5">
               <Lightbulb className="w-3.5 h-3.5 text-amber-400 shrink-0 mt-0.5" />
               <span><span className="font-semibold text-slate-300">รหัสผ่านเริ่มต้น:</span> บัญชีทั่วไปใช้ <code className="font-mono text-indigo-400 font-bold">password123</code> และบัญชี admin ใช้ <code className="font-mono text-indigo-400 font-bold">admin123</code></span>
             </div>)}

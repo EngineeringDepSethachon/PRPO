@@ -115,7 +115,7 @@ export default function ImageLightboxModal({
               {currentImage.name || title || 'รูปภาพตัวอย่าง'}
             </h4>
             {title && currentImage.name && currentImage.name !== title && (
-              <p className="text-[11px] text-slate-400 truncate max-w-sm">{title}</p>
+              <p className="text-xs text-slate-400 truncate max-w-sm">{title}</p>
             )}
           </div>
         </div>

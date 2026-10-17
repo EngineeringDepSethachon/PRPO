@@ -197,7 +197,7 @@ export default function UsageUnitCRUDModal({
                   <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
                   <span>{selectableDepts[0]?.name} ({selectableDepts[0]?.code})</span>
                 </div>
-                <span className="px-2 py-0.5 rounded-md text-[10px] font-bold border bg-indigo-50 text-indigo-700 border-indigo-200">
+                <span className="px-2 py-0.5 rounded-md text-xs font-bold border bg-indigo-50 text-indigo-700 border-indigo-200">
                   {selectableDepts[0]?.code}
                 </span>
               </div>
@@ -252,7 +252,7 @@ export default function UsageUnitCRUDModal({
                 <span className="text-rose-500">*</span>
               </span>
               {name.trim() && (
-                <span className={`text-[10px] font-mono ${isNameDuplicate ? 'text-rose-500 font-bold' : 'text-slate-400'}`}>
+                <span className={`text-xs font-mono ${isNameDuplicate ? 'text-rose-500 font-bold' : 'text-slate-400'}`}>
                   {isNameDuplicate ? 'ชื่อนี้มีอยู่แล้ว' : 'ใช้ชื่อนี้ได้'}
                 </span>
               )}

@@ -885,7 +885,7 @@ export default function QuickIssueView({
             <BarChart2 className="w-4 h-4" />
             <span>สถิติการใช้งาน & วิเคราะห์ตามหน่วย</span>
             {stockLogs.filter(l => l.type === 'OUT').length > 0 && (
-              <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-medium bg-slate-900 text-white ml-0.5">
+              <span className="px-2 py-0.5 rounded-full text-xs font-mono font-medium bg-slate-900 text-white ml-0.5">
                 {stockLogs.filter(l => l.type === 'OUT').length}
               </span>
             )}
@@ -951,7 +951,7 @@ export default function QuickIssueView({
                   <span>หน่วยที่เบิก / พื้นที่ใช้งาน (Location / Unit)</span>
                   <span className="text-rose-500">*</span>
                 </label>
-                <span className="text-[11px] text-slate-400 font-normal">เลือกห้องหรือพื้นที่ที่นำสินค้าไปใช้</span>
+                <span className="text-xs text-slate-400 font-normal">เลือกห้องหรือพื้นที่ที่นำสินค้าไปใช้</span>
               </div>
 
               {/* Clean Segmented Switcher Capsule Bar or Empty State Alert */}
@@ -1005,7 +1005,7 @@ export default function QuickIssueView({
               <label className="text-xs font-semibold text-slate-800 flex items-center justify-between">
                 <span>เลือกสินค้าจากคลัง <span className="text-rose-500">*</span></span>
                 {selectedProduct && (
-                  <span className="font-mono text-[11px] bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-medium">
+                  <span className="font-mono text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded-md font-medium">
                     {selectedProduct.code}
                   </span>
                 )}
@@ -1022,10 +1022,10 @@ export default function QuickIssueView({
               
               {/* Compact Micro-badge Info Strip */}
               {selectedProduct && (
-                <div className="mt-1.5 flex items-center justify-between text-[11px] text-slate-500 font-normal px-1">
+                <div className="mt-1.5 flex items-center justify-between text-xs text-slate-500 font-normal px-1">
                   <div className="flex items-center gap-2">
                     {rate > 1 && (
-                      <span className="text-indigo-600 bg-indigo-50/80 px-2 py-0.5 rounded-md border border-indigo-100 font-mono text-[10px]">
+                      <span className="text-indigo-600 bg-indigo-50/80 px-2 py-0.5 rounded-md border border-indigo-100 font-mono text-xs">
                         1 {pUnit} = {rate} {sUnit}
                       </span>
                     )}
@@ -1050,7 +1050,7 @@ export default function QuickIssueView({
                   <span className="text-rose-500">*</span>
                 </span>
                 {selectedProduct && (
-                  <span className="text-[11px] text-slate-400 font-normal">
+                  <span className="text-xs text-slate-400 font-normal">
                     คงเหลือในคลัง: <strong className="font-mono text-slate-700 font-semibold">{Number(currentBalance).toLocaleString()} {sUnit}</strong>
                   </span>
                 )}
@@ -1197,18 +1197,18 @@ export default function QuickIssueView({
                     <span className="font-mono text-xs font-bold bg-slate-900 text-white px-2.5 py-0.5 rounded-lg shadow-2xs">
                       {selectedProduct.code}
                     </span>
-                    <span className="text-[11px] font-medium text-slate-500 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-200/50 flex items-center gap-1">
+                    <span className="text-xs font-medium text-slate-500 bg-slate-100/90 px-2 py-0.5 rounded-md border border-slate-200/50 flex items-center gap-1">
                       <PackageCheck size={15} className="text-slate-400 shrink-0" />
                       <span>{selectedProduct.locationName || 'คลังหลัก'}</span>
                     </span>
                     {isInactive && (
-                      <span className="text-[10px] font-medium text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
+                      <span className="text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md">
                         ● ยกเลิกใช้งาน / รอเคลียร์สต็อก
                       </span>
                     )}
                   </div>
                   {rate > 1 && (
-                    <span className="text-[10px] font-mono text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
+                    <span className="text-xs font-mono text-indigo-700 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-md">
                       1 {pUnit} = {rate} {sUnit}
                     </span>
                   )}
@@ -1225,12 +1225,12 @@ export default function QuickIssueView({
                 </div>
                 <div className="bg-blue-50/80 rounded-2xl p-3.5 border border-blue-100 flex items-start justify-between gap-3">
                   <div>
-                    <span className="text-[10px] font-medium text-blue-600 uppercase tracking-wider block">มูลค่าเงินที่เบิกครั้งนี้</span>
+                    <span className="text-xs font-medium text-blue-600 uppercase tracking-wider block">มูลค่าเงินที่เบิกครั้งนี้</span>
                     <p className="font-mono text-base font-bold text-blue-700 mt-0.5">฿0.00</p>
                   </div>
                   <div className="flex flex-col items-end">
-                    <span className="text-[9px] font-medium text-slate-400 block">(คำนวณจากต้นทุนเฉลี่ย)</span>
-                    <p className="font-mono text-[11px] text-slate-400 mt-0.5">฿0.00 / ชิ้น</p>
+                    <span className="text-xs font-medium text-slate-400 block">(คำนวณจากต้นทุนเฉลี่ย)</span>
+                    <p className="font-mono text-xs text-slate-400 mt-0.5">฿0.00 / ชิ้น</p>
                     <button
                       type="button"
                       disabled={true}
@@ -1250,7 +1250,7 @@ export default function QuickIssueView({
               <div className="space-y-3 pb-4 border-b border-slate-100">
                 <div className="flex items-center justify-between text-xs">
                   <span className="text-slate-500 font-medium">จำลองผลกระทบสต็อก</span>
-                  <span className="text-[11px] text-slate-400 font-mono">
+                  <span className="text-xs text-slate-400 font-mono">
                     ROP: {Number(reorderPoint).toLocaleString()} {sUnit}
                   </span>
                 </div>
@@ -1258,7 +1258,7 @@ export default function QuickIssueView({
                 {/* การแสดงผลเปรียบเทียบแบบกระชับ: คงเหลือ X -> หลังเบิก Y */}
                 <div className="bg-slate-50/80 rounded-2xl p-3.5 border border-slate-100/90 flex items-center justify-between">
                   <div>
-                    <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider block">คงเหลือ</span>
+                    <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block">คงเหลือ</span>
                     <p className="font-mono text-base font-bold text-slate-800 tabular-nums mt-0.5">
                       {Number(currentBalance).toLocaleString()} <span className="text-xs font-normal text-slate-500">{sUnit}</span>
                     </p>
@@ -1267,7 +1267,7 @@ export default function QuickIssueView({
                   <ArrowRight className="w-4 h-4 text-slate-400 shrink-0" />
 
                   <div className="text-right">
-                    <span className="text-[10px] font-medium text-slate-400 uppercase tracking-wider block">หลังเบิก</span>
+                    <span className="text-xs font-medium text-slate-400 uppercase tracking-wider block">หลังเบิก</span>
                     <p className={`font-mono text-base font-bold tabular-nums mt-0.5 ${
                       postIssueBalance < 0 
                         ? 'text-rose-600' 
@@ -1300,7 +1300,7 @@ export default function QuickIssueView({
                       }}
                     />
                   </div>
-                  <div className="flex items-center justify-between text-[10px] text-slate-400">
+                  <div className="flex items-center justify-between text-xs text-slate-400">
                     <span>
                       {postIssueBalance < 0 
                         ? 'สินค้าไม่พอเบิก' 
@@ -1318,20 +1318,20 @@ export default function QuickIssueView({
 
                 <div className="bg-blue-50/80 rounded-2xl p-3.5 border border-blue-100 flex items-start justify-between mt-3 gap-3">
                   <div>
-                    <span className="text-[10px] font-medium text-blue-600 uppercase tracking-wider block">มูลค่าเงินที่เบิกครั้งนี้</span>
+                    <span className="text-xs font-medium text-blue-600 uppercase tracking-wider block">มูลค่าเงินที่เบิกครั้งนี้</span>
                     <p className="font-mono text-base font-bold text-blue-700 mt-0.5">
                       ฿{(currentUnitCost * qtyNumber).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                     </p>
                     {costUpdateToast && (
-                      <span className="inline-flex items-center gap-1 mt-1.5 text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
+                      <span className="inline-flex items-center gap-1 mt-1.5 text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-md border border-emerald-200">
                         <Check className="w-3 h-3 text-emerald-600 shrink-0" />
                         <span>{costUpdateToast}</span>
                       </span>
                     )}
                   </div>
                   <div className="flex flex-col items-end">
-                    <span className="text-[9px] font-medium text-slate-400 block">(คำนวณจากต้นทุนเฉลี่ย)</span>
-                    <p className="font-mono text-[11px] text-slate-600 font-semibold mt-0.5">
+                    <span className="text-xs font-medium text-slate-400 block">(คำนวณจากต้นทุนเฉลี่ย)</span>
+                    <p className="font-mono text-xs text-slate-600 font-semibold mt-0.5">
                       ฿{currentUnitCost.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {sUnit}
                     </p>
                     <button
@@ -1357,7 +1357,7 @@ export default function QuickIssueView({
                   <span>ประวัติการเบิกล่าสุด ({recentIssuesForProduct.length} รายการ)</span>
                 </span>
                 {recentIssuesForProduct.length > 0 && (
-                  <span className="text-[10px] text-slate-400 font-mono">{recentIssuesForProduct.length} รายการ</span>
+                  <span className="text-xs text-slate-400 font-mono">{recentIssuesForProduct.length} รายการ</span>
                 )}
               </div>
 
@@ -1371,14 +1371,14 @@ export default function QuickIssueView({
                         <div key={log.id || `issue-${idx}-${log.timestamp}`} className="py-2.5 first:pt-2.5 last:pb-2.5 flex items-center justify-between gap-2.5 text-xs">
                           <div className="min-w-0 flex-1 space-y-0.5">
                             <div className="flex items-center gap-1.5 flex-wrap">
-                              <span className="px-2 py-0.5 rounded-md text-[10px] font-semibold bg-slate-100 text-slate-700 border border-slate-200/60">
+                              <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200/60">
                                 {logUnit}
                               </span>
-                              <span className="font-mono text-[10px] text-slate-400">
+                              <span className="font-mono text-xs text-slate-400">
                                 {log.productCode}
                               </span>
                             </div>
-                            <p className="text-[11px] text-slate-500 truncate">
+                            <p className="text-xs text-slate-500 truncate">
                               {log.reason || log.note || 'เบิกใช้งาน'} • {safeDate}
                             </p>
                           </div>
@@ -1386,7 +1386,7 @@ export default function QuickIssueView({
                             <span className="font-mono font-bold text-slate-800 bg-white border border-slate-200/80 px-2 py-0.5 rounded-lg text-xs block mb-0.5 shadow-2xs">
                               -{Math.abs(log.qty || log.changeQty || 0)}
                             </span>
-                            <span className="text-[10px] text-rose-500 font-mono font-semibold block">
+                            <span className="text-xs text-rose-500 font-mono font-semibold block">
                               (฿{Number(log.totalCost ?? (Math.abs(log.qty || log.changeQty || 0) * (selectedProduct?.avgCost || selectedProduct?.price || 0))).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })})
                             </span>
                           </div>
@@ -1403,7 +1403,7 @@ export default function QuickIssueView({
 
               {/* ส่วนท้าย (Footer): นำทางไปยังหน้าประวัติสต็อกเต็มรูปแบบ (StockMovementTable) */}
               <div className="pt-2 border-t border-slate-100 flex items-center justify-between">
-                <span className="text-[11px] text-slate-400">แสดงสูงสุด 20 รายการล่าสุด (LIFO)</span>
+                <span className="text-xs text-slate-400">แสดงสูงสุด 20 รายการล่าสุด (LIFO)</span>
                 <button
                   type="button"
                   onClick={() => {
@@ -1475,7 +1475,7 @@ export default function QuickIssueView({
                 <DoorClosed className="w-3.5 h-3.5 text-indigo-600" />
                 <span>เลือกดูหน่วยที่เบิก (Location Filter):</span>
               </span>
-              <span className="text-[11px] text-slate-400 font-normal">คลิกเลือกหน่วยเพื่อเจาะลึกเฉพาะห้องนั้นๆ</span>
+              <span className="text-xs text-slate-400 font-normal">คลิกเลือกหน่วยเพื่อเจาะลึกเฉพาะห้องนั้นๆ</span>
             </div>
 
             <div className="flex flex-wrap gap-2">
@@ -1489,7 +1489,7 @@ export default function QuickIssueView({
                 }`}
               >
                 <span>ทุกหน่วย (All Units)</span>
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${statsUnitFilter === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
+                <span className={`px-1.5 py-0.2 rounded-full text-xs font-mono ${statsUnitFilter === 'ALL' ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-600'}`}>
                   {unitBadgeCounts.ALL || 0}
                 </span>
               </button>
@@ -1512,7 +1512,7 @@ export default function QuickIssueView({
                   >
                     <span className={`w-2 h-2 rounded-full ${isSelected ? 'bg-indigo-400' : dot}`} />
                     <span>{unit.name}</span>
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono ${isSelected ? 'bg-white/20 text-white' : 'bg-white/80 text-slate-700 border border-slate-200/50'}`}>
+                    <span className={`px-1.5 py-0.2 rounded-full text-xs font-mono ${isSelected ? 'bg-white/20 text-white' : 'bg-white/80 text-slate-700 border border-slate-200/50'}`}>
                       {count}
                     </span>
                   </button>
@@ -1526,7 +1526,7 @@ export default function QuickIssueView({
             
             {/* Time Filter Select */}
             <div>
-              <label className="text-[11px] font-semibold text-slate-500 block mb-1">ช่วงเวลา (Time Period)</label>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">ช่วงเวลา (Time Period)</label>
               <select
                 value={statsTimeFilter}
                 onChange={e => setStatsTimeFilter(e.target.value)}
@@ -1543,7 +1543,7 @@ export default function QuickIssueView({
 
             {/* Department Filter (Scoped to User Permissions) */}
             <div>
-              <label className="text-[11px] font-semibold text-slate-500 block mb-1">แผนกสินค้า (Department)</label>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">แผนกสินค้า (Department)</label>
               <select
                 value={statsDeptFilter}
                 onChange={e => setStatsDeptFilter(e.target.value)}
@@ -1567,7 +1567,7 @@ export default function QuickIssueView({
 
             {/* Search Input */}
             <div className="lg:col-span-2">
-              <label className="text-[11px] font-semibold text-slate-500 block mb-1">ค้นหารายการ / รหัส / ผู้เบิก</label>
+              <label className="text-xs font-semibold text-slate-500 block mb-1">ค้นหารายการ / รหัส / ผู้เบิก</label>
               <div className="relative">
                 <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
                 <input
@@ -1592,7 +1592,7 @@ export default function QuickIssueView({
             {statsTimeFilter === 'CUSTOM' && (
               <div className="lg:col-span-4 grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-indigo-50/50 rounded-xl border border-indigo-100 animate-fade-in">
                 <div>
-                  <label className="text-[11px] font-semibold text-indigo-900 block mb-1">ตั้งแต่วันที่</label>
+                  <label className="text-xs font-semibold text-indigo-900 block mb-1">ตั้งแต่วันที่</label>
                   <input
                     type="date"
                     value={statsCustomStart}
@@ -1601,7 +1601,7 @@ export default function QuickIssueView({
                   />
                 </div>
                 <div>
-                  <label className="text-[11px] font-semibold text-indigo-900 block mb-1">ถึงวันที่</label>
+                  <label className="text-xs font-semibold text-indigo-900 block mb-1">ถึงวันที่</label>
                   <input
                     type="date"
                     value={statsCustomEnd}
@@ -1621,7 +1621,7 @@ export default function QuickIssueView({
           <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">จำนวนครั้งที่เบิกจ่าย</p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">จำนวนครั้งที่เบิกจ่าย</p>
                 <h3 className="text-2xl sm:text-3xl font-black text-slate-900 font-mono mt-1 tracking-tight">
                   {analytics.totalIssues}
                   <span className="text-xs font-semibold text-slate-400 ml-1.5 font-sans">ครั้ง</span>
@@ -1631,7 +1631,7 @@ export default function QuickIssueView({
                 <History className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
               <span>ขอบเขต: {statsUnitFilter === 'ALL' ? 'ทุกหน่วย' : statsUnitFilter}</span>
               <span className="font-semibold text-indigo-600">Active Logs</span>
             </div>
@@ -1641,7 +1641,7 @@ export default function QuickIssueView({
           <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
             <div className="flex items-start justify-between gap-2">
               <div>
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">มูลค่าตัดจ่ายรวม</p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">มูลค่าตัดจ่ายรวม</p>
                 <h3 className="text-2xl sm:text-3xl font-black text-rose-600 font-mono mt-1 tracking-tight">
                   <span className="text-base mr-1">฿</span>
                   {analytics.totalValue.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
@@ -1651,7 +1651,7 @@ export default function QuickIssueView({
                 <SendToBack className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
               <span>ปริมาณสินค้าเบิกจ่าย:</span>
               <span className="font-bold text-slate-800 font-mono">{analytics.totalQty.toLocaleString(undefined, { maximumFractionDigits: 2 })} หน่วย</span>
             </div>
@@ -1661,7 +1661,7 @@ export default function QuickIssueView({
           <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">หน่วยที่เบิกใช้งานสูงสุด</p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">หน่วยที่เบิกใช้งานสูงสุด</p>
                 <h3 className="text-lg sm:text-xl font-bold text-slate-900 mt-1 truncate" title={analytics.mostActiveUnit?.name || '-'}>
                   {analytics.mostActiveUnit ? analytics.mostActiveUnit.name : '-'}
                 </h3>
@@ -1673,7 +1673,7 @@ export default function QuickIssueView({
                 <Building2 className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
               <span>อันดับ 1 ในการเบิก</span>
               <span className="font-semibold text-emerald-700">Top Consumer</span>
             </div>
@@ -1683,7 +1683,7 @@ export default function QuickIssueView({
           <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-xs flex flex-col justify-between">
             <div className="flex items-start justify-between gap-2">
               <div className="min-w-0 flex-1">
-                <p className="text-[11px] font-bold text-slate-500 uppercase tracking-wider">สินค้าที่ถูกเบิกมากที่สุด</p>
+                <p className="text-xs font-bold text-slate-500 uppercase tracking-wider">สินค้าที่ถูกเบิกมากที่สุด</p>
                 <h3 className="text-sm sm:text-base font-bold text-slate-900 mt-1 truncate" title={analytics.mostIssuedProduct?.name || '-'}>
                   {analytics.mostIssuedProduct ? analytics.mostIssuedProduct.name : '-'}
                 </h3>
@@ -1695,7 +1695,7 @@ export default function QuickIssueView({
                 <Sparkles className="w-5 h-5" />
               </div>
             </div>
-            <div className="mt-3 pt-2.5 border-t border-slate-100 text-[11px] text-slate-500 flex items-center justify-between">
+            <div className="mt-3 pt-2.5 border-t border-slate-100 text-xs text-slate-500 flex items-center justify-between">
               <span>รหัส: {analytics.mostIssuedProduct?.code || '-'}</span>
               <span className="font-semibold text-amber-700">Top Item</span>
             </div>
@@ -1735,7 +1735,7 @@ export default function QuickIssueView({
 
             <div className="overflow-x-auto overflow-y-auto max-h-[550px] custom-scrollbar relative">
               <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs text-slate-500 font-bold text-[11px] uppercase tracking-wider border-b border-slate-200">
+                <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs text-slate-500 font-bold text-xs uppercase tracking-wider border-b border-slate-200">
                   <tr>
                     <th className="py-3.5 px-4 pl-6 whitespace-nowrap">หน่วยที่เบิก (Location)</th>
                     <th className="py-3.5 px-4 whitespace-nowrap">รหัสสินค้า</th>
@@ -1775,7 +1775,7 @@ export default function QuickIssueView({
                             {row.name}
                           </td>
                           <td className="py-3 px-4 text-center whitespace-nowrap">
-                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                            <span className={`px-2 py-0.5 rounded text-xs font-bold ${
                               row.dept === 'PD' ? 'bg-blue-50 text-blue-700 border border-blue-200/60' : 'bg-amber-50 text-amber-700 border border-amber-200/60'
                             }`}>
                               {row.dept}
@@ -1852,7 +1852,7 @@ export default function QuickIssueView({
 
             <div className="overflow-x-auto overflow-y-auto max-h-[550px] custom-scrollbar relative">
               <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs text-slate-500 font-bold text-[11px] uppercase tracking-wider border-b border-slate-200">
+                <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs text-slate-500 font-bold text-xs uppercase tracking-wider border-b border-slate-200">
                   <tr>
                     <th className="py-3.5 px-4 pl-6 whitespace-nowrap">วัน-เวลา</th>
                     <th className="py-3.5 px-4 whitespace-nowrap">เลขที่เอกสาร</th>
@@ -1886,13 +1886,13 @@ export default function QuickIssueView({
                             {log.docNo}
                           </td>
                           <td className="py-3 px-4">
-                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-[11px] font-bold border ${unitConf.color}`}>
+                            <span className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded text-xs font-bold border ${unitConf.color}`}>
                               <span className={`w-1.5 h-1.5 rounded-full ${unitConf.dot || 'bg-slate-500'}`} />
                               {logUnit}
                             </span>
                           </td>
                           <td className="py-3 px-4 max-w-[220px]">
-                            <span className="font-mono text-[11px] font-semibold text-slate-500 block">{log.productCode}</span>
+                            <span className="font-mono text-xs font-semibold text-slate-500 block">{log.productCode}</span>
                             <span className="font-semibold text-slate-800 truncate block text-xs" title={prod?.name || log.productCode}>
                               {prod?.name || log.productCode}
                             </span>

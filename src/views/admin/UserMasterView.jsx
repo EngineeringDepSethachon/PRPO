@@ -311,7 +311,7 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 font-bold text-[11px] uppercase tracking-wider">
+            <thead className="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 font-bold text-xs uppercase tracking-wider">
               <tr>
                 <th className="py-3.5 pl-5">รหัสพนักงาน</th>
                 <th className="py-3.5 px-4">ชื่อ-นามสกุล / ข้อมูลผู้ใช้</th>
@@ -358,7 +358,7 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
                             <p className="font-bold text-slate-900 text-xs sm:text-sm truncate">
                               {user.name || user.employeeName}
                             </p>
-                            <p className="text-[11px] text-slate-400 font-mono mt-0.5">
+                            <p className="text-xs text-slate-400 font-mono mt-0.5">
                               @{user.username}
                             </p>
                           </div>
@@ -379,12 +379,12 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
                               : [user.primaryDepartment || user.department].filter(Boolean);
                             const isAll = depts.includes('*') || depts.includes('ALL');
                             if (isAll) return (
-                              <span className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200">
+                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200">
                                 <Building2 className="w-3 h-3" />ALL
                               </span>
                             );
                             return depts.map(d => (
-                              <span key={d} className="inline-flex items-center gap-1 text-[11px] font-bold px-2 py-0.5 rounded-full border bg-slate-100 text-slate-700 border-slate-200">
+                              <span key={d} className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border bg-slate-100 text-slate-700 border-slate-200">
                                 {d}
                               </span>
                             ));
@@ -394,7 +394,7 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
 
                       {/* 5. Role */}
                       <td className="py-3.5 px-3">
-                        <span className={`inline-block px-2.5 py-0.5 rounded-md text-[10.5px] font-bold border ${roleCfg.color}`}>
+                        <span className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-bold border ${roleCfg.color}`}>
                           {roleCfg.label.split(' - ')[0]}
                         </span>
                       </td>
@@ -414,14 +414,14 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
                                 className="max-w-full max-h-full object-contain group-hover:scale-110 transition-transform" 
                               />
                             </div>
-                            <span className="text-[10px] font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
+                            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200">
                               ✓ มีลายเซ็น
                             </span>
                           </div>
                         ) : (
                           <button
                             onClick={() => handleOpenEdit(user)}
-                            className="inline-flex items-center gap-1 text-[11px] text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-lg border border-amber-200 transition-all cursor-pointer font-semibold"
+                            className="inline-flex items-center gap-1 text-xs text-amber-700 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded-lg border border-amber-200 transition-all cursor-pointer font-semibold"
                           >
                             <PenTool className="w-3 h-3" />
                             <span>+ เพิ่มลายเซ็น</span>
@@ -432,7 +432,7 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
                       {/* 7. Status */}
                       <td className="py-3.5 px-3 text-center">
                         <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${user.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
-                        <span className="text-[11px] font-semibold text-slate-600">
+                        <span className="text-xs font-semibold text-slate-600">
                           {user.status === 'ACTIVE' ? 'ใช้งาน' : 'ระงับ'}
                         </span>
                       </td>
@@ -509,7 +509,7 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
 
             <div className="space-y-1">
               <p className="text-xs font-semibold text-slate-700">{previewingSig.employeeName || previewingSig.name}</p>
-              <p className="text-[11px] text-slate-400">{previewingSig.title} • {previewingSig.department}</p>
+              <p className="text-xs text-slate-400">{previewingSig.title} • {previewingSig.department}</p>
             </div>
 
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-center min-h-[120px]">
@@ -795,7 +795,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
               <h3 className="text-base font-bold text-slate-900">
                 {isEdit ? 'แก้ไขข้อมูลผู้ใช้และลายเซ็นดิจิทัล' : 'เพิ่มผู้ใช้งานใหม่ (User Master)'}
               </h3>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-xs text-slate-500">
                 จัดการข้อมูลระบุตัวตน สิทธิ์ในระบบ และลายเซ็นอิเล็กทรอนิกส์ (E-Signature Base64)
               </p>
             </div>
@@ -930,7 +930,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
               <div className="sm:col-span-2">
                 <label className="block text-xs font-semibold text-slate-700 mb-1.5">
                   แผนกที่รับผิดชอบ (Assigned Departments)
-                  <span className="ml-1.5 text-[10px] font-normal text-slate-400">— เลือกได้หลายแผนก (Multi-select)</span>
+                  <span className="ml-1.5 text-xs font-normal text-slate-400">— เลือกได้หลายแผนก (Multi-select)</span>
                 </label>
                 <div className="flex flex-wrap gap-2 p-3 bg-slate-50 border border-slate-200 rounded-xl">
                   {/* ALL chip */}
@@ -960,17 +960,17 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                       }`}
                     >
                       {dept.code}
-                      <span className="ml-1 font-normal opacity-80 text-[10px]">({dept.name})</span>
+                      <span className="ml-1 font-normal opacity-80 text-xs">({dept.name})</span>
                     </button>
                   ))}
                   {assignedDepts.length === 0 && (
-                    <span className="text-[11px] text-amber-600 font-medium flex items-center gap-1">
+                    <span className="text-xs text-amber-600 font-medium flex items-center gap-1">
                       ⚠️ กรุณาเลือกแผนกที่รับผิดชอบ
                     </span>
                   )}
                 </div>
                 {assignedDepts.length > 0 && !assignedDepts.includes('ALL') && (
-                  <p className="text-[11px] text-slate-500 mt-1.5 pl-1">
+                  <p className="text-xs text-slate-500 mt-1.5 pl-1">
                     เลือกแล้ว: <span className="font-semibold text-indigo-700">{assignedDepts.join(', ')}</span>
                   </p>
                 )}
@@ -1024,7 +1024,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                   <div className="flex items-center gap-3">
                     {/* Pen Color Choices */}
                     <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] font-semibold text-slate-500">หมึกปากกา:</span>
+                      <span className="text-xs font-semibold text-slate-500">หมึกปากกา:</span>
                       {[
                         { color: '#0F2370', name: 'น้ำเงินกรมท่า' },
                         { color: '#1E293B', name: 'ดำสนิท' },
@@ -1045,13 +1045,13 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
 
                     {/* Pen Width */}
                     <div className="flex items-center gap-1.5 ml-2">
-                      <span className="text-[11px] font-semibold text-slate-500">ขนาด:</span>
+                      <span className="text-xs font-semibold text-slate-500">ขนาด:</span>
                       {[1.5, 2.5, 3.5].map(w => (
                         <button
                           key={w}
                           type="button"
                           onClick={() => setPenWidth(w)}
-                          className={`px-2 py-0.5 rounded text-[10px] font-mono transition-all cursor-pointer ${
+                          className={`px-2 py-0.5 rounded text-xs font-mono transition-all cursor-pointer ${
                             penWidth === w ? 'bg-indigo-600 text-white font-bold' : 'bg-slate-200 text-slate-700'
                           }`}
                         >
@@ -1064,7 +1064,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                   <button
                     type="button"
                     onClick={clearCanvas}
-                    className="flex items-center gap-1 text-[11px] text-rose-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                    className="flex items-center gap-1 text-xs text-rose-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg transition-all cursor-pointer"
                   >
                     <Eraser className="w-3 h-3" />
                     <span>ล้างกระดาน</span>
@@ -1095,7 +1095,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-[10px] text-slate-400">
+                  <span className="text-xs text-slate-400">
                     * เมื่อวาดเสร็จให้กดปุ่ม "บันทึกลายเซ็นจากกระดาน" ด้านขวา
                   </span>
                   <button
@@ -1129,7 +1129,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                   </div>
                   <div>
                     <p className="text-xs font-bold text-slate-800">คลิกเพื่อเลือกไฟล์ภาพลายเซ็น (PNG หรือ JPG)</p>
-                    <p className="text-[11px] text-slate-400 mt-0.5">แนะนำไฟล์ PNG พื้นหลังโปร่งใส เพื่อความสวยงามบนเอกสาร PDF</p>
+                    <p className="text-xs text-slate-400 mt-0.5">แนะนำไฟล์ PNG พื้นหลังโปร่งใส เพื่อความสวยงามบนเอกสาร PDF</p>
                   </div>
                 </label>
               </div>
@@ -1146,7 +1146,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                   <button
                     type="button"
                     onClick={() => setSignatureDataUrl('')}
-                    className="text-rose-600 hover:text-rose-700 text-[11px] font-semibold flex items-center gap-1 cursor-pointer"
+                    className="text-rose-600 hover:text-rose-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
                   >
                     <Trash2 className="w-3 h-3" />
                     <span>ลบลายเซ็น</span>
@@ -1164,10 +1164,10 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                     />
                   </div>
                   <div className="flex-1 min-w-0 text-left">
-                    <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-[10px] font-bold">
+                    <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-xs font-bold">
                       ✓ E-Signature Verified
                     </span>
-                    <p className="text-[11px] text-slate-500 mt-1">
+                    <p className="text-xs text-slate-500 mt-1">
                       ลายเซ็นดิจิทัลพร้อมประทับลงบนกล่อง Audit Stamp ของเอกสาร PO PDF (ระบบจะสแกนและใส่ ISO Hash ให้โดยอัตโนมัติ)
                     </p>
                   </div>
@@ -1176,7 +1176,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                 <div className="py-5 text-center text-slate-400 bg-white rounded-xl border border-dashed border-slate-200">
                   <AlertCircle className="w-5 h-5 mx-auto mb-1 text-amber-500" />
                   <p className="text-xs font-medium text-slate-600">ยังไม่ได้ลงทะเบียนลายเซ็นดิจิทัล</p>
-                  <p className="text-[11px] text-slate-400">กรุณาวาดลายเซ็นหรืออัปโหลดไฟล์ภาพเพื่อนำไปใช้งานบน PO PDF</p>
+                  <p className="text-xs text-slate-400">กรุณาวาดลายเซ็นหรืออัปโหลดไฟล์ภาพเพื่อนำไปใช้งานบน PO PDF</p>
                 </div>
               )}
             </div>

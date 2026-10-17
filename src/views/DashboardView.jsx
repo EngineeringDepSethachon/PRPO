@@ -237,7 +237,7 @@ export default function DashboardView({
               <div className="flex items-center gap-2 flex-wrap">
                 <h3 className="text-sm sm:text-base font-bold text-rose-900 tracking-tight">สินค้าใกล้หมด / แจ้งเตือน ROP</h3>
                 {!isMultiDeptUser && (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold border ${
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold border ${
                     matchDepartment(effectiveUser?.department, 'QC')
                       ? 'bg-amber-50 text-amber-700 border-amber-200'
                       : 'bg-blue-50 text-blue-700 border-blue-200'
@@ -324,7 +324,7 @@ export default function DashboardView({
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2 flex-wrap">
                         <span className="font-bold text-sm text-slate-800">{item.name || 'สินค้าไม่มีชื่อ'}</span>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-[11px] font-bold border ${
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold border ${
                           matchDepartment(item.department, 'PD')
                             ? 'bg-blue-50 text-blue-700 border-blue-200'
                             : matchDepartment(item.department, 'QC')

@@ -14,7 +14,7 @@ export default function MEMODetailsSection({ memo }) {
             รายละเอียด MEMO (Request For Approval)
           </h4>
         </div>
-        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+        <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
           ≥ ฿20,000
         </span>
       </div>

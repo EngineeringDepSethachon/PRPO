@@ -237,7 +237,7 @@ export default function VendorCRUDModal({
                             const next = generateNextVendorCode(allVendors, currentDeptScope);
                             setVendorCode(next);
                           }}
-                          className="text-[11px] font-semibold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
                           title="รันรหัสผู้ขายอัตโนมัติตามแผนก"
                         >
                           <Sparkles className="w-3 h-3 text-amber-500" />
@@ -245,7 +245,7 @@ export default function VendorCRUDModal({
                         </button>
                       )}
                       {isVendorCodeDuplicate && (
-                        <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1 animate-pulse">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1 animate-pulse">
                           <AlertTriangle className="w-3 h-3 text-rose-500" /> รหัสซ้ำ!
                         </span>
                       )}

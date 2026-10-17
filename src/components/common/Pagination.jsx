@@ -50,11 +50,11 @@ export default function Pagination({
 
         {onPageSizeChange && (
           <div className="hidden sm:flex items-center gap-1.5 pl-2 border-l border-slate-200">
-            <span className="text-[11px] text-slate-400">แสดง:</span>
+            <span className="text-xs text-slate-400">แสดง:</span>
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="bg-white border border-slate-200 text-slate-700 text-[11px] font-mono font-semibold rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-slate-400 cursor-pointer shadow-2xs"
+              className="bg-white border border-slate-200 text-slate-700 text-xs font-mono font-semibold rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-slate-400 cursor-pointer shadow-2xs"
             >
               {pageSizeOptions.map((size) => (
                 <option key={size} value={size}>
@@ -69,7 +69,7 @@ export default function Pagination({
       {/* Right: Controls & Page Info */}
       <div className="flex items-center gap-2">
         {/* Subtle Page Indicator Badge */}
-        <span className="text-[11px] font-medium text-slate-500 bg-white px-2 py-1 rounded-md border border-slate-200/80 shadow-2xs font-mono">
+        <span className="text-xs font-medium text-slate-500 bg-white px-2 py-1 rounded-md border border-slate-200/80 shadow-2xs font-mono">
           หน้า <strong className="font-mono font-bold text-slate-800 px-0.5">{currentPage}</strong> / <span className="font-mono">{validTotalPages}</span>
         </span>
 

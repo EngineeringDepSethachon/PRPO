@@ -268,7 +268,7 @@ export default function PrintablePO({ po }) {
 
   return (
     <div
-      className="font-sarabun text-slate-900 bg-white p-8 print:p-0 max-w-[210mm] print:max-w-none print:w-full mx-auto print:m-0 text-sm thai-doc-container"
+      className="font-sarabun text-slate-900 bg-white p-8 print:p-0 max-w-[210mm] print:max-w-none print:w-full mx-auto print:m-0 text-[14px] leading-[20px] thai-doc-container"
       style={{
         fontFamily: "'TH Sarabun New', 'Sarabun', 'Prompt', 'Noto Sans Thai', -apple-system, BlinkMacSystemFont, sans-serif",
         letterSpacing: '0px',
@@ -292,20 +292,20 @@ export default function PrintablePO({ po }) {
               className="h-16 w-auto object-contain shrink-0 mt-1"
             />
             <div className="flex flex-col space-y-1.5">
-              <h1 className="text-base font-bold text-slate-900 leading-normal">
+              <h1 className="text-[16px] font-bold text-slate-900 leading-normal">
                 {cleanThaiText('บริษัท เศรษฐชล จำกัด (สำนักงานใหญ่)')}
               </h1>
-              <p className="text-xs text-slate-700 leading-relaxed">
+              <p className="text-[12px] text-slate-700 leading-relaxed">
                 {cleanThaiText('ที่อยู่ 225 หมู่ที่ 12 ถนนเทพารักษ์ ตำบลบางพลีใหญ่ อำเภอบางพลี จังหวัดสมุทรปราการ 10540')}
               </p>
-              <p className="text-xs text-slate-700 leading-relaxed">
+              <p className="text-[12px] text-slate-700 leading-relaxed">
                 {cleanThaiText('เลขประจำตัวผู้เสียภาษี (TAX ID):')} <span className="font-mono font-medium">0-10553-2104-63-7</span>
               </p>
               <div className="pt-1">
-                <span className="text-sm font-bold text-blue-900 block leading-normal">
+                <span className="text-[14px] font-bold text-blue-900 block leading-normal">
                   {cleanThaiText('ใบสั่งซื้อสินค้า / PURCHASE ORDER')}
                 </span>
-                <span className="text-xs text-slate-600 leading-relaxed block mt-0.5">
+                <span className="text-[12px] text-slate-600 leading-relaxed block mt-0.5">
                   {cleanThaiText('อ้างอิงใบขอซื้อ (PR):')} <strong className="text-slate-900 font-mono">{po.prNumber || po.prId || '-'}</strong> | {cleanThaiText('แผนกผู้ขอ:')} <strong className="text-slate-900">{po.department || '-'}</strong>
                 </span>
               </div>
@@ -313,7 +313,7 @@ export default function PrintablePO({ po }) {
           </div>
 
           {/* Right Column: PO Number Box (Aligned to top) */}
-          <div className="border border-black rounded p-2.5 bg-gray-50 shrink-0 w-52 text-xs leading-relaxed">
+          <div className="border border-black rounded p-2.5 bg-gray-50 shrink-0 w-52 text-[12px] leading-relaxed">
             <div className="flex justify-between mb-1">
               <span className="text-slate-600 font-medium">{cleanThaiText('เลขที่ PO:')}</span>
               <span className="font-mono font-bold text-slate-900">{po.id || po.poNumber}</span>
@@ -327,7 +327,7 @@ export default function PrintablePO({ po }) {
       </div>
 
       {/* VENDOR DETAILS BLOCK: Clean Stacked Grid with Natural Flow */}
-      <div className="mb-6 p-3 border border-black rounded bg-gray-50/50 text-xs leading-relaxed">
+      <div className="mb-6 p-3 border border-black rounded bg-gray-50/50 text-[12px] leading-relaxed">
         <div className="font-bold text-slate-900 border-b border-black pb-1 mb-2 flex justify-between items-center">
           <span>{cleanThaiText('ข้อมูลคู่ค้า / ผู้จำหน่าย (Vendor Details)')}</span>
           <span className="font-mono font-normal text-slate-700">{cleanThaiText('รหัสผู้ขาย:')} {po.vendorCode || po.vendorDetails?.code || '-'}</span>
@@ -392,8 +392,8 @@ export default function PrintablePO({ po }) {
                 style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
               >
                 <td className="border border-black p-4 text-center">{index + 1}</td>
-                <td className="border border-black p-4 text-center font-mono text-sm">{cleanThaiText(item.code || item.sku || '-')}</td>
-                <td className="border border-black p-4 break-words whitespace-normal text-xs leading-relaxed">
+                <td className="border border-black p-4 text-center font-mono text-[14px] leading-[20px]">{cleanThaiText(item.code || item.sku || '-')}</td>
+                <td className="border border-black p-4 break-words whitespace-normal text-[12px] leading-relaxed">
                   <div className="font-medium text-slate-900">{cleanThaiText(item.name)}</div>
                   {item.specification && (
                     <div className="text-[11px] text-slate-600 mt-0.5">{cleanThaiText(item.specification)}</div>
@@ -419,7 +419,7 @@ export default function PrintablePO({ po }) {
             >
               <td className="border-x border-black p-4 h-8"></td>
               <td className="border-x border-black p-4"></td>
-              <td className="border-x border-black p-4 break-words whitespace-normal text-xs leading-relaxed"></td>
+              <td className="border-x border-black p-4 break-words whitespace-normal text-[12px] leading-relaxed"></td>
               <td className="border-x border-black p-4"></td>
               <td className="border-x border-black p-4"></td>
               <td className="border-x border-black p-4"></td>
@@ -440,9 +440,9 @@ export default function PrintablePO({ po }) {
         }}
       >
         {/* Financial Summary Breakdown */}
-        <div className="flex justify-between items-start my-3 text-xs">
+        <div className="flex justify-between items-start my-3 text-[12px] leading-[16px]">
           <div className="w-1/2 align-top text-slate-700 pr-4">
-            <span className="font-semibold text-xs text-slate-900">{cleanThaiText('หมายเหตุ (Remarks):')}</span>
+            <span className="font-semibold text-[12px] leading-[16px] text-slate-900">{cleanThaiText('หมายเหตุ (Remarks):')}</span>
             <p className="mt-0.5 leading-relaxed text-[11px] text-slate-600">{cleanThaiText('1. โปรดระบุเลขที่ใบสั่งซื้อ (PO No.) ในเอกสารใบกำกับภาษีทุกครั้ง')}</p>
             <p className="leading-relaxed text-[11px] text-slate-600">{cleanThaiText('2. กรณีส่งมอบล่าช้ากว่ากำหนด บริษัทขอสงวนสิทธิ์ในการคิดค่าปรับตามระเบียบบริษัท')}</p>
             {po.note && (
@@ -487,7 +487,7 @@ export default function PrintablePO({ po }) {
         {/* Actual Settlement Summary Box (Rendered when PO has settled actual amount) */}
         {hasSettlement && (
           <div
-            className="settlement-summary-box border border-emerald-600 bg-emerald-50/50 rounded p-2.5 my-3 break-inside-avoid print:break-inside-avoid text-xs"
+            className="settlement-summary-box border border-emerald-600 bg-emerald-50/50 rounded p-2.5 my-3 break-inside-avoid print:break-inside-avoid text-[12px] leading-[16px]"
             style={{ breakInside: 'avoid', pageBreakInside: 'avoid' }}
           >
             <div className="flex items-center justify-between font-bold text-emerald-900 border-b border-emerald-200 pb-1 mb-1.5">
@@ -588,7 +588,7 @@ export default function PrintablePO({ po }) {
                 ) : (
                   <>
                     <div className="h-14 flex items-center justify-center"></div>
-                    <p className="text-xs text-slate-600">( ............................................................ )</p>
+                    <p className="text-[12px] leading-[16px] text-slate-600">( ............................................................ )</p>
                     <p className="text-[11px] text-slate-400 mt-1">วันที่ ..... / ..... / .........</p>
                   </>
                 )}
@@ -618,7 +618,7 @@ export default function PrintablePO({ po }) {
                 ) : (
                   <>
                     <div className="h-14 flex items-center justify-center"></div>
-                    <p className="text-xs text-slate-600">( ............................................................ )</p>
+                    <p className="text-[12px] leading-[16px] text-slate-600">( ............................................................ )</p>
                     <p className="text-[11px] text-slate-400 mt-1">วันที่ ..... / ..... / .........</p>
                   </>
                 )}
@@ -648,7 +648,7 @@ export default function PrintablePO({ po }) {
                 ) : (
                   <>
                     <div className="h-14 flex items-center justify-center"></div>
-                    <p className="text-xs text-slate-600">( ........................................... )</p>
+                    <p className="text-[12px] leading-[16px] text-slate-600">( ........................................... )</p>
                     <p className="text-[11px] text-slate-400 mt-1">วันที่ ..... / ..... / .........</p>
                   </>
                 )}

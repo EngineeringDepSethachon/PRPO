@@ -30,7 +30,7 @@ export default function AttachmentThumbnail({ img, imgIdx, onClick, sizeClass = 
       >
         <Paperclip className={`${isLarge ? 'w-8 h-8' : isSmall ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-slate-400 shrink-0`} />
         {!isSmall && (
-          <span className={`${isLarge ? 'text-[10px] mt-1' : 'text-[8px] mt-0.5'} font-mono text-slate-500 truncate max-w-full px-0.5 leading-tight`}>
+          <span className={`${isLarge ? 'text-xs mt-1' : 'text-xs mt-0.5'} font-mono text-slate-500 truncate max-w-full px-0.5 leading-tight`}>
             {defaultName}
           </span>
         )}
@@ -64,7 +64,7 @@ export default function AttachmentThumbnail({ img, imgIdx, onClick, sizeClass = 
           }
         }}
       />
-      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center text-white text-[10px]">
+      <div className="absolute inset-0 bg-black/20 opacity-0 group-hover/thumb:opacity-100 transition-opacity flex items-center justify-center text-white text-xs">
         🔍
       </div>
     </button>

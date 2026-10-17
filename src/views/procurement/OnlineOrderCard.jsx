@@ -1890,7 +1890,7 @@ export default function OnlineOrderCard({
               </button>
             </div>
 
-            <span className="px-2 py-0.5 text-[11px] font-semibold bg-slate-100 text-slate-700 rounded-md border border-slate-200">
+            <span className="px-2 py-0.5 text-xs font-semibold bg-slate-100 text-slate-700 rounded-md border border-slate-200">
               {po.department || 'PD'}
             </span>
 
@@ -1931,7 +1931,7 @@ export default function OnlineOrderCard({
           {/* Left: Goods Preview & Date */}
           <div className="flex items-center gap-2 truncate min-w-0">
             <Calendar className="w-3 h-3 text-slate-400 flex-shrink-0"/>
-            <span className="text-[11px] font-mono text-slate-500">{completionDateTag}</span>
+            <span className="text-xs font-mono text-slate-500">{completionDateTag}</span>
             <span className="text-slate-300">•</span>
             <span className="truncate text-slate-600 font-medium" title={itemsSnippet}>
               {itemsSnippet}
@@ -1940,7 +1940,7 @@ export default function OnlineOrderCard({
 
           {/* Right: Detailed Financial Diff & Interactive Controls */}
           <div className="flex items-center gap-3 flex-shrink-0">
-            <div className="flex items-center gap-2 text-[11px] font-mono">
+            <div className="flex items-center gap-2 text-xs font-mono">
               <span className="text-slate-400">งบ: ฿{formattedOriginalBudget}</span>
               {totalRefundedValue > 0 ? (
                 <span className="text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded font-semibold border border-emerald-100">
@@ -2044,7 +2044,7 @@ export default function OnlineOrderCard({
           )}
 
           {hasModifications && isPending && (
-            <span className="inline-flex items-center gap-1 text-[11px] font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md ml-1">
+            <span className="inline-flex items-center gap-1 text-xs font-bold text-amber-800 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded-md ml-1">
               <AlertTriangle className="w-3 h-3 text-amber-600" />
               <span>ปรับยอด {priceDiff >= 0 ? '+' : ''}฿{priceDiff.toLocaleString()}</span>
             </span>
@@ -2064,7 +2064,7 @@ export default function OnlineOrderCard({
             title="ย่อการ์ดสรุป"
           >
             <ChevronUp className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline text-[11px]">ย่อ</span>
+            <span className="hidden sm:inline text-xs">ย่อ</span>
           </button>
         </div>
       </div>
@@ -2122,7 +2122,7 @@ export default function OnlineOrderCard({
                   <div className={`flex items-center gap-2 ${isStoreResolved ? 'text-emerald-800' : isWaiting ? 'text-amber-800' : 'text-emerald-700'}`}>
                     {getPlatformBadge(group.platform)}
                     <span className={`font-medium ${isStoreResolved ? 'text-emerald-900' : isWaiting ? 'text-amber-900' : 'text-emerald-800'}`}>ร้าน: {group.storeName || 'ทั่วไป'}</span>
-                    <span className={`text-[11px] ${isStoreResolved ? 'text-emerald-700 bg-emerald-100 border-emerald-200' : isWaiting ? 'text-amber-700 bg-amber-100/80 border-amber-200' : 'text-emerald-600 bg-emerald-100 border-emerald-200'} px-1.5 py-0.5 rounded border font-semibold flex items-center gap-1`}>
+                    <span className={`text-xs ${isStoreResolved ? 'text-emerald-700 bg-emerald-100 border-emerald-200' : isWaiting ? 'text-amber-700 bg-amber-100/80 border-amber-200' : 'text-emerald-600 bg-emerald-100 border-emerald-200'} px-1.5 py-0.5 rounded border font-semibold flex items-center gap-1`}>
                       {isStoreResolved && <CheckCircle2 className="w-3 h-3 text-emerald-600" />}
                       {statusText}
                     </span>
@@ -2130,7 +2130,7 @@ export default function OnlineOrderCard({
                   <button
                     type="button"
                     onClick={() => toggleStoreExpand(group.storeKey)}
-                    className="text-slate-400 hover:text-slate-600 font-semibold text-[11px] flex items-center gap-1 cursor-pointer"
+                    className="text-slate-400 hover:text-slate-600 font-semibold text-xs flex items-center gap-1 cursor-pointer"
                   >
                     เปิดดู / จัดการเคลม ▾
                   </button>
@@ -2147,7 +2147,7 @@ export default function OnlineOrderCard({
                 <div className="flex items-center gap-2 text-slate-600">
                   {getPlatformBadge(group.platform)}
                   <span className="font-medium">ร้าน: {group.storeName || 'ทั่วไป'}</span>
-                  <span className="text-[11px] text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 font-semibold">
+                  <span className="text-xs text-rose-600 bg-rose-50 px-1.5 py-0.5 rounded border border-rose-200 font-semibold">
                     ⚠️ มีรายการติดปัญหา ({group.issueItems.length} รายการ)
                   </span>
                 </div>
@@ -2157,7 +2157,7 @@ export default function OnlineOrderCard({
                       เคลม ฿{rowClaimFmt}
                     </span>
                   )}
-                  <span className="text-indigo-600 hover:text-indigo-700 font-semibold text-[11px] flex items-center gap-1">
+                  <span className="text-indigo-600 hover:text-indigo-700 font-semibold text-xs flex items-center gap-1">
                     เปิดจัดการเคลม ▾
                   </span>
                 </div>
@@ -2176,7 +2176,7 @@ export default function OnlineOrderCard({
                   <div className="flex items-center gap-2 text-slate-600">
                     {getPlatformBadge(group.platform)}
                     <span className="font-bold text-slate-800">ร้าน: {group.storeName || 'ทั่วไป'}</span>
-                    <span className="text-[11px] text-slate-500">
+                    <span className="text-xs text-slate-500">
                       {isStoreResolved
                         ? '✓ บันทึกผลเจรจาเรียบร้อย'
                         : group.hasDispute 
@@ -2186,7 +2186,7 @@ export default function OnlineOrderCard({
                   </div>
                   <div className="flex items-center gap-3">
                     <span className="font-mono text-slate-600 font-semibold">ยอดร้านนี้: ฿{storeTotalFormatted}</span>
-                    <span className="text-indigo-600 hover:text-indigo-700 font-semibold text-[11px] flex items-center gap-1">
+                    <span className="text-indigo-600 hover:text-indigo-700 font-semibold text-xs flex items-center gap-1">
                       ย่อเก็บ ▴
                     </span>
                   </div>
@@ -2199,7 +2199,7 @@ export default function OnlineOrderCard({
 
                     {isPending ? (
                       <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                        <span className="text-[11px] font-semibold text-slate-500 shrink-0">ร้าน:</span>
+                        <span className="text-xs font-semibold text-slate-500 shrink-0">ร้าน:</span>
                         <input
                           type="text"
                           placeholder="ระบุชื่อร้านค้าจริง..."
@@ -2214,19 +2214,19 @@ export default function OnlineOrderCard({
                         <span>ร้าน: {group.storeName}</span>
                       </span>
                     ) : (
-                      <span className="px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                      <span className="px-2 py-0.5 rounded text-xs font-semibold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
                         [ระบุร้านค้าตอนกดสั่งซื้อ]
                       </span>
                     )}
 
                     {/* Claim Status Pill - STRICTLY ONLY IN CLAIM MODE */}
                     {isClaimOrder && isStoreResolved && (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-100 text-emerald-700 shrink-0">
+                      <span className="px-2 py-0.5 rounded text-xs font-bold bg-emerald-100 text-emerald-700 shrink-0">
                         <CheckCircle2 className="w-3 h-3 inline mr-0.5" /> {(isClosed || activeTab === 'CLOSED') ? 'เคลมเสร็จสิ้น' : 'บันทึกผลเจรจาเรียบร้อย'}
                       </span>
                     )}
                     {isClaimOrder && group.hasDispute && !isStoreResolved && (
-                      <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-rose-100 text-rose-700 shrink-0 animate-pulse">
+                      <span className="px-2 py-0.5 rounded text-xs font-bold bg-rose-100 text-rose-700 shrink-0 animate-pulse">
                         มีปัญหารอเคลม
                       </span>
                     )}
@@ -2245,7 +2245,7 @@ export default function OnlineOrderCard({
                 if (!effClaim || (!effClaim.isResolved && effClaim.status !== 'RESOLVED' && !isClosed && activeTab !== 'CLOSED')) return null;
                 const refundAmountFormatted = formatMoney(effClaim.refundAmount || 0);
                 return (
-                  <div className="px-3 py-1 bg-emerald-50/50 border-b border-emerald-100 flex items-center justify-between text-[11px] text-emerald-800">
+                  <div className="px-3 py-1 bg-emerald-50/50 border-b border-emerald-100 flex items-center justify-between text-xs text-emerald-800">
                     <div className="flex items-center gap-1.5">
                       <CheckCircle2 className="w-3 h-3 text-emerald-600 shrink-0" />
                       <span>
@@ -2259,7 +2259,7 @@ export default function OnlineOrderCard({
                       </span>
                     </div>
                     {effClaim.resolvedAt && (
-                      <span className="text-[10px] text-emerald-600/80 font-mono">
+                      <span className="text-xs text-emerald-600/80 font-mono">
                         {new Date(effClaim.resolvedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })}
                       </span>
                     )}
@@ -2379,7 +2379,7 @@ export default function OnlineOrderCard({
                           {/* ราคารวมที่จ่ายจริง: ช่อง Input */}
                           <div className="flex flex-col items-end shrink-0">
                             <div className="relative w-28 h-8">
-                              <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-[10px] font-mono select-none pointer-events-none">฿</span>
+                              <span className="absolute left-1.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs font-mono select-none pointer-events-none">฿</span>
                               <input
                                 type="number"
                                 min="0"
@@ -2392,7 +2392,7 @@ export default function OnlineOrderCard({
                               />
                             </div>
                             {Number(pQty) > 0 && currentItem.actualTotal !== '' && (
-                              <span className="text-[10px] text-slate-500 font-medium mt-1 text-right">
+                              <span className="text-xs text-slate-500 font-medium mt-1 text-right">
                                 เฉลี่ย @ ฿{((Number(currentItem.actualTotal) || 0) / Number(pQty)).toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} / {pUnit}
                               </span>
                             )}
@@ -2466,7 +2466,7 @@ export default function OnlineOrderCard({
                         badges={
                           <>
                           {currentItem.orderRefNo && (
-                            <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 shrink-0">
+                            <span className="text-xs text-purple-700 font-bold bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 shrink-0">
                               Ref: {currentItem.orderRefNo}
                             </span>
                           )}
@@ -2480,7 +2480,7 @@ export default function OnlineOrderCard({
                             if (isStoreSettled && effRefund > 0 && (currentItem.refundAmt > 0 || currentItem.shortageQty > 0 || currentItem.damagedQty > 0 || currentItem.hasDispute || group.hasDispute || group.items.length === 1)) {
                               const timeStr = storeClaim?.resolvedAt ? new Date(storeClaim.resolvedAt).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : '';
                               return (
-                                <span className="text-[11px] bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-medium shrink-0">
+                                <span className="text-xs bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded font-medium shrink-0">
                                   ✓ ได้รับเงินคืน ฿{effRefund.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} เข้าแผนกแล้ว {timeStr ? `(${timeStr})` : ''}
                                 </span>
                               );
@@ -2498,12 +2498,12 @@ export default function OnlineOrderCard({
                               return (
                                 <div className="flex items-center gap-1.5 shrink-0 font-sans">
                                   {itemShortage > 0 && !isWait && (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200 shrink-0">
                                       🚨 ขาด {itemShortage} {pUnit}
                                     </span>
                                   )}
                                   {itemDamaged > 0 && (
-                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                                    <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
                                       ⚠️ ชำรุด {itemDamaged} {pUnit}
                                     </span>
                                   )}
@@ -2515,7 +2515,7 @@ export default function OnlineOrderCard({
                             if (isWait && itemShortage > 0) {
                               return (
                                 <div className="flex items-center gap-1.5 shrink-0 font-sans">
-                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[11px] font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
+                                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-xs font-bold bg-amber-50 text-amber-800 border border-amber-200 shrink-0">
                                     ⏳ รอส่งมอบเพิ่ม {itemShortage} {pUnit}
                                   </span>
                                 </div>
@@ -2535,7 +2535,7 @@ export default function OnlineOrderCard({
                           if (isItemDisputed) {
                             return (
                               <div className="text-right shrink-0">
-                                <div className="text-[10px] text-slate-400 font-medium">มูลค่าที่ต้องเคลม</div>
+                                <div className="text-xs text-slate-400 font-medium">มูลค่าที่ต้องเคลม</div>
                                 <div className="text-xs sm:text-sm font-mono font-bold text-rose-600">
                                   ฿{formatMoney(itemMetrics.claimableAmount)}
                                 </div>
@@ -2574,7 +2574,7 @@ export default function OnlineOrderCard({
                   <button 
                     type="button"
                     onClick={() => setStoreClaimStates(prev => ({ ...prev, [group.storeKey]: { ...prev[group.storeKey], showResolutionForm: true } }))} 
-                    className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 cursor-pointer transition-colors"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 cursor-pointer transition-colors"
                   >
                     <AlertTriangle className="w-3.5 h-3.5" /> จัดการผลการเคลมเฉพาะร้านค้านี้
                   </button>
@@ -2608,7 +2608,7 @@ export default function OnlineOrderCard({
                             } 
                           }));
                         }} 
-                        className="inline-flex items-center gap-1.5 text-[11px] font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 cursor-pointer transition-colors shrink-0"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 cursor-pointer transition-colors shrink-0"
                       >
                         <AlertTriangle className="w-3.5 h-3.5" /> เปิดดำเนินการเคลมสำหรับร้านนี้
                       </button>
@@ -2651,7 +2651,7 @@ export default function OnlineOrderCard({
                               <span className="text-slate-800 font-semibold">{evData.inspectorName}</span>
                               <span className="text-amber-800/80 font-normal font-mono">({evData.inspectedAt})</span>
                             </div>
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-100/90 text-amber-900 border border-amber-300/60 text-[11px] font-semibold">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-100/90 text-amber-900 border border-amber-300/60 text-xs font-semibold">
                               <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                               หลักฐานการตรวจรับ (GRN Evidence)
                             </span>
@@ -2660,7 +2660,7 @@ export default function OnlineOrderCard({
                           {/* แสดงหมายเหตุอาการชำรุด ในกล่องข้อความสีขาวอ่านง่าย */}
                           {evData.defectNote && (
                             <div className="p-2.5 bg-white border border-amber-200/80 rounded-lg text-xs text-slate-800 shadow-2xs">
-                              <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">
+                              <div className="text-xs font-bold text-slate-400 uppercase tracking-wider mb-1">
                                 หมายเหตุอาการชำรุด / ปัญหาที่พบ
                               </div>
                               <p className="whitespace-pre-wrap break-words font-medium text-slate-700 leading-relaxed">
@@ -2672,7 +2672,7 @@ export default function OnlineOrderCard({
                           {/* แสดงแกลเลอรีรูปภาพ: แสดงรูปภาพ Thumbnail ที่ผู้ตรวจรับแนบมา */}
                           {evData.images && evData.images.length > 0 ? (
                             <div>
-                              <div className="text-[11px] font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
+                              <div className="text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
                                 <ImageIcon className="w-3.5 h-3.5 text-amber-700" />
                                 <span>รูปภาพหลักฐานความเสียหาย ({evData.images.length} รูป) — คลิกเพื่อดูรูปขนาดเต็ม</span>
                               </div>
@@ -2701,7 +2701,7 @@ export default function OnlineOrderCard({
                               </div>
                             </div>
                           ) : (
-                            <div className="text-[11px] text-slate-400 italic">
+                            <div className="text-xs text-slate-400 italic">
                               (ไม่มีรูปภาพแนบจากฟอร์มตรวจรับ)
                             </div>
                           )}
@@ -2750,7 +2750,7 @@ export default function OnlineOrderCard({
                               <span className="text-slate-400 font-mono text-xs">฿</span>
                               <span className="font-mono font-bold text-slate-400 text-xs">0.00</span>
                             </div>
-                            <span className="text-[10px] text-slate-400 italic leading-tight max-w-[180px]">
+                            <span className="text-xs text-slate-400 italic leading-tight max-w-[180px]">
                               ไม่ได้รับเงินคืน — ปิดเคสทันที
                             </span>
                           </div>
@@ -2783,7 +2783,7 @@ export default function OnlineOrderCard({
                                   refundAmount: currentResolutionType === 'CANCEL' ? group.totalAmount : effectiveDefaultRefund
                                 }
                               }))}
-                              className="h-8 px-2 text-[11px] font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                              className="h-8 px-2 text-xs font-semibold text-indigo-700 bg-indigo-50 hover:bg-indigo-100 rounded-lg border border-indigo-200 transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
                               title="คลิกเพื่อกรอกยอดคืนเต็มจำนวน"
                             >
                               คืนเต็มจำนวน
@@ -2879,12 +2879,12 @@ export default function OnlineOrderCard({
           {/* Right: Main Confirm Button (Unlocked when store name is filled for all stores) */}
           <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 shrink-0">
             {!isAllStoresFilled && (
-              <span className="text-[11px] text-amber-600 font-medium text-right">
+              <span className="text-xs text-amber-600 font-medium text-right">
                 * ระบุชื่อร้านค้าจริงให้ครบ
               </span>
             )}
             {hasInvalidQty && (
-              <span className="text-[11px] text-rose-600 font-medium text-right">
+              <span className="text-xs text-rose-600 font-medium text-right">
                 * ระบุจำนวนให้เป็นจำนวนเต็มบวก
               </span>
             )}
@@ -2945,14 +2945,14 @@ export default function OnlineOrderCard({
         isPending ? '' : 'border-t border-slate-100'
       }`}>
         <div className="flex items-center gap-2 text-slate-400 min-w-0">
-          <span className="truncate text-[11px]">
+          <span className="truncate text-xs">
             🕒 ล่าสุด: {latestActivityText}
           </span>
           {Array.isArray(po.activityLog) && po.activityLog.length > 0 && (
             <button
               type="button"
               onClick={() => setIsHistoryExpanded(!isHistoryExpanded)}
-              className="text-indigo-600 hover:text-indigo-700 font-semibold text-[11px] inline-flex items-center gap-0.5 shrink-0 cursor-pointer"
+              className="text-indigo-600 hover:text-indigo-700 font-semibold text-xs inline-flex items-center gap-0.5 shrink-0 cursor-pointer"
             >
               <span>{isHistoryExpanded ? 'ย่อประวัติ' : 'ดูประวัติ'}</span>
               {isHistoryExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
@@ -3038,7 +3038,7 @@ export default function OnlineOrderCard({
                   <h3 className="text-sm font-bold text-slate-900">
                     เอกสารแนบ PR: {po.prNo || po.prNumber}
                   </h3>
-                  <p className="text-[11px] text-slate-500">
+                  <p className="text-xs text-slate-500">
                     มีเอกสารและไฟล์แนบทั้งหมด {prDocs.length} รายการ
                   </p>
                 </div>
@@ -3070,7 +3070,7 @@ export default function OnlineOrderCard({
                         <p className="text-xs font-semibold text-slate-800 truncate" title={doc.name}>
                           {doc.name}
                         </p>
-                        <div className="flex items-center gap-1.5 text-[10px] text-slate-400">
+                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
                           <span className={`px-1.5 py-0.2 rounded font-medium ${
                             doc.category === 'QUOTATION' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'
                           }`}>

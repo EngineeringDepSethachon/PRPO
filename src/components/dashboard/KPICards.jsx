@@ -115,7 +115,7 @@ export default function KPICards({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] text-slate-400 font-bold tracking-wider uppercase">PR รอพิจารณาอนุมัติ</p>
+            <p className="text-xs text-slate-400 font-bold tracking-wider uppercase">PR รอพิจารณาอนุมัติ</p>
             <h3 className="text-3xl lg:text-4xl font-black text-slate-900 mt-2 font-mono tabular-nums tracking-tight">
               {pendingPRs} <span className="text-xs font-medium text-slate-400 font-sans">รายการ</span>
             </h3>
@@ -126,7 +126,7 @@ export default function KPICards({
         </div>
         <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs">
           <span className="text-slate-400 font-normal">รอ Asst / Plant Mgr</span>
-          <span className="text-amber-700 font-semibold bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200/60 font-mono text-[11px]">
+          <span className="text-amber-700 font-semibold bg-amber-50 px-2.5 py-0.5 rounded-full border border-amber-200/60 font-mono text-xs">
             Action Queue
           </span>
         </div>
@@ -140,7 +140,7 @@ export default function KPICards({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] text-slate-400 font-bold tracking-wider uppercase">PO รอรับเข้าคลัง</p>
+            <p className="text-xs text-slate-400 font-bold tracking-wider uppercase">PO รอรับเข้าคลัง</p>
             <h3 className="text-3xl lg:text-4xl font-black text-slate-900 mt-2 font-mono tabular-nums tracking-tight">
               {activePOs} <span className="text-xs font-medium text-slate-400 font-sans">ฉบับ</span>
             </h3>
@@ -151,7 +151,7 @@ export default function KPICards({
         </div>
         <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs">
           <span className="text-slate-400 font-normal">รอส่งมอบสินค้า</span>
-          <span className="text-indigo-700 font-semibold bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200/60 font-mono text-[11px]">
+          <span className="text-indigo-700 font-semibold bg-indigo-50 px-2.5 py-0.5 rounded-full border border-indigo-200/60 font-mono text-xs">
             In Delivery
           </span>
         </div>
@@ -165,7 +165,7 @@ export default function KPICards({
       >
         <div className="flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] text-slate-400 font-bold tracking-wider uppercase">สินค้าแตะจุดสั่งซื้อ (ROP)</p>
+            <p className="text-xs text-slate-400 font-bold tracking-wider uppercase">สินค้าแตะจุดสั่งซื้อ (ROP)</p>
             <h3 className="text-3xl lg:text-4xl font-black text-slate-900 mt-2 font-mono tabular-nums tracking-tight">
               {lowStockCount} <span className="text-xs font-medium text-slate-400 font-sans">รายการ</span>
             </h3>
@@ -182,7 +182,7 @@ export default function KPICards({
               e.stopPropagation();
               handleLowStockClick();
             }}
-            className={`font-semibold px-2.5 py-0.5 rounded-full border text-[11px] transition-all cursor-pointer inline-flex items-center gap-1 ${
+            className={`font-semibold px-2.5 py-0.5 rounded-full border text-xs transition-all cursor-pointer inline-flex items-center gap-1 ${
               lowStockCount > 0 
                 ? 'bg-rose-50 text-rose-700 border-rose-200 hover:bg-rose-100' 
                 : 'bg-emerald-50 text-emerald-700 border-emerald-200 hover:bg-emerald-100'
@@ -203,7 +203,7 @@ export default function KPICards({
         <div>
           <div className="flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-[11px] text-slate-400 font-bold tracking-wider uppercase truncate">งบประจำเดือน ({budgetLabel})</p>
+              <p className="text-xs text-slate-400 font-bold tracking-wider uppercase truncate">งบประจำเดือน ({budgetLabel})</p>
               <h3 className="font-mono text-2xl lg:text-3xl font-black text-slate-900 tracking-tight whitespace-nowrap mt-2 tabular-nums">
                 ฿{totalSpent.toLocaleString()}
               </h3>
@@ -224,7 +224,7 @@ export default function KPICards({
         </div>
         <div className="mt-5 pt-3.5 border-t border-slate-100 flex items-center justify-between text-xs">
           <span className="text-slate-500 font-medium">ใช้ไปแล้ว <span className={`font-mono font-bold ${budgetPercent >= 90 ? 'text-rose-600' : 'text-slate-700'}`}>{budgetPercent}%</span></span>
-          <span className="font-mono text-slate-400 font-semibold text-[11px] whitespace-nowrap">
+          <span className="font-mono text-slate-400 font-semibold text-xs whitespace-nowrap">
             จาก ฿{totalAllocated.toLocaleString()}
           </span>
         </div>

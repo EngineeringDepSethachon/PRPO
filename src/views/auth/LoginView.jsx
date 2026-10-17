@@ -155,7 +155,7 @@ export default function LoginView() {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-[11px] text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
                 >
                   {showPassword ? 'ซ่อน Password' : 'แสดง Password'}
                 </button>
@@ -200,7 +200,7 @@ export default function LoginView() {
         {/* Security & System Info Footer */}
         <div className="mt-6 text-center text-xs text-slate-400 font-mono space-y-1">
           <p>🔒 เซสชันปลอดภัย อายุการใช้งาน 24 ชั่วโมง</p>
-          <p className="text-[11px] text-slate-400">Enterprise Resource Planning System</p>
+          <p className="text-xs text-slate-400">Enterprise Resource Planning System</p>
         </div>
       </div>
     </div>

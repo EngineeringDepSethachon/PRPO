@@ -140,7 +140,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
                 <button
                   type="button"
                   onClick={handleReset}
-                  className="px-2 py-1 hover:bg-slate-600 rounded-md transition-colors text-[11px] font-semibold text-slate-300 hover:text-white"
+                  className="px-2 py-1 hover:bg-slate-600 rounded-md transition-colors text-xs font-semibold text-slate-300 hover:text-white"
                 >
                   รีเซ็ต
                 </button>

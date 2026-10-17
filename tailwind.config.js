@@ -41,6 +41,15 @@ export default {
         sarabun: ['"TH Sarabun New"', 'Sarabun', 'sans-serif'],
         mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
+      // Phase 3 FR-04 (2026-10-17): ขยายขนาดตัวอักษร xs–xl ให้อ่านง่ายขึ้น (M12 B1)
+      // เฉพาะ xs–xl ; 2xl ขึ้นไปและขนาดกราฟคงเดิม
+      fontSize: {
+        xs: ['0.875rem', { lineHeight: '1.25rem' }],
+        sm: ['1rem', { lineHeight: '1.5rem' }],
+        base: ['1.125rem', { lineHeight: '1.75rem' }],
+        lg: ['1.25rem', { lineHeight: '1.75rem' }],
+        xl: ['1.375rem', { lineHeight: '1.875rem' }],
+      },
       keyframes: {
         'fade-in-up': {
           '0%': { opacity: '0', transform: 'translateY(6px)' },

@@ -1283,7 +1283,7 @@ function MasterDataContent({
                 >
                   <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
                   <span>เปิดใช้งาน</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-slate-100 text-slate-600 font-bold">
+                  <span className="px-1.5 py-0.2 rounded-full text-xs font-mono bg-slate-100 text-slate-600 font-bold">
                     {prodStatusCounts.active}
                   </span>
                 </button>
@@ -1298,7 +1298,7 @@ function MasterDataContent({
                   title="แสดงรายการสินค้าทั้งหมดรวมที่ปิดใช้งาน"
                 >
                   <span>ทั้งหมด</span>
-                  <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-slate-100 text-slate-600 font-bold">
+                  <span className="px-1.5 py-0.2 rounded-full text-xs font-mono bg-slate-100 text-slate-600 font-bold">
                     {prodStatusCounts.total}
                   </span>
                 </button>
@@ -1315,7 +1315,7 @@ function MasterDataContent({
                   <span className="w-2 h-2 rounded-full bg-slate-400"></span>
                   <span>ปิดใช้งาน</span>
                   {prodStatusCounts.inactive > 0 && (
-                    <span className="px-1.5 py-0.2 rounded-full text-[10px] font-mono bg-slate-200 text-slate-700 font-bold">
+                    <span className="px-1.5 py-0.2 rounded-full text-xs font-mono bg-slate-200 text-slate-700 font-bold">
                       {prodStatusCounts.inactive}
                     </span>
                   )}
@@ -1341,7 +1341,7 @@ function MasterDataContent({
           <div className="bg-white border border-slate-200/70 rounded-2xl overflow-hidden shadow-2xs">
             <div className="overflow-x-auto max-h-[580px] custom-scrollbar">
               <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs shadow-2xs border-b border-slate-200/80 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs shadow-2xs border-b border-slate-200/80 text-slate-500 font-semibold text-xs uppercase tracking-wider">
                   <tr>
                     <th className="py-3 pl-5">รหัสสินค้า</th>
                     <th className="py-3 px-4 w-1/3">ชื่อสินค้า / สเปก & จุดจัดเก็บ</th>
@@ -1369,12 +1369,12 @@ function MasterDataContent({
                         <td className="py-3.5 px-4">
                           <div className="font-semibold text-slate-900">{p.name}</div>
                           <div className="flex items-center gap-1.5 mt-1 flex-wrap">
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium bg-indigo-50/80 text-indigo-700 border border-indigo-100">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-medium bg-indigo-50/80 text-indigo-700 border border-indigo-100">
                               <MapPin className="w-3 h-3 text-indigo-500 shrink-0" />
                               <span>{p.locationName || 'ไม่ระบุจุดจัดเก็บ'}</span>
                             </span>
                             {Number(p.conversionRate) > 1 && (
-                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-mono font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-mono font-semibold bg-emerald-50 text-emerald-700 border border-emerald-100">
                                 1 {p.purchaseUnit || p.unit} = {p.conversionRate} {p.stockUnit || p.unit}
                               </span>
                             )}
@@ -1383,12 +1383,12 @@ function MasterDataContent({
                         <td className="py-3.5 px-4">{deptBadge(p.category || p.department)}</td>
                         <td className="py-3.5 px-4 text-center whitespace-nowrap">
                           {isInactive ? (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-slate-100 text-slate-500 border border-slate-200">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-slate-100 text-slate-500 border border-slate-200">
                               <span className="w-1.5 h-1.5 rounded-full bg-slate-400"></span>
                               ปิดใช้งาน
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200">
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
                               เปิดใช้งาน
                             </span>
@@ -1540,7 +1540,7 @@ function MasterDataContent({
           <div className="bg-white border border-slate-200/70 rounded-2xl overflow-hidden shadow-2xs">
             <div className="overflow-x-auto max-h-[580px] custom-scrollbar">
               <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs shadow-2xs border-b border-slate-200/80 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs shadow-2xs border-b border-slate-200/80 text-slate-500 font-semibold text-xs uppercase tracking-wider">
                   <tr>
                     <th className="py-3 pl-5">รหัสผู้ขาย</th>
                     <th className="py-3 px-4 w-1/3">ชื่อบริษัท / ร้านค้า</th>
@@ -1662,7 +1662,7 @@ function MasterDataContent({
           <div className="bg-white border border-slate-200/70 rounded-2xl overflow-hidden shadow-2xs">
             <div className="overflow-x-auto max-h-[580px] custom-scrollbar">
               <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs shadow-2xs border-b border-slate-200/80 text-slate-500 font-semibold text-[11px] uppercase tracking-wider">
+                <thead className="sticky top-0 z-10 bg-slate-50/95 backdrop-blur-xs shadow-2xs border-b border-slate-200/80 text-slate-500 font-semibold text-xs uppercase tracking-wider">
                   <tr>
                     <th className="py-3 pl-5 w-16">ลำดับ</th>
                     <th className="py-3 px-4 w-1/2">ชื่อจุดจัดเก็บสินค้า</th>
@@ -1816,7 +1816,7 @@ function MasterDataContent({
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs sm:text-sm">
                 <thead>
-                  <tr className="bg-slate-50/70 border-b border-slate-100 text-[11px] font-bold text-slate-500 uppercase tracking-wider">
+                  <tr className="bg-slate-50/70 border-b border-slate-100 text-xs font-bold text-slate-500 uppercase tracking-wider">
                     <th className="py-3.5 pl-6">ชื่อหน่วยเบิก / ห้อง</th>
                     <th className="py-3.5 px-4 text-center">แผนก</th>
                     <th className="py-3.5 px-4">รหัสระบบ</th>
@@ -1984,7 +1984,7 @@ function MasterDataContent({
           <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 font-bold text-[11px] uppercase tracking-wider">
+                <thead className="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 font-bold text-xs uppercase tracking-wider">
                   <tr>
                     <th className="py-3.5 pl-6">รหัสย่อ (Code)</th>
                     <th className="py-3.5 px-4">ชื่อแผนก / ฝ่าย (Department Name)</th>
@@ -2017,10 +2017,10 @@ function MasterDataContent({
                             <div>
                               <span className="font-bold text-slate-900 text-sm">{dept.name}</span>
                               {dept.nameEn && (
-                                <p className="text-[11px] text-slate-400 font-normal">{dept.nameEn}</p>
+                                <p className="text-xs text-slate-400 font-normal">{dept.nameEn}</p>
                               )}
                               {dept.description && (
-                                <p className="text-[11px] text-slate-500 line-clamp-1 mt-0.5">{dept.description}</p>
+                                <p className="text-xs text-slate-500 line-clamp-1 mt-0.5">{dept.description}</p>
                               )}
                             </div>
                           </td>

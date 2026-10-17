@@ -149,7 +149,7 @@ export default function ProductActionCard({
                 type="button"
                 onClick={() => openImage(1)}
                 title={`ดูรูปเพิ่มเติม (${imageList.length - 1} รูป)`}
-                className="absolute bottom-1 right-1 min-w-[28px] h-6 px-1.5 rounded-full bg-slate-800/90 hover:bg-indigo-600 text-white text-[11px] font-mono font-bold flex items-center justify-center border border-white shadow-sm cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                className="absolute bottom-1 right-1 min-w-[28px] h-6 px-1.5 rounded-full bg-slate-800/90 hover:bg-indigo-600 text-white text-xs font-mono font-bold flex items-center justify-center border border-white shadow-sm cursor-pointer focus:outline-none focus:ring-1 focus:ring-indigo-500"
               >
                 +{imageList.length - 1}
               </button>
@@ -174,7 +174,7 @@ export default function ProductActionCard({
           {nameExtra}
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap text-[11px] text-slate-500">
+        <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500">
           <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono font-semibold">{shownCode}</span>
           <span>หน่วย: {unit}</span>
         </div>

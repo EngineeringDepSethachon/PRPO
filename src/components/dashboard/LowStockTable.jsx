@@ -112,7 +112,7 @@ export default function LowStockTable({ products = [], onQuickPR }) {
               >
                 {/* ฝั่งซ้าย: ข้อมูลสินค้าและรหัส */}
                 <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                  <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[11px] font-bold shrink-0">
+                  <span className="px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-xs font-bold shrink-0">
                     {item.department}
                   </span>
                   <span className="px-2 py-0.5 rounded-md bg-white border border-rose-200 text-slate-700 font-mono text-xs font-semibold shrink-0">
@@ -129,7 +129,7 @@ export default function LowStockTable({ products = [], onQuickPR }) {
                     <div className="text-xs font-mono font-bold text-rose-600 tabular-nums">
                       คงเหลือ: {item.currentStock.toLocaleString()} {item.unit}
                     </div>
-                    <div className="text-[10px] text-slate-400 font-mono">
+                    <div className="text-xs text-slate-400 font-mono">
                       จุดสั่งซื้อซ้ำ (ROP): {item.rop.toLocaleString()} {item.unit}
                     </div>
                   </div>

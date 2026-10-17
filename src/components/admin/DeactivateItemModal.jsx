@@ -53,7 +53,7 @@ export default function DeactivateItemModal({
                 </p>
               </div>
               <div className="text-right shrink-0">
-                <span className="text-[11px] text-slate-400 block">สต็อกคงเหลือ</span>
+                <span className="text-xs text-slate-400 block">สต็อกคงเหลือ</span>
                 <span className="font-mono font-bold text-sm text-slate-800 tabular-nums">
                   {stockQty.toLocaleString()} {sUnit}
                 </span>

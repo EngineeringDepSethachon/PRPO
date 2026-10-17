@@ -245,7 +245,7 @@ export default function NotificationPopover(props) {
             <div className="flex items-center gap-2">
               <h3 className="text-sm font-bold text-slate-900 tracking-tight">การแจ้งเตือน</h3>
               {unreadCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-[11px] font-bold bg-indigo-500 text-white shadow-xs font-mono">
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-500 text-white shadow-xs font-mono">
                   {unreadCount}
                 </span>
               )}
@@ -258,7 +258,7 @@ export default function NotificationPopover(props) {
             type="button"
             onClick={handleMarkAll}
             disabled={notifications.length === 0}
-            className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[11px] font-semibold transition-all cursor-pointer active:scale-95 ${
+            className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer active:scale-95 ${
               unreadCount > 0
                 ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-700 border border-indigo-200/80 shadow-2xs'
                 : 'text-slate-500 bg-slate-100 hover:bg-slate-200/70 border border-slate-200/80'
@@ -294,7 +294,7 @@ export default function NotificationPopover(props) {
             }`}
           >
             <span>ทั้งหมด</span>
-            <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-slate-100 text-slate-600 font-mono">
+            <span className="px-1.5 py-0.2 rounded-full text-xs bg-slate-100 text-slate-600 font-mono">
               {notifications.length}
             </span>
           </button>
@@ -309,7 +309,7 @@ export default function NotificationPopover(props) {
           >
             <span>ยังไม่อ่าน</span>
             {unreadCount > 0 && (
-              <span className="px-1.5 py-0.2 rounded-full text-[10px] bg-indigo-500 text-white font-bold font-mono">
+              <span className="px-1.5 py-0.2 rounded-full text-xs bg-indigo-500 text-white font-bold font-mono">
                 {unreadCount}
               </span>
             )}
@@ -325,7 +325,7 @@ export default function NotificationPopover(props) {
               <Inbox size={22} strokeWidth={1.5} />
             </div>
             <p className="text-xs font-semibold text-slate-700">ไม่มีการแจ้งเตือน</p>
-            <p className="text-[11px] text-slate-400 mt-0.5">คุณเคลียร์งานทั้งหมดเรียบร้อยแล้ว เยี่ยมมาก! ⚡</p>
+            <p className="text-xs text-slate-400 mt-0.5">คุณเคลียร์งานทั้งหมดเรียบร้อยแล้ว เยี่ยมมาก! ⚡</p>
           </div>
         ) : (
           displayedNotifications.map((item) => {
@@ -362,15 +362,15 @@ export default function NotificationPopover(props) {
                 {/* Content Box */}
                 <div className="flex-1 min-w-0 pr-2">
                   <div className="flex items-center gap-2 mb-1">
-                    <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold border ${visual.badge}`}>
+                    <span className={`px-2 py-0.5 rounded-md text-xs font-bold border ${visual.badge}`}>
                       {visual.label}
                     </span>
                     {cleanDocNo && (
-                      <span className="text-[10px] font-mono font-medium text-slate-400">
+                      <span className="text-xs font-mono font-medium text-slate-400">
                         {cleanDocNo}
                       </span>
                     )}
-                    <span className="text-[10px] text-slate-400 ml-auto flex items-center gap-1 shrink-0">
+                    <span className="text-xs text-slate-400 ml-auto flex items-center gap-1 shrink-0">
                       <Clock size={11} />
                       {formatNotificationTime(item.timestamp || item.createdAt || item.time)}
                     </span>
@@ -383,7 +383,7 @@ export default function NotificationPopover(props) {
 
                   {/* Clean Non-repeating Description (No 'undefined') */}
                   {displayMessage && (
-                    <p className="text-[11px] text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">
                       {displayMessage}
                     </p>
                   )}

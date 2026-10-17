@@ -216,7 +216,7 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
         </div>
 
         {/* บรรทัดที่ 2: วันที่และเวลาที่ฟอร์แมตเรียบร้อย */}
-        <div className="flex items-center gap-1.5 text-[11px] font-mono text-slate-400 mb-2.5">
+        <div className="flex items-center gap-1.5 text-xs font-mono text-slate-400 mb-2.5">
           <span>🕒</span>
           <span>{formatDateTime(dateVal)}</span>
         </div>
@@ -267,7 +267,7 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
             {entityName}
           </span>
           <span className="text-slate-300">•</span>
-          <span className="text-indigo-600 font-semibold text-[11px] shrink-0">
+          <span className="text-indigo-600 font-semibold text-xs shrink-0">
             {channelLabel}
           </span>
         </div>
@@ -276,7 +276,7 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
       {/* ── 3. Card Footer: Net Amount & Minimal Action Button on same baseline ── */}
       <div className="border-t border-slate-100 pt-3.5 mt-4 flex items-center justify-between gap-3">
         <div>
-          <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">มูลค่าสุทธิ</p>
+          <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">มูลค่าสุทธิ</p>
           <p className="text-base font-black font-mono text-slate-900 leading-tight tabular-nums">
             {canViewPrice 
               ? `฿${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
@@ -295,7 +295,7 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
         ) : isPartialPO ? (
           <div className="flex items-center gap-2 shrink-0 max-w-[160px]">
             {task.purchaseChannel !== 'ONLINE' && task.status !== 'WAITING_DELIVERY_ROUND_2' && task.claimStatus !== 'PENDING' && task.claimStatus !== 'IN_CLAIM' && (
-              <span className="text-[10px] font-medium text-amber-600 underline cursor-pointer hover:text-amber-800 whitespace-nowrap hidden sm:inline-block">
+              <span className="text-xs font-medium text-amber-600 underline cursor-pointer hover:text-amber-800 whitespace-nowrap hidden sm:inline-block">
                 ส่งเคลม
               </span>
             )}

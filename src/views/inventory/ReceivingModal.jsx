@@ -1317,7 +1317,7 @@ export default function ReceivingModal({
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
               <div>
                 <div className="font-bold text-emerald-800">สินค้าทุกรายการได้รับการตรวจรับหรือเคลมชดเชยครบถ้วนแล้ว (100% Accounted)</div>
-                <div className="text-emerald-700 text-[11px] mt-0.5">
+                <div className="text-emerald-700 text-xs mt-0.5">
                   รายการสินค้าในใบสั่งซื้อนี้รับเข้าคลังครบถ้วนหรือได้รับการชดเชยเงินคืนแล้ว สามารถกดปุ่ม &quot;ยืนยันปิดงานใบสั่งซื้อ (Finalize PO)&quot; ด้านล่างเพื่อบันทึกปิดงานสมบูรณ์
                 </div>
               </div>
@@ -1335,7 +1335,7 @@ export default function ReceivingModal({
                     จ่ายจริง: ฿{Number(targetPO.actualTotalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
                 </div>
-                <div className="text-emerald-700 text-[11px] mt-0.5">
+                <div className="text-emerald-700 text-xs mt-0.5">
                   ราคาทุนสต็อกจะถูกบันทึกลง StockLogs ตามมูลค่าจ่ายจริงที่คำนวณไว้
                   {targetPO.savingsAmount > 0 && ` (ประหยัด ฿${Number(targetPO.savingsAmount).toLocaleString(undefined, { minimumFractionDigits: 2 })} คืนงบประมาณแล้ว)`}
                 </div>
@@ -1415,18 +1415,18 @@ export default function ReceivingModal({
                               <div className="text-xs text-slate-500 font-mono flex items-center gap-2 flex-wrap">
                                 <span>หน่วย: <strong className="text-slate-700">{item.pUnit}</strong></span>
                                 {item.conversionRatio > 1 && (
-                                  <span className="text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded font-sans">
+                                  <span className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded font-sans">
                                     (1 {item.pUnit} = {item.conversionRatio.toLocaleString()} {item.sUnit})
                                   </span>
                                 )}
                                 {item.originalPurchaseQty && Number(item.originalPurchaseQty) !== Number(item.orderedQty) && (
-                                  <span className="text-[11px] text-indigo-700 font-sans">
+                                  <span className="text-xs text-indigo-700 font-sans">
                                     (ปรับจาก PR: {item.originalPurchaseQty})
                                   </span>
                                 )}
                               </div>
                               {item.isOverLimit && (
-                                <div className="text-[11px] text-rose-700 font-semibold flex items-center gap-1 mt-0.5">
+                                <div className="text-xs text-rose-700 font-semibold flex items-center gap-1 mt-0.5">
                                   <span>⚠</span>
                                   <span>จำนวนรวมเกินยอดค้างรับ ({item.remainingToReceive} {item.pUnit}) — ระบบจะ clamp อัตโนมัติ</span>
                                 </div>
@@ -1447,7 +1447,7 @@ export default function ReceivingModal({
                               </span>
                             </div>
                             {/* Context Subtext */}
-                            <span className="text-[11px] text-slate-400 mt-1 whitespace-nowrap font-sans">
+                            <span className="text-xs text-slate-400 mt-1 whitespace-nowrap font-sans">
                               สั่งทั้งหมด {orderedQty} • รับแล้ว {previouslyReceived}
                             </span>
                           </div>
@@ -1543,7 +1543,7 @@ export default function ReceivingModal({
                                     <span>ขาด {shortageQty}</span>
                                   </span>
                                 </div>
-                                <span className="text-[11px] text-slate-400 mt-0.5 inline-block whitespace-nowrap">
+                                <span className="text-xs text-slate-400 mt-0.5 inline-block whitespace-nowrap">
                                   ↳ {isOnlinePurchase ? 'ส่งต่องานให้จัดซื้อออนไลน์ประสานงานร้านค้า' : 'ผู้สั่งซื้อดำเนินการประสานงานเคลมกับร้านค้าด้วยตนเอง'}
                                 </span>
                               </>
@@ -1555,7 +1555,7 @@ export default function ReceivingModal({
                                     <span>ชำรุด {currentDamageInput} {item.pUnit}</span>
                                   </span>
                                 </div>
-                                <span className="text-[11px] text-slate-400 mt-0.5 inline-block whitespace-nowrap">
+                                <span className="text-xs text-slate-400 mt-0.5 inline-block whitespace-nowrap">
                                   ↳ {isOnlinePurchase ? 'ส่งต่องานให้จัดซื้อออนไลน์ประสานงานร้านค้า' : 'ผู้สั่งซื้อดำเนินการประสานงานเคลมกับร้านค้าด้วยตนเอง'}
                                 </span>
                               </>
@@ -1566,7 +1566,7 @@ export default function ReceivingModal({
                                     <span>ขาด {shortageQty} {item.pUnit}</span>
                                   </span>
                                 </div>
-                                <span className="text-[11px] text-slate-400 mt-0.5 inline-block whitespace-nowrap">
+                                <span className="text-xs text-slate-400 mt-0.5 inline-block whitespace-nowrap">
                                   ↳ {isOnlinePurchase ? 'ส่งต่องานให้จัดซื้อออนไลน์ประสานงานร้านค้า' : 'ผู้สั่งซื้อดำเนินการประสานงานเคลมกับร้านค้าด้วยตนเอง'}
                                 </span>
                               </>
@@ -1598,7 +1598,7 @@ export default function ReceivingModal({
                                 />
                               </div>
                               <div className="shrink-0 flex items-center gap-3">
-                                <span className="text-[10px] text-rose-500 font-medium">
+                                <span className="text-xs text-rose-500 font-medium">
                                   * จำเป็นต้องระบุอาการและแนบรูปเพื่อส่งเรื่องเคลม
                                 </span>
                                 <button
@@ -1609,7 +1609,7 @@ export default function ReceivingModal({
                                   <Camera className="w-4 h-4" />
                                   <span>ถ่ายรูป / แนบหลักฐาน</span>
                                   {attachments.length > 0 && (
-                                    <span className="ml-1 px-1.5 py-0.5 bg-rose-600 text-white rounded-full text-[10px]">
+                                    <span className="ml-1 px-1.5 py-0.5 bg-rose-600 text-white rounded-full text-xs">
                                       {attachments.length}
                                     </span>
                                   )}
@@ -1684,7 +1684,7 @@ export default function ReceivingModal({
                           onClick={() => setPreviewAttachment({ file: att, url: att.localUrl || att.previewUrl || att.fileUrl || att.dataUrl, title: att.name || att.fileName })}
                         >
                           <FileText className="w-4 h-4" />
-                          <span className="text-[9px] font-bold mt-0.5">PDF</span>
+                          <span className="text-xs font-bold mt-0.5">PDF</span>
                         </div>
                       ) : (
                         <AttachmentThumbnail 
@@ -1694,7 +1694,7 @@ export default function ReceivingModal({
                           onClick={() => setPreviewAttachment({ file: att, url: att.localUrl || att.previewUrl || att.fileUrl || att.dataUrl, title: att.name || att.fileName })}
                         />
                       )}
-                      <p className="text-[9px] text-slate-500 truncate w-full text-center mt-0.5 font-mono">
+                      <p className="text-xs text-slate-500 truncate w-full text-center mt-0.5 font-mono">
                         {att.name || att.fileName || `ไฟล์ ${i+1}`}
                       </p>
                       <button
@@ -1772,7 +1772,7 @@ export default function ReceivingModal({
                       />
                       <div className="flex-1">
                         <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">บันทึกปัญหาไว้ก่อน (รอประสานงานร้านค้า)</p>
-                        <p className="text-[11px] text-slate-500">บันทึกรับดีเข้าคลัง และนำงานไปพักไว้ที่เมนู "ต้องดำเนินการ" เพื่อกลับมาบันทึกผลเจรจาในภายหลัง</p>
+                        <p className="text-xs text-slate-500">บันทึกรับดีเข้าคลัง และนำงานไปพักไว้ที่เมนู "ต้องดำเนินการ" เพื่อกลับมาบันทึกผลเจรจาในภายหลัง</p>
                       </div>
                     </label>
 
@@ -1787,10 +1787,10 @@ export default function ReceivingModal({
                       />
                       <div className="flex-1">
                         <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">ส่งสินค้าใหม่ทดแทน (Replacement)</p>
-                        <p className="text-[11px] text-slate-500">ร้านค้ายินยอมส่งของมาทดแทนส่วนที่ขาด/ชำรุด งานจะแสดงปุ่ม "ตรวจรับรอบ 2" ทันที</p>
+                        <p className="text-xs text-slate-500">ร้านค้ายินยอมส่งของมาทดแทนส่วนที่ขาด/ชำรุด งานจะแสดงปุ่ม "ตรวจรับรอบ 2" ทันที</p>
                         {inlineClaimAction === 'REPLACEMENT' && (
                           <div className="mt-2 flex items-center gap-2 animate-fade-in">
-                            <span className="text-[11px] font-semibold text-slate-600">วันที่คาดว่าจะได้รับ:</span>
+                            <span className="text-xs font-semibold text-slate-600">วันที่คาดว่าจะได้รับ:</span>
                             <input type="date" value={inlineExpectedDelivery} onChange={e => setInlineExpectedDelivery(e.target.value)} className="text-xs px-2 py-1 border border-slate-200 rounded-md outline-none focus:border-indigo-400" />
                           </div>
                         )}
@@ -1808,10 +1808,10 @@ export default function ReceivingModal({
                       />
                       <div className="flex-1">
                         <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">ได้รับเงินคืน / ปรับปรุงยอด (Refund)</p>
-                        <p className="text-[11px] text-slate-500">ร้านค้าคืนเงินสำหรับส่วนที่ชำรุด/ขาด ระบบจะปิด PO และส่งยอดเงินคืนเข้าสมุดบัญชีงบประมาณ</p>
+                        <p className="text-xs text-slate-500">ร้านค้าคืนเงินสำหรับส่วนที่ชำรุด/ขาด ระบบจะปิด PO และส่งยอดเงินคืนเข้าสมุดบัญชีงบประมาณ</p>
                         {inlineClaimAction === 'REFUND' && (
                           <div className="mt-2 flex items-center gap-2 animate-fade-in">
-                            <span className="text-[11px] font-semibold text-slate-600">ยอดเงินคืน (บาท):</span>
+                            <span className="text-xs font-semibold text-slate-600">ยอดเงินคืน (บาท):</span>
                             <input type="number" min="0" step="0.01" placeholder="ระบุจำนวนเงินคืน" value={inlineRefundAmount} onChange={e => setInlineRefundAmount(e.target.value)} className="text-xs px-2 py-1 border border-slate-200 rounded-md outline-none focus:border-indigo-400 w-32" />
                           </div>
                         )}
@@ -1829,7 +1829,7 @@ export default function ReceivingModal({
                       />
                       <div className="flex-1">
                         <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">ยอมรับสภาพ / ใช้งานตามจริง (Write-off)</p>
-                        <p className="text-[11px] text-slate-500">ไม่สามารถเรียกร้องอะไรได้อีก ปิดงาน PO ตามสภาพความเป็นจริงที่ได้รับ</p>
+                        <p className="text-xs text-slate-500">ไม่สามารถเรียกร้องอะไรได้อีก ปิดงาน PO ตามสภาพความเป็นจริงที่ได้รับ</p>
                       </div>
                     </label>
 

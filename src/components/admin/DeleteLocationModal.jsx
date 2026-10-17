@@ -149,14 +149,14 @@ export default function DeleteLocationModal({
                   {assignedProducts.slice(0, 6).map(p => (
                     <span
                       key={p.id}
-                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-slate-100 text-slate-700 border border-slate-200"
+                      className="inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-100 text-slate-700 border border-slate-200"
                     >
                       <span className="font-mono font-bold text-indigo-700">[{p.code}]</span>
                       <span className="truncate max-w-[140px]">{p.name}</span>
                     </span>
                   ))}
                   {assignedProducts.length > 6 && (
-                    <span className="inline-flex items-center px-2 py-1 rounded-lg text-[11px] font-semibold text-slate-500 bg-slate-50 border border-slate-200">
+                    <span className="inline-flex items-center px-2 py-1 rounded-lg text-xs font-semibold text-slate-500 bg-slate-50 border border-slate-200">
                       +{assignedProducts.length - 6} รายการเพิ่มเติม
                     </span>
                   )}
@@ -186,14 +186,14 @@ export default function DeleteLocationModal({
                         <div className="font-bold text-slate-900 text-xs">
                           ย้ายสินค้าทั้งหมด ({assignedProducts.length} รายการ) ไปยังจุดจัดเก็บอื่น
                         </div>
-                        <p className="text-[11px] text-slate-500 mt-0.5">
+                        <p className="text-xs text-slate-500 mt-0.5">
                           อัปเดตจุดเก็บใหม่ให้กับสินค้าทุกตัว แล้วลบจุดเก็บนี้
                         </p>
                       </div>
 
                       {resolutionMode === 'REASSIGN' && (
                         <div className="pt-1">
-                          <label className="text-[11px] font-bold text-slate-700 mb-1 block">
+                          <label className="text-xs font-bold text-slate-700 mb-1 block">
                             เลือกจุดจัดเก็บปลายทาง:
                           </label>
                           <select
@@ -232,7 +232,7 @@ export default function DeleteLocationModal({
                     <div className="font-bold text-slate-900 text-xs">
                       ปลดจุดจัดเก็บออกจากสินค้าทั้งหมด ({assignedProducts.length} รายการ)
                     </div>
-                    <p className="text-[11px] text-slate-500 mt-0.5">
+                    <p className="text-xs text-slate-500 mt-0.5">
                       ตั้งค่าสินค้าเป็น "ยังไม่ระบุจุดจัดเก็บ" แล้วลบจุดเก็บนี้ทันที
                     </p>
                   </div>

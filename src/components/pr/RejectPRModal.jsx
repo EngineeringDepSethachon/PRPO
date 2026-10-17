@@ -139,7 +139,7 @@ export default function RejectPRModal({
               className="w-full bg-white border border-slate-300 rounded-2xl p-3.5 text-xs sm:text-sm text-slate-800 placeholder-slate-400 focus:ring-2 focus:ring-rose-500/20 focus:border-rose-500 outline-none transition-all shadow-inner resize-none"
               autoFocus
             />
-            <div className="flex items-center justify-between text-[11px] text-slate-400 px-1">
+            <div className="flex items-center justify-between text-xs text-slate-400 px-1">
               <span>* จำเป็นต้องระบุเหตุผลเพื่อประกอบการส่งกลับ</span>
               <span className="font-mono">{reason.length} ตัวอักษร</span>
             </div>

@@ -253,7 +253,7 @@ export default function WorkspaceView({
             <Flame size={15} strokeWidth={2} className="text-rose-500" />
             <span>ต้องดำเนินการ (To Do)</span>
             {tabCounts.todo > 0 && (
-              <span className="bg-rose-500 text-white font-bold px-2 py-0.5 rounded-full text-[10px] font-mono shadow-2xs">
+              <span className="bg-rose-500 text-white font-bold px-2 py-0.5 rounded-full text-xs font-mono shadow-2xs">
                 {tabCounts.todo}
               </span>
             )}
@@ -271,7 +271,7 @@ export default function WorkspaceView({
             <Timer size={15} strokeWidth={2} className="text-amber-500" />
             <span>รอผู้อื่นดำเนินการ (In Progress)</span>
             {tabCounts.inProgress > 0 && (
-              <span className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full text-[10px] font-mono border border-amber-200/60">
+              <span className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full text-xs font-mono border border-amber-200/60">
                 {tabCounts.inProgress}
               </span>
             )}
@@ -289,7 +289,7 @@ export default function WorkspaceView({
             <CheckCheck size={15} strokeWidth={2} className="text-emerald-500" />
             <span>เสร็จสิ้นแล้ว (Completed)</span>
             {tabCounts.completed > 0 && (
-              <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full text-[10px] font-mono border border-emerald-200/60">
+              <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full text-xs font-mono border border-emerald-200/60">
                 {tabCounts.completed}
               </span>
             )}
@@ -380,7 +380,7 @@ export default function WorkspaceView({
               <h5 className="text-xs sm:text-sm font-bold text-slate-800">
                 แสดงเฉพาะรายการที่เสร็จสิ้นภายใน 30 วันที่ผ่านมา
               </h5>
-              <p className="text-[11px] sm:text-xs text-slate-500 mt-0.5">
+              <p className="text-xs sm:text-xs text-slate-500 mt-0.5">
                 สำหรับเอกสารย้อนหลังทั้งหมด กรุณาดูที่เมนู ใบขอซื้อ (PR) หรือ ใบสั่งซื้อ (PO)
               </p>
             </div>

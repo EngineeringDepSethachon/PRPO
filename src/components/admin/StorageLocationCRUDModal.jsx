@@ -196,7 +196,7 @@ export default function StorageLocationCRUDModal({
                     <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
                     <span>{selectableDepts[0]?.name} ({selectableDepts[0]?.code})</span>
                   </div>
-                  <span className="px-2 py-0.5 rounded-md text-[10px] font-bold border bg-indigo-50 text-indigo-700 border-indigo-200">
+                  <span className="px-2 py-0.5 rounded-md text-xs font-bold border bg-indigo-50 text-indigo-700 border-indigo-200">
                     {selectableDepts[0]?.code}
                   </span>
                 </div>

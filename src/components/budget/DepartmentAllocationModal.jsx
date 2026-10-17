@@ -198,13 +198,13 @@ function DepartmentAllocationModalContent({
           {/* Status & Current Budget Comparison Strip */}
           <div className="grid grid-cols-2 gap-3 bg-slate-50 p-3.5 rounded-xl border border-slate-200/70">
             <div>
-              <span className="text-[11px] font-medium text-slate-500 block">งบประมาณเดิม</span>
+              <span className="text-xs font-medium text-slate-500 block">งบประมาณเดิม</span>
               <span className="font-mono text-base font-bold text-slate-700 block mt-0.5">
                 {currentAmount > 0 ? `฿${Number(currentAmount).toLocaleString()}` : '฿0 (ยังไม่จัดสรร)'}
               </span>
             </div>
             <div>
-              <span className="text-[11px] font-medium text-slate-500 block">ผลต่าง (Delta)</span>
+              <span className="text-xs font-medium text-slate-500 block">ผลต่าง (Delta)</span>
               <span className={`font-mono text-base font-bold block mt-0.5 ${
                 delta > 0 ? 'text-emerald-600' : delta < 0 ? 'text-rose-600' : 'text-slate-500'
               }`}>
@@ -242,7 +242,7 @@ function DepartmentAllocationModalContent({
 
             {/* Quick Set Presets */}
             <div className="flex flex-wrap items-center gap-1.5 pt-1">
-              <span className="text-[10px] text-slate-400 font-semibold mr-1">กำหนดเร็ว:</span>
+              <span className="text-xs text-slate-400 font-semibold mr-1">กำหนดเร็ว:</span>
               <button
                 type="button"
                 onClick={() => handleQuickSet(isPD ? 1000000 : 150000)}
@@ -289,7 +289,7 @@ function DepartmentAllocationModalContent({
           </div>
 
           {/* RBAC notice */}
-          <div className="flex items-center gap-2 p-2.5 bg-amber-50/70 border border-amber-200/60 rounded-xl text-[11px] text-amber-800">
+          <div className="flex items-center gap-2 p-2.5 bg-amber-50/70 border border-amber-200/60 rounded-xl text-xs text-amber-800">
             <ShieldCheck className="w-4 h-4 text-amber-600 shrink-0" />
             <span>สิทธิ์เฉพาะ Asst. Manager และ Admin เท่านั้น ข้อมูลจะผูกกับรอบเดือน {periodDisplay.raw}</span>
           </div>

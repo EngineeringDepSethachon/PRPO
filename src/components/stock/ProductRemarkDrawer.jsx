@@ -112,7 +112,7 @@ export default function ProductRemarkDrawer({ isOpen, product, currentRole, onCl
               <span className="font-mono font-bold text-xs bg-slate-100 text-slate-800 px-2.5 py-1 rounded-md border border-slate-200/70">
                 {product.code}
               </span>
-              <span className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${deptBadgeClass}`}>
+              <span className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${deptBadgeClass}`}>
                 ฝ่าย {product.category || 'PD'}
               </span>
             </div>
@@ -122,7 +122,7 @@ export default function ProductRemarkDrawer({ isOpen, product, currentRole, onCl
             </h4>
 
             <div className="flex items-center gap-2 pt-2 border-t border-slate-100 text-xs text-slate-600 flex-wrap">
-              <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200/60 font-medium text-[11px]">
+              <span className="inline-flex items-center gap-1 bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200/60 font-medium text-xs">
                 <MapPin className="w-3 h-3 text-indigo-600" />
                 <span>{product.locationName || 'ไม่ระบุจุดจัดเก็บ'}</span>
               </span>
@@ -192,7 +192,7 @@ export default function ProductRemarkDrawer({ isOpen, product, currentRole, onCl
                   <div className="p-6 text-center border-2 border-dashed border-slate-200 rounded-xl text-slate-400 text-xs space-y-1">
                     <p className="font-semibold">ไม่มีหมายเหตุสำหรับสินค้านี้</p>
                     {canEditRemark && (
-                      <p className="text-[11px] text-slate-400">
+                      <p className="text-xs text-slate-400">
                         กดปุ่ม &ldquo;แก้ไขข้อความ&rdquo; ด้านบนเพื่อเพิ่มหมายเหตุ
                       </p>
                     )}
@@ -203,7 +203,7 @@ export default function ProductRemarkDrawer({ isOpen, product, currentRole, onCl
 
             {/* Timestamp & Author Meta */}
             {(view.remarkUpdatedAt || view.remarkUpdatedBy) && (
-              <div className="pt-3 border-t border-slate-100 text-[11px] text-slate-500 space-y-1">
+              <div className="pt-3 border-t border-slate-100 text-xs text-slate-500 space-y-1">
                 {view.remarkUpdatedAt && (
                   <div className="flex items-center gap-1.5">
                     <Clock className="w-3 h-3 text-slate-400" />

@@ -15,7 +15,7 @@ export default function RecentPRsTable({ prs = [], onNavigate, onOpenPR }) {
           <span>ใบขอซื้อล่าสุด</span>
           <span className="text-xs font-normal text-slate-400 font-sans hidden sm:inline">(Recent PRs)</span>
           {recentPRs.length > 0 && (
-            <span className="text-[11px] font-semibold text-indigo-700 bg-indigo-50/80 px-2 py-0.5 rounded-full border border-indigo-100/60 ml-1">
+            <span className="text-xs font-semibold text-indigo-700 bg-indigo-50/80 px-2 py-0.5 rounded-full border border-indigo-100/60 ml-1">
               {recentPRs.length} รายการ
             </span>
           )}
@@ -37,7 +37,7 @@ export default function RecentPRsTable({ prs = [], onNavigate, onOpenPR }) {
             <FileText className="w-5 h-5" />
           </div>
           <h4 className="text-xs sm:text-sm font-bold text-slate-900 mb-1">ยังไม่มีใบขอซื้อในระบบ</h4>
-          <p className="text-[11px] sm:text-xs text-slate-400 max-w-xs leading-relaxed mb-4">
+          <p className="text-xs sm:text-xs text-slate-400 max-w-xs leading-relaxed mb-4">
             คุณสามารถสร้างใบขอซื้อใหม่เพื่อเริ่มกระบวนการจัดซื้อวัตถุดิบหรืออุปกรณ์
           </p>
           <button
@@ -73,7 +73,7 @@ export default function RecentPRsTable({ prs = [], onNavigate, onOpenPR }) {
                       {pr.prNo}
                     </span>
                     <span
-                      className={`text-[10px] font-bold px-2 py-0.5 rounded-md border ${
+                      className={`text-xs font-bold px-2 py-0.5 rounded-md border ${
                         pr.department === 'PD'
                           ? 'bg-blue-50 text-blue-700 border-blue-200'
                           : 'bg-amber-50 text-amber-700 border-amber-200'
@@ -82,17 +82,17 @@ export default function RecentPRsTable({ prs = [], onNavigate, onOpenPR }) {
                       {pr.department}
                     </span>
                     {pr.purchaseChannel === 'ONLINE' && (
-                      <span className="text-[10px] font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-md flex items-center gap-1">
+                      <span className="text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-md flex items-center gap-1">
                         <ShoppingCart className="w-3 h-3 text-purple-600" />
                         <span>Online</span>
                       </span>
                     )}
-                    <span className="text-[11px] text-slate-400 font-normal truncate">
+                    <span className="text-xs text-slate-400 font-normal truncate">
                       • {pr.requestedBy}
                     </span>
                   </div>
                   <p className="text-xs text-slate-600 truncate max-w-md font-medium">
-                    <span className="text-slate-400 font-mono text-[11px] font-normal">{itemCount} รายการ:</span>{' '}
+                    <span className="text-slate-400 font-mono text-xs font-normal">{itemCount} รายการ:</span>{' '}
                     {firstItemName}
                   </p>
                 </div>
@@ -104,7 +104,7 @@ export default function RecentPRsTable({ prs = [], onNavigate, onOpenPR }) {
                       ฿{(pr.totalAmount || 0).toLocaleString()}
                     </div>
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold border mt-0.5 ${statusInfo.color}`}
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold border mt-0.5 ${statusInfo.color}`}
                     >
                       <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 animate-pulse"></span>
                       <span>{statusInfo.label}</span>

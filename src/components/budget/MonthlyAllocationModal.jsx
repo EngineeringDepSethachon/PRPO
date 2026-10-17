@@ -164,7 +164,7 @@ function MonthlyAllocationModalContent({
               <label className="text-xs font-bold text-slate-700 uppercase tracking-wider block">
                 1. กำหนดวงเงินงบประมาณรายแผนก (บาท) <span className="text-rose-500">*</span>
               </label>
-              <span className="text-[11px] text-slate-400">หน่วย: บาท (THB)</span>
+              <span className="text-xs text-slate-400">หน่วย: บาท (THB)</span>
             </div>
 
             {/* PD Input */}
@@ -174,7 +174,7 @@ function MonthlyAllocationModalContent({
                   <span className="w-2.5 h-2.5 rounded-full bg-indigo-600"></span>
                   <span className="text-xs font-bold text-slate-800">ฝ่ายผลิต (Production Department - PD)</span>
                 </div>
-                <span className="text-[11px] text-slate-500 font-mono font-bold">PD</span>
+                <span className="text-xs text-slate-500 font-mono font-bold">PD</span>
               </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-bold text-sm">
@@ -192,13 +192,13 @@ function MonthlyAllocationModalContent({
                 />
               </div>
               <div className="flex items-center gap-2 pt-0.5">
-                <span className="text-[10px] text-slate-400">ปุ่มลัด:</span>
+                <span className="text-xs text-slate-400">ปุ่มลัด:</span>
                 {[500000, 1000000, 1500000].map(val => (
                   <button
                     key={val}
                     type="button"
                     onClick={() => setPdAmount(String(val))}
-                    className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600 font-mono text-[10px] hover:bg-slate-100 transition-colors cursor-pointer"
+                    className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600 font-mono text-xs hover:bg-slate-100 transition-colors cursor-pointer"
                   >
                     ฿{val.toLocaleString()}
                   </button>
@@ -213,7 +213,7 @@ function MonthlyAllocationModalContent({
                   <span className="w-2.5 h-2.5 rounded-full bg-emerald-600"></span>
                   <span className="text-xs font-bold text-slate-800">ฝ่ายควบคุมคุณภาพ (Quality Control - QC)</span>
                 </div>
-                <span className="text-[11px] text-slate-500 font-mono font-bold">QC</span>
+                <span className="text-xs text-slate-500 font-mono font-bold">QC</span>
               </div>
               <div className="relative">
                 <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400 font-bold text-sm">
@@ -231,13 +231,13 @@ function MonthlyAllocationModalContent({
                 />
               </div>
               <div className="flex items-center gap-2 pt-0.5">
-                <span className="text-[10px] text-slate-400">ปุ่มลัด:</span>
+                <span className="text-xs text-slate-400">ปุ่มลัด:</span>
                 {[100000, 150000, 200000].map(val => (
                   <button
                     key={val}
                     type="button"
                     onClick={() => setQcAmount(String(val))}
-                    className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600 font-mono text-[10px] hover:bg-slate-100 transition-colors cursor-pointer"
+                    className="px-2 py-0.5 rounded-md bg-white border border-slate-200 text-slate-600 font-mono text-xs hover:bg-slate-100 transition-colors cursor-pointer"
                   >
                     ฿{val.toLocaleString()}
                   </button>
@@ -298,7 +298,7 @@ function MonthlyAllocationModalContent({
           {/* Total Summary Strip */}
           <div className="p-4 bg-emerald-50/80 rounded-2xl border border-emerald-200 flex items-center justify-between">
             <div>
-              <span className="text-[10px] text-emerald-800 font-bold uppercase tracking-wider block">
+              <span className="text-xs text-emerald-800 font-bold uppercase tracking-wider block">
                 ยอดจัดสรรงบประมาณรวมทั้งสิ้น
               </span>
               <span className="text-xs text-emerald-700 mt-0.5 block">

@@ -201,7 +201,7 @@ function BudgetManagementModalContent({
                 <h3 className="font-bold text-slate-900 text-base sm:text-lg tracking-tight truncate">
                   จัดการงบประมาณแผนก (Department Budgets)
                 </h3>
-                <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
+                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 border border-emerald-200 shrink-0">
                   {targetMonth}
                 </span>
               </div>
@@ -310,7 +310,7 @@ function BudgetManagementModalContent({
                               {dept.name} ({dept.code})
                             </h4>
                           </div>
-                          <span className="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/60">
+                          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded-md bg-slate-100 text-slate-600 border border-slate-200/60">
                             {dept.nameEn || dept.code}
                           </span>
                         </div>
@@ -318,19 +318,19 @@ function BudgetManagementModalContent({
                         {/* Financial Metrics Strip */}
                         <div className="grid grid-cols-3 gap-2 py-2 border-y border-slate-100 text-center">
                           <div>
-                            <span className="text-[10px] text-slate-400 block">วงเงินจัดสรร</span>
+                            <span className="text-xs text-slate-400 block">วงเงินจัดสรร</span>
                             <span className="text-xs font-bold font-mono text-slate-800 tabular-nums">
                               ฿{allocated.toLocaleString()}
                             </span>
                           </div>
                           <div>
-                            <span className="text-[10px] text-slate-400 block">ใช้ไปแล้ว</span>
+                            <span className="text-xs text-slate-400 block">ใช้ไปแล้ว</span>
                             <span className="text-xs font-bold font-mono text-slate-600 tabular-nums">
                               ฿{totalUsed.toLocaleString()}
                             </span>
                           </div>
                           <div>
-                            <span className="text-[10px] text-slate-400 block">คงเหลือ</span>
+                            <span className="text-xs text-slate-400 block">คงเหลือ</span>
                             <span className={`text-xs font-bold font-mono tabular-nums ${
                               remaining < 0 ? 'text-rose-600' : isWarning ? 'text-amber-600' : 'text-emerald-600'
                             }`}>
@@ -341,7 +341,7 @@ function BudgetManagementModalContent({
 
                         {/* Progress Bar */}
                         <div className="mt-3 space-y-1">
-                          <div className="flex items-center justify-between text-[11px] text-slate-500 font-medium">
+                          <div className="flex items-center justify-between text-xs text-slate-500 font-medium">
                             <span>การใช้งบ ({percent}%)</span>
                             <span>{remaining >= 0 ? `เหลือ ฿${remaining.toLocaleString()}` : `เกินงบ ฿${Math.abs(remaining).toLocaleString()}`}</span>
                           </div>
@@ -402,7 +402,7 @@ function BudgetManagementModalContent({
                         }`}
                       >
                         <div className="font-mono text-xs font-bold">{dept.code}</div>
-                        <div className="text-[11px] text-slate-500 truncate mt-0.5">{dept.name}</div>
+                        <div className="text-xs text-slate-500 truncate mt-0.5">{dept.name}</div>
                       </button>
                     );
                   })}
@@ -434,7 +434,7 @@ function BudgetManagementModalContent({
                       <div className="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">
                         <span>⚡ เติมงบประมาณพิเศษ (Budget Top-up)</span>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5">
                         บวกเพิ่มยอดเงินงบประมาณเข้าไปในวงเงินปัจจุบันทันที (เหมาะกับกรณีมีงานด่วนหรือโครงการพิเศษ)
                       </p>
                     </div>
@@ -459,7 +459,7 @@ function BudgetManagementModalContent({
                       <div className="font-bold text-slate-900 text-xs sm:text-sm flex items-center gap-1.5">
                         <span>💼 กำหนดวงเงินประจำเดือนใหม่ (New Monthly Base)</span>
                       </div>
-                      <p className="text-[11px] text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5">
                         เปลี่ยนตัวเลขวงเงินฐานประจำเดือนของแผนกใหม่ทั้งหมด (Re-allocate)
                       </p>
                     </div>
@@ -473,7 +473,7 @@ function BudgetManagementModalContent({
                   <label className="text-xs font-bold text-slate-700 block">
                     3. จำนวนเงิน {actionType === 'TOP_UP' ? 'ที่ต้องการเติมเพิ่ม (บาท)' : 'วงเงินงบประมาณใหม่ (บาท)'} <span className="text-rose-500">*</span>
                   </label>
-                  <span className="text-[11px] text-slate-400 font-mono">
+                  <span className="text-xs text-slate-400 font-mono">
                     วงเงินปัจจุบัน: ฿{currentAllocated.toLocaleString()}
                   </span>
                 </div>
@@ -496,7 +496,7 @@ function BudgetManagementModalContent({
 
                 {/* Quick Helper Chips */}
                 <div className="flex flex-wrap items-center gap-2 pt-1">
-                  <span className="text-[11px] text-slate-400 font-medium">ปุ่มลัด:</span>
+                  <span className="text-xs text-slate-400 font-medium">ปุ่มลัด:</span>
                   {[10000, 25000, 50000, 100000].map(val => (
                     <button
                       key={val}
@@ -524,7 +524,7 @@ function BudgetManagementModalContent({
                     <TrendingUp className="w-4 h-4" />
                   </div>
                   <div>
-                    <span className="text-[10px] text-slate-400 block uppercase font-bold tracking-wider">
+                    <span className="text-xs text-slate-400 block uppercase font-bold tracking-wider">
                       การคำนวณวงเงินใหม่
                     </span>
                     <div className="text-xs font-semibold text-slate-700 flex items-center gap-1.5 mt-0.5">
@@ -538,7 +538,7 @@ function BudgetManagementModalContent({
                 </div>
 
                 <div className="text-right">
-                  <span className="text-[10px] text-slate-400 block font-medium">ส่วนต่างวงเงิน (Delta)</span>
+                  <span className="text-xs text-slate-400 block font-medium">ส่วนต่างวงเงิน (Delta)</span>
                   <span className={`text-sm font-mono font-bold ${
                     deltaAmount > 0 ? 'text-emerald-600' : deltaAmount < 0 ? 'text-rose-600' : 'text-slate-600'
                   }`}>
@@ -592,7 +592,7 @@ function BudgetManagementModalContent({
                 <span className="text-xs font-bold text-slate-500 uppercase tracking-wider">
                   ประวัติการปรับปรุงวงเงิน & ธุรกรรมงบประมาณทั้งหมด ({scopedBudgetTransactions.length} รายการ)
                 </span>
-                <span className="text-[11px] text-slate-400 font-mono">
+                <span className="text-xs text-slate-400 font-mono">
                   บันทึกลง data/budgetTransactions.json
                 </span>
               </div>
@@ -606,7 +606,7 @@ function BudgetManagementModalContent({
                 <div className="rounded-2xl border border-slate-200/80 overflow-hidden shadow-2xs">
                   <div className="overflow-x-auto">
                     <table className="w-full text-left text-xs">
-                      <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200 text-[11px]">
+                      <thead className="bg-slate-50 text-slate-500 font-bold uppercase tracking-wider border-b border-slate-200 text-xs">
                         <tr>
                           <th className="py-3 px-4">วัน-เวลา</th>
                           <th className="py-3 px-3">แผนก</th>
@@ -620,14 +620,14 @@ function BudgetManagementModalContent({
                       <tbody className="divide-y divide-slate-100 font-normal">
                         {scopedBudgetTransactions.map(tx => (
                           <tr key={tx.id || Math.random()} className="hover:bg-slate-50/70 transition-colors">
-                            <td className="py-3 px-4 whitespace-nowrap text-slate-500 font-mono text-[11px]">
+                            <td className="py-3 px-4 whitespace-nowrap text-slate-500 font-mono text-xs">
                               {formatIsoForDisplay(tx.date) || formatIsoForDisplay(tx.createdAt)}
                             </td>
                             <td className="py-3 px-3 whitespace-nowrap font-bold text-slate-800">
                               {tx.dept}
                             </td>
                             <td className="py-3 px-3 whitespace-nowrap">
-                              <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold ${
+                              <span className={`px-2 py-0.5 rounded-md text-xs font-bold ${
                                 tx.type === 'TOP_UP' 
                                   ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
                                   : tx.type === 'SET_BUDGET'
@@ -643,7 +643,7 @@ function BudgetManagementModalContent({
                             <td className="py-3 px-3 text-right whitespace-nowrap font-mono text-slate-900 font-semibold">
                               ฿{Number(tx.newAmount || tx.monthlyBudget || 0).toLocaleString()}
                             </td>
-                            <td className="py-3 px-3 whitespace-nowrap text-slate-600 text-[11px]">
+                            <td className="py-3 px-3 whitespace-nowrap text-slate-600 text-xs">
                               {tx.actor || 'System'}
                             </td>
                             <td className="py-3 px-4 text-slate-600 max-w-[200px] truncate" title={tx.note}>

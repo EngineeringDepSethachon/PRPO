@@ -167,13 +167,13 @@ export default function FileUploader({
               <p className="text-xs font-semibold text-slate-800 truncate">
                 {label} {required && <span className="text-rose-500">*</span>}
               </p>
-              <p className="text-[11px] text-slate-400 truncate">
+              <p className="text-xs text-slate-400 truncate">
                 {helperText || `คลิกหรือลากไฟล์มาวาง (${accept.includes('pdf') ? 'PDF/รูป' : 'รูปภาพ'})`}
               </p>
             </div>
           </div>
 
-          <span className="text-[11px] font-semibold text-indigo-600 bg-indigo-50/80 group-hover:bg-indigo-100/70 border border-indigo-100 px-2.5 py-1 rounded-lg shrink-0 transition-colors pointer-events-none">
+          <span className="text-xs font-semibold text-indigo-600 bg-indigo-50/80 group-hover:bg-indigo-100/70 border border-indigo-100 px-2.5 py-1 rounded-lg shrink-0 transition-colors pointer-events-none">
             แนบไฟล์
           </span>
         </div>
@@ -195,7 +195,7 @@ export default function FileUploader({
                   {f.name}
                 </span>
                 {f.size ? (
-                  <span className="text-[10px] text-slate-400 font-mono">({formatSize(f.size)})</span>
+                  <span className="text-xs text-slate-400 font-mono">({formatSize(f.size)})</span>
                 ) : null}
                 <button
                   type="button"
@@ -216,10 +216,10 @@ export default function FileUploader({
   return (
     <div className="w-full animate-fade-in">
       <div className="flex justify-between items-end mb-2">
-        <label className="text-[13px] font-bold text-slate-700">
+        <label className="text-xs font-bold text-slate-700">
           {label} {required && <span className="text-rose-500">*</span>}
         </label>
-        {helperText && <span className="text-[11px] text-slate-500">{helperText}</span>}
+        {helperText && <span className="text-xs text-slate-500">{helperText}</span>}
       </div>
 
       <div
@@ -265,7 +265,7 @@ export default function FileUploader({
               ) : (
                 <div className="aspect-square bg-white flex flex-col items-center justify-center p-3 text-center">
                   <FileIcon className="w-8 h-8 text-indigo-400 mb-2" />
-                  <span className="text-[10px] font-bold text-slate-600 line-clamp-2 w-full break-all">{f.name}</span>
+                  <span className="text-xs font-bold text-slate-600 line-clamp-2 w-full break-all">{f.name}</span>
                 </div>
               )}
               
@@ -278,7 +278,7 @@ export default function FileUploader({
                 >
                   <X className="w-3.5 h-3.5" />
                 </button>
-                <div className="text-[10px] font-semibold text-white/90 truncate">
+                <div className="text-xs font-semibold text-white/90 truncate">
                   {formatSize(f.size)}
                 </div>
               </div>

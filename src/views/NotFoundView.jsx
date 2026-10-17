@@ -48,7 +48,7 @@ export default function NotFoundView() {
 
       {/* Quick Links Help */}
       <div className="mt-12 pt-6 border-t border-slate-200/80 max-w-md w-full">
-        <span className="text-[11px] font-bold text-slate-400 uppercase tracking-wider block mb-3">
+        <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block mb-3">
           เมนูแนะนำ (Quick Shortcuts)
         </span>
         <div className="flex flex-wrap justify-center gap-2 text-xs">

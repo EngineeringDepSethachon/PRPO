@@ -154,7 +154,7 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
               <div className="text-2xl font-black font-mono text-slate-800">
                 ฿{originalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="text-[11px] text-slate-400 mt-1 flex items-center gap-1">
+              <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
                 <span>ฝ่าย: {po.department || 'PD'}</span>
                 <span>•</span>
                 <span>{po.purchaseChannel === 'ONLINE' ? 'สั่งซื้อออนไลน์' : 'จัดซื้อ'}</span>
@@ -165,7 +165,7 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
             <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200">
               <div className="text-xs font-bold text-emerald-800 flex items-center justify-between mb-1">
                 <span>ยอดชำระจริง / สลิปโอน (Actual Paid) *</span>
-                <span className="text-[10px] bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">
+                <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">
                   บาท (THB)
                 </span>
               </div>
@@ -207,7 +207,7 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
                 <>
                   <div className="font-bold text-sm text-emerald-800 flex items-center gap-1.5">
                     <span>ประหยัดงบประมาณ: ฿{savingsAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    <span className="text-[10px] bg-emerald-600 text-white font-semibold px-2 py-0.5 rounded-full">
+                    <span className="text-xs bg-emerald-600 text-white font-semibold px-2 py-0.5 rounded-full">
                       คืนงบประมาณอัตโนมัติ
                     </span>
                   </div>
@@ -239,7 +239,7 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
                 <Package className="w-3.5 h-3.5 text-slate-500" />
                 การกระจายต้นทุนเข้าพัสดุ (Inventory Valuation)
               </span>
-              <span className="text-[11px] text-slate-400">
+              <span className="text-xs text-slate-400">
                 สัดส่วนต้นทุน: {(costRatio * 100).toFixed(1)}% ของราคาประเมิน
               </span>
             </div>
@@ -268,7 +268,7 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
                           <div className="font-medium text-slate-800 truncate max-w-[220px]" title={item.name}>
                             {item.name}
                           </div>
-                          <div className="text-[10px] font-mono text-slate-400">
+                          <div className="text-xs font-mono text-slate-400">
                             {item.code || '-'}
                           </div>
                         </td>

@@ -876,7 +876,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
         <div className="bg-slate-900/95 backdrop-blur-md text-white px-3.5 py-2.5 rounded-xl shadow-xl border border-slate-700/60 text-xs space-y-1.5 min-w-[190px]">
           <div className="font-semibold text-slate-200 border-b border-slate-700/80 pb-1 flex justify-between items-center">
             <span>{displayLabel}</span>
-            <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded font-bold ${
+            <span className={`text-xs font-mono px-1.5 py-0.5 rounded font-bold ${
               ratio > 90 ? 'bg-rose-500/20 text-rose-400' : ratio > 70 ? 'bg-amber-500/20 text-amber-400' : 'bg-emerald-500/20 text-emerald-400'
             }`}>
               {ratio}% ใช้ไป
@@ -899,7 +899,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
           {rowItem && rowItem.remaining !== undefined && (
             <div className="flex justify-between items-center text-slate-400 pt-0.5 border-t border-slate-800">
               <span>ส่วนต่าง:</span>
-              <span className={`font-mono text-[11px] ${rowItem.remaining < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
+              <span className={`font-mono text-xs ${rowItem.remaining < 0 ? 'text-rose-400' : 'text-emerald-400'}`}>
                 {rowItem.remaining < 0 ? '-' : '+'}฿{Math.abs(rowItem.remaining).toLocaleString()}
               </span>
             </div>
@@ -937,7 +937,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
             className="relative bg-white border border-slate-200/80 rounded-2xl p-2 shadow-xs hover:shadow-sm transition-all flex flex-col justify-center"
           >
             {/* Micro Header Label */}
-            <div className="flex items-center justify-between px-1 mb-1 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+            <div className="flex items-center justify-between px-1 mb-1 text-xs font-bold text-slate-400 uppercase tracking-wider">
               <span>รอบงบประมาณประจำเดือน</span>
               <span className="font-mono text-slate-400">({selectedMonthKey})</span>
             </div>
@@ -1049,7 +1049,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
           {/* Piece 2: Standalone Department Filter */}
           {(isSuperAdminOrApprover || userAssignedDepts.length > 1) && (
             <div className="flex flex-col justify-center">
-              <label className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-1 mb-1 hidden sm:block">
+              <label className="text-xs font-bold text-slate-400 uppercase tracking-wider px-1 mb-1 hidden sm:block">
                 แผนก (Department)
               </label>
               <select
@@ -1119,7 +1119,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
           <History className="w-4 h-4 text-slate-500" />
           <span>สมุดบัญชีความเคลื่อนไหวงบประมาณ (Budget Ledger)</span>
           {budgetTransactions.length > 0 && (
-            <span className="px-2 py-0.5 rounded-full text-[10px] font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+            <span className="px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
               {budgetTransactions.length}
             </span>
           )}
@@ -1142,7 +1142,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                       <h3 className="font-bold text-base text-white tracking-tight">
                         {isSuperAdminOrApprover ? 'งบประมาณรวมทั้งโรงงาน (Factory Total Overview)' : `งบประมาณรวมแผนกในความดูแล (${deptsToShow.length} แผนก)`}
                       </h3>
-                      <span className="text-[10px] font-mono font-bold text-amber-300 bg-amber-500/20 border border-amber-400/30 px-2.5 py-0.5 rounded-full">
+                      <span className="text-xs font-mono font-bold text-amber-300 bg-amber-500/20 border border-amber-400/30 px-2.5 py-0.5 rounded-full">
                         🔒 Read-Only (ยอดรวมคำนวณอัตโนมัติ)
                       </span>
                     </div>
@@ -1164,7 +1164,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
 
               <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
                 <div className="p-3.5 bg-white/5 hover:bg-white/10 transition-colors rounded-2xl border border-white/10">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
                     งบประมาณรวม ({deptsToShow.length} แผนก)
                   </span>
                   <span className="text-xl font-mono font-bold text-white block mt-1 tabular-nums">
@@ -1172,7 +1172,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                   </span>
                 </div>
                 <div className="p-3.5 bg-white/5 hover:bg-white/10 transition-colors rounded-2xl border border-white/10">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
                     ใช้จ่ายจริงรวม
                   </span>
                   <span className="text-xl font-mono font-bold text-indigo-300 block mt-1 tabular-nums">
@@ -1180,7 +1180,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                   </span>
                 </div>
                 <div className="p-3.5 bg-white/5 hover:bg-white/10 transition-colors rounded-2xl border border-white/10">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                  <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
                     ผูกพันรอของรวม
                   </span>
                   <span className="text-xl font-mono font-bold text-amber-300 block mt-1 tabular-nums">
@@ -1189,7 +1189,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                 </div>
                 <div className="p-3.5 bg-white/5 hover:bg-white/10 transition-colors rounded-2xl border border-white/10">
                   <div className="flex items-center justify-between">
-                    <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wider block">
+                    <span className="text-xs font-semibold text-slate-400 uppercase tracking-wider block">
                       คงเหลือสุทธิ
                     </span>
                   </div>
@@ -1237,7 +1237,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                       </div>
                       <div className="flex items-center gap-2">
                         <h4 className="font-bold text-slate-900 text-base">{deptMap[dept]?.name || DEPARTMENTS[dept]?.name || dept}</h4>
-                        <span className="text-[10px] font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
+                        <span className="text-xs font-mono font-bold text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
                           {dept}
                         </span>
                       </div>
@@ -1311,7 +1311,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                               <span className={`w-1.5 h-1.5 rounded-full ${
                                 isCritical ? 'bg-rose-500 animate-pulse' : isWarning ? 'bg-amber-500' : 'bg-emerald-500'
                               }`} />
-                              <span className={`text-[11px] font-medium ${
+                              <span className={`text-xs font-medium ${
                                 isCritical ? 'text-rose-600 font-semibold' : isWarning ? 'text-amber-600' : 'text-slate-500'
                               }`}>
                                 {isCritical ? 'ใกล้เต็มงบ' : isWarning ? 'เฝ้าระวัง' : 'ปกติ'}
@@ -1351,19 +1351,19 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                     {/* 3. Bento Metric Strip (3 Columns) */}
                     <div className="grid grid-cols-3 gap-2 mt-5 bg-slate-50/70 p-3 rounded-2xl border border-slate-100">
                       <div>
-                        <span className="text-[11px] font-medium text-slate-500 block">งบตั้งต้น</span>
+                        <span className="text-xs font-medium text-slate-500 block">งบตั้งต้น</span>
                         <span className="font-mono text-sm font-bold text-slate-800 tracking-tight tabular-nums block mt-0.5">
                           ฿{baseAllocated.toLocaleString()}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[11px] font-medium text-slate-500 block">ใช้จริง</span>
+                        <span className="text-xs font-medium text-slate-500 block">ใช้จริง</span>
                         <span className="font-mono text-sm font-bold text-slate-800 tracking-tight tabular-nums block mt-0.5">
                           ฿{actualSpent.toLocaleString()}
                         </span>
                       </div>
                       <div>
-                        <span className="text-[11px] font-medium text-slate-500 block">ผูกพันรอของ</span>
+                        <span className="text-xs font-medium text-slate-500 block">ผูกพันรอของ</span>
                         <span className="font-mono text-sm font-bold text-slate-800 tracking-tight tabular-nums block mt-0.5">
                           ฿{committed.toLocaleString()}
                         </span>
@@ -1573,7 +1573,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
 
             <div className="overflow-x-auto max-h-[560px] overflow-y-auto custom-scrollbar">
               <table className="w-full text-left text-xs sm:text-sm">
-                <thead className="bg-slate-50/95 backdrop-blur-xs text-slate-500 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200/80 sticky top-0 z-10 shadow-2xs">
+                <thead className="bg-slate-50/95 backdrop-blur-xs text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-200/80 sticky top-0 z-10 shadow-2xs">
                   <tr>
                     <th className="py-3.5 pl-6">เดือน / รอบบัญชี</th>
                     <th className="py-3.5 px-4 text-right">งบจัดสรร (฿)</th>
@@ -1603,12 +1603,12 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                           <div className="flex items-center gap-2">
                             <span className="text-slate-900 font-semibold">{row.monthFull}</span>
                             {row.isCurrent && (
-                              <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-100 text-indigo-700">
+                              <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-100 text-indigo-700">
                                 เดือนปัจจุบัน
                               </span>
                             )}
                           </div>
-                          <span className="text-[10px] font-mono text-slate-400 block mt-0.5">
+                          <span className="text-xs font-mono text-slate-400 block mt-0.5">
                             {row.monthRaw}
                           </span>
                         </td>
@@ -1659,25 +1659,25 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                               <span className="text-xs text-slate-400">— คงที่</span>
                             )
                           ) : (
-                            <span className="text-[11px] text-slate-400 font-mono">รอบฐาน</span>
+                            <span className="text-xs text-slate-400 font-mono">รอบฐาน</span>
                           )}
                         </td>
 
                         <td className="py-3.5 pr-6 text-center whitespace-nowrap">
                           {isOver ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-100 text-rose-800 border border-rose-200">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-100 text-rose-800 border border-rose-200">
                               <AlertTriangle className="w-3 h-3" /> เกินงบ
                             </span>
                           ) : isNear ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-rose-50 text-rose-700 border border-rose-200">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-rose-50 text-rose-700 border border-rose-200">
                               ใกล้เต็มงบ
                             </span>
                           ) : isWatch ? (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-amber-50 text-amber-700 border border-amber-200">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-amber-50 text-amber-700 border border-amber-200">
                               เฝ้าระวัง
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold bg-emerald-50 text-emerald-700 border border-emerald-200">
                               <CheckCircle2 className="w-3 h-3" /> ปกติ
                             </span>
                           )}
@@ -1728,7 +1728,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
           </div>
           <div className="overflow-x-auto">
             <table className="w-full text-left text-xs sm:text-sm">
-              <thead className="bg-slate-50 text-slate-500 text-[11px] font-bold uppercase tracking-wider border-b border-slate-200">
+              <thead className="bg-slate-50 text-slate-500 text-xs font-bold uppercase tracking-wider border-b border-slate-200">
                 <tr>
                   <th className="py-3.5 pl-6">วัน-เวลา</th>
                   <th className="py-3.5 px-4">ประเภทรายการ</th>
@@ -1827,7 +1827,7 @@ export default function BudgetView({ budgetSummary, currentRole, currentUser, pr
                           {formatThaiDateTime(tx.createdAt || tx.date)}
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-bold ${badgeClass}`}>
+                          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-bold ${badgeClass}`}>
                             <span>{badgeText}</span>
                           </span>
                         </td>

@@ -560,7 +560,7 @@ export default function StockMovementTable({
                   {Number(selectedProduct.conversionRate || selectedProduct.conversionRatio) > 1 && (selectedProduct.purchaseUnit || selectedProduct.purchaseUom) && (
                     <>
                       <span>•</span>
-                      <span className="text-[11px] text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded font-sans">
+                      <span className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-200 px-1.5 py-0.5 rounded font-sans">
                         (1 {selectedProduct.purchaseUnit || selectedProduct.purchaseUom} = {Number(selectedProduct.conversionRate || selectedProduct.conversionRatio).toLocaleString()} {selectedProduct.stockUnit || selectedProduct.baseUom || selectedProduct.unit || 'ชิ้น'})
                       </span>
                     </>
@@ -712,7 +712,7 @@ export default function StockMovementTable({
           {/* Table Container with Scrollbar & Sticky Header (max-h-[55vh] overflow-y-auto) */}
           <div className="overflow-x-auto overflow-y-auto max-h-[55vh] border border-slate-200/80 rounded-2xl custom-scrollbar relative shadow-2xs">
             <table className="w-full text-left text-xs sm:text-sm min-w-[950px]">
-              <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs text-slate-500 font-bold text-[11px] uppercase tracking-wider border-b border-slate-200">
+              <thead className="sticky top-0 z-10 bg-slate-50 shadow-2xs text-slate-500 font-bold text-xs uppercase tracking-wider border-b border-slate-200">
                 <tr>
                   <th className="py-3.5 pl-5 whitespace-nowrap">วัน-เวลา</th>
                   <th className="py-3.5 px-3 whitespace-nowrap">ประเภท</th>
@@ -768,15 +768,15 @@ export default function StockMovementTable({
                         {/* 2. Type */}
                         <td className="py-3 px-3 whitespace-nowrap">
                           {isNg ? (
-                            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 font-bold px-2.5 py-0.5 rounded-full text-[10px] border border-amber-200">
+                            <span className="inline-flex items-center gap-1 bg-amber-50 text-amber-700 font-bold px-2.5 py-0.5 rounded-full text-xs border border-amber-200">
                               <ArrowDownRight className="w-3 h-3 text-amber-600" /> IN (NG)
                             </span>
                           ) : isIncoming ? (
-                            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 font-bold px-2.5 py-0.5 rounded-full text-[10px] border border-emerald-200">
+                            <span className="inline-flex items-center gap-1 bg-emerald-50 text-emerald-700 font-bold px-2.5 py-0.5 rounded-full text-xs border border-emerald-200">
                               <ArrowDownRight className="w-3 h-3 text-emerald-600" /> IN
                             </span>
                           ) : (
-                            <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 font-bold px-2.5 py-0.5 rounded-full text-[10px] border border-rose-200">
+                            <span className="inline-flex items-center gap-1 bg-rose-50 text-rose-700 font-bold px-2.5 py-0.5 rounded-full text-xs border border-rose-200">
                               <ArrowUpRight className="w-3 h-3 text-rose-600" /> OUT
                             </span>
                           )}
@@ -790,7 +790,7 @@ export default function StockMovementTable({
                               <div>
                                 <span className="font-mono font-bold text-slate-800">{normalizedDocNo}</span>
                                 {parentPo && parentPo !== '-' && parentPo !== normalizedDocNo && (
-                                  <div className="text-[11px] text-slate-400 font-sans">อ้างอิง: {parentPo}</div>
+                                  <div className="text-xs text-slate-400 font-sans">อ้างอิง: {parentPo}</div>
                                 )}
                               </div>
                             );
@@ -811,7 +811,7 @@ export default function StockMovementTable({
                               {itemStockUnit}
                             </span>
                             {dualUomText && (
-                              <span className="text-[11px] font-normal font-sans text-slate-400 ml-0.5" title={`แปลงจากหน่วยสั่งซื้อ: ${dualUomText}`}>
+                              <span className="text-xs font-normal font-sans text-slate-400 ml-0.5" title={`แปลงจากหน่วยสั่งซื้อ: ${dualUomText}`}>
                                 ({dualUomText})
                               </span>
                             )}
@@ -916,7 +916,7 @@ export default function StockMovementTable({
                                     date: formatDateTimeThai(rawDate),
                                     note: noteText
                                   })}
-                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-[10px] font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200/80 transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
+                                  className="inline-flex items-center gap-0.5 px-1.5 py-0.5 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 rounded border border-indigo-200/80 transition-colors whitespace-nowrap cursor-pointer shadow-2xs"
                                   title="คลิกเพื่อดูโน้ตเต็ม"
                                 >
                                   ดูโน้ต
@@ -941,11 +941,11 @@ export default function StockMovementTable({
                 แสดง <span className="font-mono font-semibold text-slate-800">{sortedLogs.length === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1}</span> - <span className="font-mono font-semibold text-slate-800">{Math.min(safeCurrentPage * pageSize, sortedLogs.length)}</span> จากทั้งหมด <span className="font-mono font-semibold text-slate-800">{sortedLogs.length}</span> รายการ
               </span>
               <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
-                <span className="text-[11px] text-slate-400">แสดงหน้าละ:</span>
+                <span className="text-xs text-slate-400">แสดงหน้าละ:</span>
                 <select
                   value={pageSize}
                   onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
-                  className="bg-slate-50 border border-slate-200 text-slate-700 text-[11px] font-mono font-semibold rounded-lg px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-2xs"
+                  className="bg-slate-50 border border-slate-200 text-slate-700 text-xs font-mono font-semibold rounded-lg px-2 py-0.5 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer shadow-2xs"
                 >
                   <option value={10}>10</option>
                   <option value={15}>15</option>
@@ -1027,7 +1027,7 @@ export default function StockMovementTable({
                     </div>
                     <div>
                       <h4 className="text-sm font-bold text-slate-900">หมายเหตุ / บันทึก</h4>
-                      <div className="text-[11px] text-slate-400 font-mono">
+                      <div className="text-xs text-slate-400 font-mono">
                         เอกสาร: {activeNoteModal.docNo} • {formatIsoForDisplay(activeNoteModal.date)}
                       </div>
                     </div>

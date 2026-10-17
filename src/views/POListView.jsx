@@ -415,7 +415,7 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
                 >
                   <span>{tab.label}</span>
                   {count > 0 && (
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold transition-colors ${
+                    <span className={`px-1.5 py-0.2 rounded-full text-xs font-mono font-bold transition-colors ${
                       isSelected 
                         ? 'bg-white/20 text-white' 
                         : 'bg-slate-200 text-slate-700'
@@ -450,7 +450,7 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
                 ✕
               </button>
             ) : (
-              <span className="hidden sm:inline absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 pointer-events-none">
+              <span className="hidden sm:inline absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 pointer-events-none">
                 /
               </span>
             )}
@@ -605,7 +605,7 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
                             ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                           {po.settlementStatus === 'SETTLED' && (
-                            <span className="text-[10px] text-emerald-700 font-sans font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 mt-0.5">
+                            <span className="text-xs text-emerald-700 font-sans font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 mt-0.5">
                               {Number(po.savingsAmount) > 0 ? `ประหยัด ฿${Number(po.savingsAmount).toLocaleString()}` : 'ปิดยอดแล้ว'}
                             </span>
                           )}

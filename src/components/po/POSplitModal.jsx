@@ -63,7 +63,7 @@ export default function POSplitModal({ pr, pos = [], onClose, onSelectPO }) {
               <span className="font-bold text-slate-900 font-mono text-sm">฿{totalAmountAllPOs.toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>
             </div>
           </div>
-          <span className="text-[11px] text-indigo-700 font-medium flex items-center gap-1">
+          <span className="text-xs text-indigo-700 font-medium flex items-center gap-1">
             <Info className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
             <span>ระบบแยก PO อัตโนมัติตาม Supplier ของสินค้าแต่ละรายการ</span>
           </span>
@@ -92,7 +92,7 @@ export default function POSplitModal({ pr, pos = [], onClose, onSelectPO }) {
                       <div>
                         <div className="flex items-center gap-2">
                           <h4 className="font-bold text-slate-900 font-mono text-sm sm:text-base">{po.poNo}</h4>
-                          <span className={`px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${statusConfig.color}`}>
+                          <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border ${statusConfig.color}`}>
                             {statusConfig.label}
                           </span>
                         </div>
@@ -100,7 +100,7 @@ export default function POSplitModal({ pr, pos = [], onClose, onSelectPO }) {
                           <Building className="w-3.5 h-3.5 text-slate-400" />
                           <span>ผู้ขาย: <strong className="text-slate-800 font-semibold">{po.vendorName}</strong></span>
                           {po.vendorId && po.vendorId !== 'ONLINE' && (
-                            <span className="text-slate-400 font-mono text-[11px]">({po.vendorId})</span>
+                            <span className="text-slate-400 font-mono text-xs">({po.vendorId})</span>
                           )}
                         </p>
                       </div>
@@ -124,7 +124,7 @@ export default function POSplitModal({ pr, pos = [], onClose, onSelectPO }) {
                   <div className="p-4">
                     <table className="w-full text-left text-xs">
                       <thead>
-                        <tr className="border-b border-slate-100 text-slate-400 font-semibold text-[11px]">
+                        <tr className="border-b border-slate-100 text-slate-400 font-semibold text-xs">
                           <th className="pb-2 pl-2">รายการสินค้า</th>
                           <th className="pb-2 text-right">จำนวน</th>
                           <th className="pb-2 text-right">ราคาต่อหน่วย</th>
@@ -144,7 +144,7 @@ export default function POSplitModal({ pr, pos = [], onClose, onSelectPO }) {
                     </table>
 
                     <div className="mt-3 pt-2.5 border-t border-slate-100 flex items-center justify-between text-xs">
-                      <span className="text-slate-400 font-mono text-[11px]">ออกเมื่อ: {formatIsoForDisplay(po.issuedDate || po.createdAt) || '-'}</span>
+                      <span className="text-slate-400 font-mono text-xs">ออกเมื่อ: {formatIsoForDisplay(po.issuedDate || po.createdAt) || '-'}</span>
                       <div className="text-right">
                         <span className="text-slate-500 font-medium">ยอดรวม PO ใบนี้: </span>
                         <span className="font-mono font-bold text-slate-900 text-sm tabular-nums">฿{(po.grandTotal || po.subtotal || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</span>

@@ -407,7 +407,7 @@ export default function PRListView({
                 >
                   <span>{tab.label}</span>
                   {count > 0 && (
-                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold transition-colors ${
+                    <span className={`px-1.5 py-0.2 rounded-full text-xs font-mono font-bold transition-colors ${
                       isSelected 
                         ? 'bg-white/20 text-white' 
                         : 'bg-slate-200 text-slate-700'
@@ -442,7 +442,7 @@ export default function PRListView({
                 ✕
               </button>
             ) : (
-              <span className="hidden sm:inline absolute right-3 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 pointer-events-none">
+              <span className="hidden sm:inline absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 font-mono bg-slate-100 px-1.5 py-0.5 rounded border border-slate-200 pointer-events-none">
                 /
               </span>
             )}
@@ -498,7 +498,7 @@ export default function PRListView({
         <div className="flex-1 overflow-x-auto">
           <table className="w-full min-w-[880px] text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/80 text-[11px] font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200/80">
+              <tr className="bg-slate-50/80 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200/80">
                 <th className="w-36 px-4 py-3">เลขที่เอกสาร</th>
                 <th className="w-44 px-4 py-3">ผู้ขอ / หน่วยงาน</th>
                 <th className="min-w-[220px] px-4 py-3">รายการสินค้า</th>
@@ -536,7 +536,7 @@ export default function PRListView({
                           <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
                             <span className="text-xs text-slate-400 font-mono">{pr.requestedDate}</span>
                             {pr.memo && (
-                              <span className="inline-flex items-center gap-0.5 bg-amber-50 text-amber-700 border border-amber-200/80 text-[10px] font-bold px-1.5 py-0.2 rounded-full whitespace-nowrap" title="มี MEMO แนบ">
+                              <span className="inline-flex items-center gap-0.5 bg-amber-50 text-amber-700 border border-amber-200/80 text-xs font-bold px-1.5 py-0.2 rounded-full whitespace-nowrap" title="มี MEMO แนบ">
                                 <Tag size={10} /> MEMO
                               </span>
                             )}

@@ -317,19 +317,19 @@ export default function SearchableSelect({
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-1.5 flex-wrap">
                         {opt.code && (
-                          <span className="font-mono font-semibold text-[11px] text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/80 shrink-0">
+                          <span className="font-mono font-semibold text-xs text-slate-700 bg-slate-100 px-1.5 py-0.2 rounded border border-slate-200/80 shrink-0">
                             {opt.code}
                           </span>
                         )}
                         <span className="font-semibold text-slate-900 truncate text-xs">{opt.label}</span>
                         {opt.badge && (
-                          <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded border bg-indigo-50 text-indigo-700 border-indigo-100 shrink-0">
+                          <span className="text-xs font-semibold px-1.5 py-0.2 rounded border bg-indigo-50 text-indigo-700 border-indigo-100 shrink-0">
                             {opt.badge}
                           </span>
                         )}
                       </div>
                       {opt.subLabel && (
-                        <div className="text-[11px] text-slate-500 font-normal mt-0.5 truncate">
+                        <div className="text-xs text-slate-500 font-normal mt-0.5 truncate">
                           {opt.subLabel}
                         </div>
                       )}
@@ -388,7 +388,7 @@ export default function SearchableSelect({
           </div>
 
           {/* Footer count indicator */}
-          <div className="px-3 py-1.5 bg-slate-50/60 border-t border-slate-100 text-[11px] text-slate-400 flex items-center justify-between">
+          <div className="px-3 py-1.5 bg-slate-50/60 border-t border-slate-100 text-xs text-slate-400 flex items-center justify-between">
             <span>แสดง {filteredOptions.length} รายการ</span>
             <span>ลูกศร ↑ ↓ เพื่อเลือก</span>
           </div>

@@ -103,7 +103,7 @@ export default function DepartmentCRUDModal({
               <h3 className="font-bold text-slate-900 text-base">
                 {isEdit ? 'แก้ไขข้อมูลแผนก / ฝ่าย' : 'เพิ่มแผนก / ฝ่ายใหม่'}
               </h3>
-              <p className="text-[11px] text-slate-500">
+              <p className="text-xs text-slate-500">
                 ข้อมูล Master Data สำหรับระบุโครงสร้างองค์กร งบประมาณ และการกระจายสิทธิ์
               </p>
             </div>
@@ -147,7 +147,7 @@ export default function DepartmentCRUDModal({
                 }`}
               />
               {isCodeDuplicate && (
-                <p className="text-[10px] text-rose-500 mt-1 font-semibold">⚠️ รหัสนี้มีในระบบแล้ว</p>
+                <p className="text-xs text-rose-500 mt-1 font-semibold">⚠️ รหัสนี้มีในระบบแล้ว</p>
               )}
             </div>
 

@@ -225,11 +225,11 @@ export default function UserProfileModal({
               <div className="flex items-center gap-2 flex-wrap">
                 <h4 className="font-bold text-slate-900 text-base truncate">{targetUser.name}</h4>
                 {currentDepts.map(d => (
-                  <span key={d} className={`text-[11px] font-bold px-2.5 py-0.5 rounded-full border ${getDeptBadgeStyle(d)}`}>
+                  <span key={d} className={`text-xs font-bold px-2.5 py-0.5 rounded-full border ${getDeptBadgeStyle(d)}`}>
                     {d}
                   </span>
                 ))}
-                <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
+                <span className="text-xs font-semibold px-2 py-0.5 rounded-full bg-emerald-50 text-emerald-700 border border-emerald-200">
                   Active
                 </span>
               </div>
@@ -241,11 +241,11 @@ export default function UserProfileModal({
                   </span>
                 )}
               </p>
-              <div className="flex items-center gap-2 mt-0.5 text-[11px] font-mono text-slate-400 flex-wrap">
+              <div className="flex items-center gap-2 mt-0.5 text-xs font-mono text-slate-400 flex-wrap">
                 {targetUser.username && <span>@{targetUser.username}</span>}
                 {targetUser.employeeId && <span>• {targetUser.employeeId}</span>}
                 {targetUser.email && <span>• {targetUser.email}</span>}
-                <span className="bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-1.5 py-0.2 rounded font-sans text-[10px] font-bold">
+                <span className="bg-indigo-50 text-indigo-700 border border-indigo-200/60 px-1.5 py-0.2 rounded font-sans text-xs font-bold">
                   {canonicalRole}
                 </span>
               </div>
@@ -260,7 +260,7 @@ export default function UserProfileModal({
                   <ArrowRightLeft className="w-3.5 h-3.5 text-indigo-600" />
                   <span>สลับบัญชีผู้ใช้งาน (Fast Account Switcher)</span>
                 </span>
-                <span className="text-[10px] text-slate-400 font-mono">
+                <span className="text-xs text-slate-400 font-mono">
                   {availableUsers.length} บัญชีในระบบ
                 </span>
               </div>
@@ -309,7 +309,7 @@ export default function UserProfileModal({
                             </span>
                           </div>
                           <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                            <span className="text-[10px] text-slate-500 block truncate font-normal">
+                            <span className="text-xs text-slate-500 block truncate font-normal">
                               {userAcc.title}
                             </span>
                             {(() => {
@@ -318,7 +318,7 @@ export default function UserProfileModal({
                                 return (
                                   <div className="flex items-center gap-1">
                                     {accDepts.map(d => (
-                                      <span key={d} className={`text-[9px] font-bold px-1.5 py-0.2 rounded-md border ${getDeptBadgeStyle(d)}`}>
+                                      <span key={d} className={`text-xs font-bold px-1.5 py-0.2 rounded-md border ${getDeptBadgeStyle(d)}`}>
                                         {d}
                                       </span>
                                     ))}
@@ -336,7 +336,7 @@ export default function UserProfileModal({
                           <Check className="w-3.5 h-3.5 stroke-[2.5]" />
                         </span>
                       ) : (
-                        <span className="text-[10px] text-slate-400 group-hover:text-indigo-600 font-medium shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <span className="text-xs text-slate-400 group-hover:text-indigo-600 font-medium shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
                           สลับ
                         </span>
                       )}

@@ -59,7 +59,7 @@ export default function MasterDataNav({
           >
             <Icon className={`w-4 h-4 ${tab.iconColor}`} />
             <span>{tab.label}</span>
-            <span className="px-1.5 py-0.5 rounded-full text-[11px] font-mono bg-slate-100 text-slate-600">
+            <span className="px-1.5 py-0.5 rounded-full text-xs font-mono bg-slate-100 text-slate-600">
               {count}
             </span>
           </button>

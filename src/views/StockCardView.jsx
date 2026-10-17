@@ -270,7 +270,7 @@ export default function StockCardView({
               {products.length} SKUs
             </span>
           </div>
-          <p className="text-xs sm:text-[13px] text-slate-600 mt-0.5 font-normal">
+          <p className="text-xs sm:text-xs text-slate-600 mt-0.5 font-normal">
             ระบบบริหารสินค้าคงคลัง ตรวจสอบยอดคงเหลือ รับเข้า-เบิกจ่าย และจุดสั่งซื้อซ้ำ
           </p>
         </div>
@@ -314,7 +314,7 @@ export default function StockCardView({
 
             <div className="text-xs text-amber-950 font-normal truncate">
               <span className="font-semibold text-amber-900 mr-1.5">ตรวจพบสินค้าแตะจุด ROP</span>
-              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-mono font-bold bg-amber-200/70 text-amber-900 border border-amber-300/80 mr-2">
+              <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-amber-200/70 text-amber-900 border border-amber-300/80 mr-2">
                 {lowStockCount} รายการ
               </span>
               <span className="text-slate-600 hidden md:inline">
@@ -354,7 +354,7 @@ export default function StockCardView({
             >
               <Warehouse className="w-3.5 h-3.5 text-slate-500" />
               <span>รายการสต็อก</span>
-              <span className="text-[10px] font-mono px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600">
+              <span className="text-xs font-mono px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600">
                 {sortedAndFilteredProducts.length}
               </span>
             </button>
@@ -370,7 +370,7 @@ export default function StockCardView({
               <BarChart3 className="w-3.5 h-3.5 text-slate-500" />
               <span>วิเคราะห์ ROP</span>
               {lowStockCount > 0 && (
-                <span className="text-[10px] font-mono font-bold px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800">
+                <span className="text-xs font-mono font-bold px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800">
                   {lowStockCount}
                 </span>
               )}
@@ -451,7 +451,7 @@ export default function StockCardView({
               <Archive className="w-3.5 h-3.5" />
               <span>แสดงที่ปิดใช้งานแล้ว</span>
               {discontinuedCount > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                <span className={`px-1.5 py-0.2 rounded-full text-xs font-bold ${
                   showDiscontinued ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-600'
                 }`}>
                   {discontinuedCount}
@@ -478,7 +478,7 @@ export default function StockCardView({
                     ✕
                   </button>
                 ) : (
-                  <kbd className="hidden sm:inline-block font-mono text-[9px] text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">
+                  <kbd className="hidden sm:inline-block font-mono text-xs text-slate-400 bg-white px-1.5 py-0.5 rounded border border-slate-200">
                     /
                   </kbd>
                 )}
@@ -493,7 +493,7 @@ export default function StockCardView({
         <div className="bg-white border border-slate-200/70 rounded-2xl overflow-hidden shadow-2xs">
           <div className="overflow-x-auto max-h-[640px] custom-scrollbar relative">
             <table className="w-full text-left text-xs sm:text-sm min-w-[880px]">
-              <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/70 text-slate-400 font-semibold text-[11px] uppercase tracking-wider">
+              <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/70 text-slate-400 font-semibold text-xs uppercase tracking-wider">
                 <tr>
                   <th className="py-3 pl-5 whitespace-nowrap">รหัสสินค้า</th>
                   <th className="py-3 px-4 w-2/5">รายการสินค้า</th>
@@ -552,7 +552,7 @@ export default function StockCardView({
                         {/* ชื่อสินค้า & Location Breadcrumb & Remark Inline Chip */}
                         <td className="py-3 px-4 break-words max-w-md">
                           <div className="flex items-start gap-1.5 flex-wrap">
-                            <span className="font-medium text-slate-900 text-xs sm:text-[13px] leading-snug">
+                            <span className="font-medium text-slate-900 text-xs sm:text-xs leading-snug">
                               {prod.name}
                             </span>
 
@@ -561,7 +561,7 @@ export default function StockCardView({
                               <button
                                 type="button"
                                 onClick={() => setRemarkProduct(prod)}
-                                className="inline-flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
                                 title={`คลิกเพื่อดูหมายเหตุ: ${prod.remark}`}
                               >
                                 <FileText className="w-2.5 h-2.5 text-amber-600" />
@@ -570,7 +570,7 @@ export default function StockCardView({
                             )}
                           </div>
 
-                          <div className="flex items-center gap-1.5 mt-1 text-slate-400 text-[11px]">
+                          <div className="flex items-center gap-1.5 mt-1 text-slate-400 text-xs">
                             <span className="inline-flex items-center gap-1 text-slate-500 font-normal">
                               <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
                               <span>{prod.locationName || 'ไม่ระบุจุดเก็บ'}</span>
@@ -583,7 +583,7 @@ export default function StockCardView({
 
                         {/* แผนก */}
                         <td className="py-3 px-3 text-center whitespace-nowrap">
-                          <span className={`text-[11px] font-medium px-2 py-0.5 rounded-full ${
+                          <span className={`text-xs font-medium px-2 py-0.5 rounded-full ${
                             prod.category === 'PD' 
                               ? 'bg-blue-50 text-blue-700 border border-blue-100' 
                               : 'bg-amber-50 text-amber-700 border border-amber-100'
@@ -605,7 +605,7 @@ export default function StockCardView({
                             </span>
                           </div>
                           {purchaseEquivStr && (
-                            <div className="text-[10px] text-slate-400 font-mono">
+                            <div className="text-xs text-slate-400 font-mono">
                               ≈ {purchaseEquivStr} {pUnit}
                             </div>
                           )}
@@ -723,7 +723,7 @@ export default function StockCardView({
           <div className="bg-white rounded-2xl overflow-hidden border border-slate-200/70 shadow-2xs">
             <div className="overflow-x-auto max-h-[580px] custom-scrollbar relative">
               <table className="w-full text-left text-xs sm:text-sm min-w-[800px]">
-                <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/70 text-slate-400 font-semibold text-[11px] uppercase tracking-wider">
+                <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/70 text-slate-400 font-semibold text-xs uppercase tracking-wider">
                   <tr>
                     <th className="py-3 pl-5">รหัส & รายการสินค้า</th>
                     <th className="py-3 px-4 text-right">คงเหลือ</th>
@@ -763,11 +763,11 @@ export default function StockCardView({
                       </td>
                       <td className="py-3 px-4 text-center whitespace-nowrap">
                         {item.isRopUnderSuggested ? (
-                          <span className="inline-flex items-center text-[11px] font-medium text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
+                          <span className="inline-flex items-center text-xs font-medium text-rose-700 bg-rose-50 px-2 py-0.5 rounded-full border border-rose-200">
                             ต่ำกว่าเกณฑ์ (-{item.ropGap})
                           </span>
                         ) : (
-                          <span className="inline-flex items-center text-[11px] font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
+                          <span className="inline-flex items-center text-xs font-medium text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded-full border border-emerald-200">
                             เหมาะสม
                           </span>
                         )}

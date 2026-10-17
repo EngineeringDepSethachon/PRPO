@@ -386,7 +386,7 @@ export default function UserCRUDModal({
                   <CheckCircle2 className="w-4 h-4 text-indigo-600" />
                   <span>ขอบเขตแผนกที่ดูแล / มีสิทธิ์ (Authorized Departments)</span>
                 </label>
-                <p className="text-[11px] text-slate-500 mt-0.5">
+                <p className="text-xs text-slate-500 mt-0.5">
                   เลือกแผนกที่ผู้ใช้นี้ได้รับอนุญาตให้เห็นและจัดการงาน (เลือกได้หลายแผนกเพื่อดูแลงานข้ามสายงาน)
                 </p>
               </div>
@@ -429,7 +429,7 @@ export default function UserCRUDModal({
                   >
                     <span className={`w-2 h-2 rounded-full ${dept === 'PD' ? 'bg-blue-500' : dept === 'QC' ? 'bg-amber-500' : 'bg-indigo-500'}`} />
                     <span>แผนก {dept}</span>
-                    {isPrimary && <span className="text-[10px] text-slate-400 font-normal">(หลัก)</span>}
+                    {isPrimary && <span className="text-xs text-slate-400 font-normal">(หลัก)</span>}
                     {isSelected && <Check className="w-3 h-3 text-indigo-600 shrink-0" />}
                   </button>
                 );
