@@ -4,7 +4,8 @@
 - [x] B1 tailwind.config.js theme.extend.fontSize xs–xl (commit 988f3b1) — nong
 - [x] B4 codemod --write 495 จุด/55 ไฟล์ + tests/font_scale_guard.test.js + แก้ po_procurement:2025 ; npm test 3008 — nong
 - [x] B5a/B5b/B5c เก็บจุดล้น 13+14+21 ไฟล์ (commit 2ba63a5) ; npm test 3008 build ผ่าน ; deploy preview แล้ว ; ตัดสินคงเดิม: stepper h-8, ช่องราคา w-28, แถวสินค้า PRCreateView sm:flex-nowrap, header ตาราง ReceivingModal wrap ได้ ; ReceivingModal ทำใน B5b แล้ว (B5c ข้าม) ; FastIssueModal ไม่ได้แตะ
-- [ ] B0/B6 screenshot ก่อน/หลัง: Chromium Playwright ติดตั้งแล้ว ; รอผู้ใช้อนุญาตเปิด local dev server หรือให้ผู้ใช้ตรวจบน preview แทน
+- [x] B6 ผู้ใช้ตรวจด้วยตาบน preview แล้วสั่ง "ขึ้นได้" (2026-10-17) ; QA (prae) PASS + เก็บ 5 จุด (commit 6cbdb85) ; screenshot อัตโนมัติไม่ได้ทำ (Chromium ติดตั้งไว้แล้ว ใช้รอบหน้าได้)
+- [x] v1.3.0: backup prpo-db-20261017-v1.2.0.sql → bump → CHANGELOG → tag → build worktree → preview + main
 - [x] B2 PrintablePO.jsx ล็อกขนาดเดิมเป็น px 13 จุด (Q11=A) + เทสต์ไม่มีคลาส text-xs/sm ใน PrintablePO ; po_procurement PrintablePO ผ่าน — malee
 - [x] B3 scripts/codemod-font-scale.mjs (dry-run default, --write) + tests/codemod_font_scale.test.js (40 ผ่าน) — malee ; dry-run: 497 จุด / 54 ไฟล์ ไม่มี warning (มากสุด QuickIssueView 47, OnlineOrderCard 44, PODetailsModal 36) ; **ยังไม่ --write** (รอหลัง v1.2.0)
 - [ ] B6 screenshot หลังแก้ + รายการเทียบ → prae → bump 1.3.0 + CHANGELOG → preview → main
