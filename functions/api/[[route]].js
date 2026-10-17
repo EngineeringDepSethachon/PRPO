@@ -150,9 +150,18 @@ const prLineKey2 = (it) => String((it && (it.productId || it.id || it.code)) || 
 const r2 = (n) => Math.round((Number(n) + Number.EPSILON) * 100) / 100;
 // The quantity of a line, read in ONE order everywhere (the PR amounts, the PR -> PO ceiling : orderedQtyOf) : purchaseQty, qty, quantity, orderedQty ; none = 1.
 // (a PR line written by the server carries all four names with the same number : normalizePrLine)
+// ONE reader for the amounts AND the PR -> PO ceiling (orderedQtyOf below is the same function) : the FIRST of those names that holds a positive number (a number or a plain
+// decimal text : strictNum), else 1. A line {purchaseQty: 0 | '', qty: 100} is worth 100 in the amounts and 100 at the ceiling (it used to be 0 and 100).
 const PR_QTY_READ_ORDER = ['purchaseQty', 'qty', 'quantity', 'orderedQty'];
 const lineQty = (it) => {
-  if (it && typeof it === 'object') for (const k of PR_QTY_READ_ORDER) if (it[k] !== undefined && it[k] !== null) return Number(it[k]);
+  if (it && typeof it === 'object') {
+    for (const k of PR_QTY_READ_ORDER) {
+      const v = it[k];
+      if (v === undefined || v === null || v === '') continue;
+      const n = strictNum(v); // (a text like 0x3E8 is not a number here : Number() and parseFloat would read it differently)
+      if (n !== null && n > 0) return n;
+    }
+  }
   return 1;
 };
 // unit price of a line : price, else the aliases the BUFFER edit keeps in step (unitPrice / estimatedPrice) ; '' / null count as "not there"
@@ -293,7 +302,10 @@ function prLineDiscount(storedLine, qty, price) {
   const s = storedLine && typeof storedLine === 'object' ? storedLine : {};
   const gross = qty * price;
   const pct = parseFloat(s.discountPercent) || 0;
-  const raw = pct > 0 ? r2(gross * (pct / 100)) : (parseFloat(s.discountAmount) || 0);
+  const da = parseFloat(s.discountAmount) || 0;
+  // a percent that was read back from the amount (r2(amount / gross x 100) : the old PRCreateView typed an amount, the percent is its rounding) keeps the amount as the figure
+  const fromAmount = pct > 0 && da > 0 && gross > 0 && r2((da / gross) * 100) === pct;
+  const raw = fromAmount ? da : (pct > 0 ? r2(gross * (pct / 100)) : da);
   return Math.min(gross, Math.max(0, raw));
 }
 /**
@@ -321,7 +333,7 @@ function prBufferEdit(curRow, p, rawLinks) {
   const storedTotal = Number(curRow.totalAmount || 0);
   const out = {};
   let lines = base;
-  let discs = base.map((s) => prLineDiscount(s, lineQty(s), parseFloat(s && s.price) || 0));
+  let discs = base.map((s) => prLineDiscount(s, lineQty(s), linePrice(s)));
   let figuresChanged = false;
   if (Array.isArray(p.items)) {
     if (p.items.length !== base.length) return FORBID;
@@ -337,12 +349,12 @@ function prBufferEdit(curRow, p, rawLinks) {
       const sentQty = it.purchaseQty ?? it.qty ?? it.quantity ?? it.orderedQty;
       const sentPrice = it.price ?? it.unitPrice ?? it.estimatedPrice;
       const qty = sentQty === undefined || sentQty === null ? lineQty(s) : Number(sentQty);
-      const price = sentPrice === undefined || sentPrice === null ? (parseFloat(s.price ?? s.unitPrice ?? s.estimatedPrice) || 0) : parseFloat(sentPrice);
+      const price = sentPrice === undefined || sentPrice === null ? linePrice(s) : parseFloat(sentPrice);
       if (!Number.isFinite(qty) || qty <= 0 || qty > 10000000) return { status: 400, message: 'จำนวนสินค้าไม่ถูกต้อง' };
       if (!Number.isFinite(price) || price < 0 || price > 1e9) return { status: 400, message: 'ราคาต่อหน่วยไม่ถูกต้อง' };
       for (const k of PR_QTY_ALIASES) line[k] = qty;
       for (const k of PR_PRICE_ALIASES) line[k] = price;
-      const lineChanged = qty !== lineQty(s) || price !== (parseFloat(s.price ?? s.unitPrice ?? s.estimatedPrice) || 0);
+      const lineChanged = qty !== lineQty(s) || price !== linePrice(s);
       const disc = prLineDiscount(s, qty, price);
       if (lineChanged) {
         figuresChanged = true;
@@ -527,30 +539,55 @@ function prFigure(it, s, k) {
   if (!isSent(v)) return {};
   const n = strictNum(v);
   if (n !== null) return { n };
-  if (s && s[k] === v) { const f = parseFloat(v); return { n: Number.isFinite(f) && f >= 0 ? f : 0 }; }
+  if (s && s[k] === v) { const f = parseFloat(v); return { n: Number.isFinite(f) && f >= 0 ? f : 0, lenient: true }; }
   return { bad: true };
 }
 // a figure with several names -> { value } (undefined = none sent) | { error }
-function prNamedFigure(it, s, names, err) {
-  let value; let mixed = false;
+// Names that disagree are a 400, except :
+//  - a line sent back exactly as the stored one holds it (an old PR that already disagrees with itself) : the line is read the way the amounts read it (qty : the first
+//    positive name, so {purchaseQty: '' | 0, qty: 100} is 100 ; price : the first name sent)
+//  - an OLD BUNDLE's edit (it changes qty / price but does not keep the alias names in step) : the stored line holds ONE number for every name (sv), the body carries exactly
+//    two numbers, one of them sv (the names it left alone) -> the other one is the new figure. A stored line that disagrees with itself, no stored line (a new PR), or three
+//    numbers are still a 400.
+// A text the STORED line holds as it is (lenient : '' , '1,234') does not count in the disagreement ; it is only the answer when nothing else was sent.
+function prNamedFigure(it, s, names, err, isQty) {
+  const entries = [];
   for (const k of names) {
     const f = prFigure(it, s, k);
     if (f.bad) return { error: err };
     if (f.n === undefined) continue;
-    if (value === undefined) value = f.n; else if (f.n !== value) mixed = true;
+    entries.push({ k, n: f.n, lenient: Boolean(f.lenient) });
   }
-  // names that disagree are a 400 - except a line sent back exactly as the stored one holds it (an old PR that already disagrees with itself) : the first name wins, as its total always did
-  if (mixed && !(s && names.every((k) => !isSent(it[k]) || it[k] === s[k]))) return { error: err };
-  return { value };
+  if (!entries.length) return { value: undefined };
+  const firm = entries.filter((e) => !e.lenient);
+  const distinct = new Set(firm.map((e) => e.n));
+  if (distinct.size <= 1) return { value: firm.length ? firm[0].n : (isQty ? (entries.find((e) => e.n > 0) || entries[0]).n : entries[0].n) };
+  if (s && names.every((k) => !isSent(it[k]) || it[k] === s[k])) {
+    return { value: isQty ? (entries.find((e) => e.n > 0) || entries[0]).n : entries[0].n };
+  }
+  if (s && distinct.size === 2) {
+    const stored = new Set();
+    let storedClean = true;
+    for (const k of names) {
+      if (!isSent(s[k])) continue;
+      const n = strictNum(s[k]);
+      if (n === null) storedClean = false; else stored.add(n);
+    }
+    if (storedClean && stored.size === 1) {
+      const [sv] = [...stored];
+      if (distinct.has(sv)) return { value: [...distinct].find((n) => n !== sv) };
+    }
+  }
+  return { error: err };
 }
 // skipDiscount : the discount keys of the line are not read (the BUFFER's edit at PENDING_BUFFER takes only qty / price / links from the body and keeps the stored discount)
 function normalizePrLine(it, s, skipDiscount) {
   if (!isObj(it)) return { error: PR_ERR_ITEMS };
-  const q = prNamedFigure(it, s, PR_QTY_READ_ORDER, PR_ERR_QTY);
+  const q = prNamedFigure(it, s, PR_QTY_READ_ORDER, PR_ERR_QTY, true);
   if (q.error) return q;
   const qty = q.value === undefined ? 1 : q.value;
   if (!(qty > 0) || qty > 1e7) return { error: PR_ERR_QTY };
-  const pr = prNamedFigure(it, s, PR_PRICE_ALIASES_ORDER, PR_ERR_PRICE);
+  const pr = prNamedFigure(it, s, PR_PRICE_ALIASES_ORDER, PR_ERR_PRICE, false);
   if (pr.error) return pr;
   const price = pr.value === undefined ? 0 : pr.value;
   if (price < 0 || price > 1e9) return { error: PR_ERR_PRICE };
@@ -566,10 +603,14 @@ function normalizePrLine(it, s, skipDiscount) {
   if (pf.bad || af.bad) return { error: PR_ERR_LINE_DISC };
   const pct = pf.n === undefined ? 0 : pf.n; const da = af.n === undefined ? 0 : af.n;
   if (pct < 0 || pct > 100 || da < 0) return { error: PR_ERR_LINE_DISC };
-  let amount;
+  let amount; let outPct = pct;
   if (pct > 0) {
     amount = r2(gross * (pct / 100)); // ONE formula (the percent wins : workflowEngine.editPRItems, prLineDiscount)
-    if (da > 0 && Math.abs(Math.round(da * 100) - Math.round(amount * 100)) > 1) return { error: PR_ERR_LINE_DISC };
+    if (da > 0 && Math.abs(Math.round(da * 100) - Math.round(amount * 100)) > 1) {
+      // an OLD PRCreateView sends the percent it read back from the amount the user typed (rounded to 2 places) : percent === r2(amount / gross x 100) -> the amount is the
+      // figure (never above the line) and the percent is written as that ratio. Any other disagreement is still a 400.
+      if (gross > 0 && da <= gross + 0.01 && r2((da / gross) * 100) === pct) { amount = Math.min(gross, da); outPct = r2((amount / gross) * 100); } else return { error: PR_ERR_LINE_DISC };
+    }
   } else {
     if (da > gross + 0.01) return { error: PR_ERR_LINE_DISC };
     amount = Math.min(gross, da);
@@ -578,7 +619,7 @@ function normalizePrLine(it, s, skipDiscount) {
   for (const k of PR_PRICE_ALIASES_ORDER) out[k] = price;
   out.stockQty = qty * (rate > 0 ? rate : 1);
   if (!skipDiscount) {
-    if (isSent(it.discountPercent) || pct > 0) out.discountPercent = pct;
+    if (isSent(it.discountPercent) || pct > 0) out.discountPercent = outPct;
     if (isSent(it.discountAmount) || isSent(it.discountPercent) || amount > 0) out.discountAmount = amount;
   }
   const total = r2(Math.max(0, gross - amount));
@@ -775,7 +816,15 @@ function guardPrWrite(authUser, cur, p, rawLinks) {
   // an admin is not restricted (beyond the shape + the lines above), except that his edit of a PR parked at the BUFFER step is checked like the BUFFER's (the total must match
   // the lines) ; a total he sets that is not the lines' is written to the audit log (PR_TOTAL_OVERRIDE)
   if (perms.isAdmin && cur.status !== PR_PENDING_BUFFER) {
+    const adminRaw = Array.isArray(p.items) ? p.items : null;
     if (nres.items) p.items = nres.items;
+    // lines that give other amounts and NO total sent (neither a total nor financials.grandTotal) : the total follows the lines, like every other role's edit (the stored total
+    // used to stay, lower than the lines, with no audit row). A total he does send is his to set : a different one goes to the audit log below.
+    if (differ && sentTotalOf(p) === null && !(isObj(p.financials) && hasVal(p.financials.grandTotal))) {
+      const e = prEnforceAmounts(cur, p, adminRaw);
+      if (e) return e;
+      return null;
+    }
     const ov = prTotalOverride(cur, p, differ);
     if (ov) PR_TOTAL_OVERRIDES.set(p, ov);
     return null;
@@ -1957,15 +2006,65 @@ const PRE_ORDER_STATUSES = new Set(['', ...PO_PRE_ORDER]); // the same set the t
 // qty, quantity, orderedQty) : the FIRST of those names that holds a positive number, else 1. NOT the highest - a PR line {purchaseQty:1, qty:1, quantity:1000} is worth 1
 // in the amounts, so it must be 1 at the PO ceiling too (normalizePrLine now refuses such a PR line ; an old one is still read consistently).
 const QTY_KEYS = PR_QTY_READ_ORDER;
-const orderedQtyOf = (line) => {
-  for (const k of QTY_KEYS) {
-    const v = line && line[k];
-    if (v === undefined || v === null || v === '') continue;
-    const n = strictNum(v); // (a text like 0x3E8 is not a number here either : Number() and parseFloat would read it differently)
-    if (n !== null && n > 0) return n;
+const orderedQtyOf = lineQty; // (the SAME reader as the PR amounts : one function, so the amount and the ceiling cannot disagree)
+// What the other POs of a PR already took, by PR row index : a live PO counts its ordered qty, a CANCELLED one what it had already received (that stock is in).
+// excludeId = the PO being saved (a save of an existing PO) ; null for a new PO.
+async function prQtyTakenByPos(db, prRow, prItems, excludeId) {
+  const used = new Map();
+  const others = (await db.prepare('SELECT id, status, itemsJson FROM pos WHERE prNumber = ? OR prId = ?').bind(prRow.prNumber, prRow.id).all().catch(() => ({ results: [] }))).results || [];
+  for (const o of others) {
+    if (excludeId && o.id === excludeId) continue;
+    const cancelled = normalizePoStatus(o.status) === 'CANCELLED';
+    const oLines = parseJsonSafe(o.itemsJson, []);
+    // the row a line was paired with when its PO was made (prRowIndex, written by the server) ; an older PO without it is paired again
+    const paired = pickPrRows(prItems, oLines);
+    oLines.forEach((it, i) => {
+      const stored = it && Number.isInteger(it.prRowIndex) && it.prRowIndex >= 0 && it.prRowIndex < prItems.length ? it.prRowIndex : -1;
+      const row = stored >= 0 ? stored : paired[i];
+      if (row < 0) return;
+      const q = cancelled ? Math.max(Number(it && it.goodQty) || 0, Number(it && it.receivedQty) || 0) : orderedQtyOf(it);
+      used.set(row, (used.get(row) || 0) + q);
+    });
   }
-  return 1;
-};
+  return used;
+}
+// A save of an EXISTING PO by a non-admin (PUT, POST upsert ; `out` = the lines as guardPoItems returned them, same positions as the stored ones) :
+//  - a line whose qty names differ from the stored line's gets ONE qty on every qty name it carries (orderedQtyOf : the PR's reading order, never the highest) ;
+//  - a line whose qty went UP must still fit the PR : the PR's qty of its row minus what the other POs of the PR took minus this PO's own lines of that row (the message of a new PO).
+// A line whose qty did not change is not checked (receiving / claim / settle send the lines back as they are). A PO with no PR to compare with (admin-seeded) cannot be checked.
+// -> null | an error message (400). out is mutated.
+async function guardPoQtyVsPr(db, curPo, storedLines, out) {
+  if (!curPo || !Array.isArray(out) || !Array.isArray(storedLines)) return null;
+  const raised = [];
+  out.forEach((line, i) => {
+    const s = storedLines[i];
+    if (!isPlain(line) || !isPlain(s)) return;
+    if (!QTY_KEYS.some((k) => k in line && Number(line[k]) !== Number(s[k]))) return;
+    const q = orderedQtyOf(line);
+    for (const k of QTY_KEYS) if (k in line) line[k] = q;
+    if (q > orderedQtyOf(s) + 1e-9) raised.push(i);
+  });
+  if (!raised.length) return null;
+  const keys = [curPo.prId, curPo.prNumber].map((v) => String(v || '').trim()).filter(Boolean);
+  if (!keys.length) return null;
+  const prRow = await lookupStatus(db, 'SELECT id, prNumber, itemsJson FROM prs WHERE id = ? OR prNumber = ? OR id = ? OR prNumber = ? ORDER BY (id = ?) DESC LIMIT 1', keys[0], keys[0], keys[1] || keys[0], keys[1] || keys[0], keys[0]);
+  const prItems = prRow ? parseJsonSafe(prRow.itemsJson, []) : [];
+  if (!prRow || !Array.isArray(prItems) || !prItems.length) return null;
+  const paired = pickPrRows(prItems, storedLines.map((x) => (isPlain(x) ? x : {})));
+  const rowOf = (i) => {
+    const s = storedLines[i];
+    return s && Number.isInteger(s.prRowIndex) && s.prRowIndex >= 0 && s.prRowIndex < prItems.length ? s.prRowIndex : (paired[i] === undefined ? -1 : paired[i]);
+  };
+  const used = await prQtyTakenByPos(db, prRow, prItems, curPo.id);
+  const mine = new Map(); // PR row -> this PO's own qty on it, as saved
+  out.forEach((line, i) => { const r = rowOf(i); if (isPlain(line) && r >= 0) mine.set(r, (mine.get(r) || 0) + orderedQtyOf(line)); });
+  for (const i of raised) {
+    const r = rowOf(i);
+    if (r < 0 || !isPlain(prItems[r])) return 'รายการใน PO ไม่ตรงกับรายการใน PR';
+    if ((used.get(r) || 0) + (mine.get(r) || 0) > orderedQtyOf(prItems[r]) + 1e-9) return 'จำนวนใน PO รวมแล้วเกินจำนวนใน PR';
+  }
+  return null;
+}
 // A PO body's status: trimmed + upper-cased at the single entry (a non-string / unknown value is refused for a non-admin) -> an error response or null
 function checkPoStatus(p, authUser) {
   if (p.status === undefined || p.status === null) return null;
@@ -3927,7 +4026,7 @@ async function handleRequest(context, state) {
           const batchKeys = [String(p.id), String(p.poNumber || p.poNo || p.id)];
           if (batchKeys.some((k) => seenPo.has(k))) return errorResponse('รหัส/เลขที่ PO ซ้ำกันในคำขอเดียวกัน', 400);
           batchKeys.forEach((k) => seenPo.add(k));
-          const cur = p.id ? await lookupStatus(db, 'SELECT status, department, totalAmount, vatAmount, grandTotal, timelineJson, itemsJson, evidenceJson, purchaseChannel, extraJson FROM pos WHERE id = ? LIMIT 1', p.id) : null;
+          const cur = p.id ? await lookupStatus(db, 'SELECT id, prId, prNumber, status, department, totalAmount, vatAmount, grandTotal, timelineJson, itemsJson, evidenceJson, purchaseChannel, extraJson FROM pos WHERE id = ? LIMIT 1', p.id) : null;
           poCur.set(p, cur);
           // lines / evidence: existing row + not sent => keep the stored value ; received quantities never go down ; actual prices are fixed after the settlement ;
           // a final status only accepts ADDED evidence (checked here, before anything of the request is written)
@@ -3939,6 +4038,11 @@ async function handleRequest(context, state) {
             const itemsOut = Array.isArray(p.items)
               ? guardPoItems(cur ? parseJsonSafe(cur.itemsJson, []) : [], p.items, { admin, lockPrice, onlineish: resolvePermissions(authUser).onlineish, storedStatus: cur ? cur.status : '', notes: itemNotes, grnStarted: hasGrn(storedExtra) })
               : (cur ? parseJsonSafe(cur.itemsJson, []) : []);
+            // an existing PO saved through the upsert : a raised qty must still fit the PR (same rule as PUT)
+            if (cur && !admin && Array.isArray(p.items)) {
+              const over = await guardPoQtyVsPr(db, cur, parseJsonSafe(cur.itemsJson, []), itemsOut);
+              if (over) return errorResponse(over, 400);
+            }
             const evOut = guardedDocBlob(cur ? parseJsonSafe(cur.evidenceJson, {}) : undefined, p.evidence, Boolean(cur), cur && cur.status, {});
             poGuard.set(p, { itemsJson: JSON.stringify(itemsOut), evidenceJson: JSON.stringify(evOut), storedExtra, itemNotes });
           }
@@ -3977,22 +4081,7 @@ async function handleRequest(context, state) {
               if (!lines.length) return errorResponse('PO ต้องมีรายการสินค้าจาก PR', 400);
               // what the PR's other POs already took : a live PO counts its ordered qty, a CANCELLED one what it had already received (that stock is in)
               if (!prUsed.has(prRow.id)) {
-                const used = new Map(); // PR row index -> qty taken
-                const others = (await db.prepare('SELECT status, itemsJson FROM pos WHERE prNumber = ? OR prId = ?').bind(prRow.prNumber, prRow.id).all().catch(() => ({ results: [] }))).results || [];
-                for (const o of others) {
-                  const cancelled = normalizePoStatus(o.status) === 'CANCELLED';
-                  const oLines = parseJsonSafe(o.itemsJson, []);
-                  // the row a line was paired with when its PO was made (prRowIndex, written by the server) ; an older PO without it is paired again
-                  const paired = pickPrRows(prItems, oLines);
-                  oLines.forEach((it, i) => {
-                    const stored = it && Number.isInteger(it.prRowIndex) && it.prRowIndex >= 0 && it.prRowIndex < prItems.length ? it.prRowIndex : -1;
-                    const row = stored >= 0 ? stored : paired[i];
-                    if (row < 0) return;
-                    const q = cancelled ? Math.max(Number(it && it.goodQty) || 0, Number(it && it.receivedQty) || 0) : orderedQtyOf(it);
-                    used.set(row, (used.get(row) || 0) + q);
-                  });
-                }
-                prUsed.set(prRow.id, used);
+                prUsed.set(prRow.id, await prQtyTakenByPos(db, prRow, prItems, null)); // PR row index -> qty taken
               }
               const used = prUsed.get(prRow.id);
               const pend = new Map();
@@ -4193,9 +4282,16 @@ async function handleRequest(context, state) {
         const putStoredExtra = curPo ? parseExtra(curPo.extraJson) : {};
         const putLockPrice = Boolean(curPo) && (putStoredExtra.settlementStatus === 'SETTLED' || String(curPo.status || '').trim().toUpperCase() === 'SETTLED');
         const putItemNotes = [];
-        const itemsJson = Array.isArray(p.items)
-          ? JSON.stringify(guardPoItems(curPo ? parseJsonSafe(curPo.itemsJson, []) : [], p.items, { admin: normalizeUser(authUser).isAdmin, lockPrice: putLockPrice, onlineish: resolvePermissions(authUser).onlineish, storedStatus: curPo ? curPo.status : '', notes: putItemNotes, grnStarted: hasGrn(putStoredExtra) }))
+        const putAdmin = normalizeUser(authUser).isAdmin;
+        const putItemsOut = Array.isArray(p.items)
+          ? guardPoItems(curPo ? parseJsonSafe(curPo.itemsJson, []) : [], p.items, { admin: putAdmin, lockPrice: putLockPrice, onlineish: resolvePermissions(authUser).onlineish, storedStatus: curPo ? curPo.status : '', notes: putItemNotes, grnStarted: hasGrn(putStoredExtra) })
           : null;
+        // a raised qty of a non-admin must still fit the PR (like a new PO : the online purchaser edits the lines of his task before receiving) ; the qty names follow one figure
+        if (putItemsOut && curPo && !putAdmin) {
+          const over = await guardPoQtyVsPr(db, curPo, parseJsonSafe(curPo.itemsJson, []), putItemsOut);
+          if (over) return errorResponse(over, 400);
+        }
+        const itemsJson = putItemsOut ? JSON.stringify(putItemsOut) : null;
         const timelineJson = Array.isArray(p.timeline) ? JSON.stringify(mergeLog(curPo ? parseJsonSafe(curPo.timelineJson, []) : [], p.timeline, actorOf(authUser))) : null;
         const evidenceJson = p.evidence ? JSON.stringify(guardedDocBlob(curPo ? parseJsonSafe(curPo.evidenceJson, {}) : undefined, p.evidence, Boolean(curPo), curPo && curPo.status, {})) : null;
         // fields without a column -> merged into extraJson ; ownership / server-owned values (approvedTotal, settlement*) are never taken from the body

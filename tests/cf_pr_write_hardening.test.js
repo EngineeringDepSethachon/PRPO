@@ -90,6 +90,7 @@ d('PR write hardening (kla round 2)', () => {
       ['U2', 'asst', 'Asst PD', 'PD', '["PD"]', 'ASST_MANAGER', 'REVIEWER', 2],
       ['U-BF', 'su', 'Su Buffer', 'ALL', '["ALL"]', 'BUFFER', 'BUFFER', 2],
       ['U3', 'pm', 'Plant PM', 'MGT', '["*"]', 'PLANT_MANAGER', 'APPROVER', 3],
+      ['U-ON', 'onl', 'Nat Online', 'ALL', '["*"]', 'ONLINE_PURCHASER', 'PURCHASER', 2],
       ['U9', 'adm', 'Admin', 'ALL', '["*"]', 'ADMIN', 'ADMIN', 99]
     ];
     for (const [id, username, name, dept, allowed, roleId, canon, level] of users) {
@@ -544,12 +545,12 @@ d('PR write hardening (kla round 2)', () => {
     it('1. names of ONE figure that disagree are a 400 (qty : purchaseQty / qty / quantity / orderedQty ; price : price / unitPrice / estimatedPrice) - new PR, PUT, POST upsert, requester and admin - nothing written', async () => {
       const bad = [
         ['quantity 1000', { purchaseQty: 1, qty: 1, quantity: 1000 }],
-        ['orderedQty 3', { purchaseQty: 2, qty: 2, orderedQty: 3 }],
-        ['purchaseQty vs qty', { purchaseQty: 1, qty: 2 }],
-        ['text vs number', { purchaseQty: 2, qty: '3' }],
-        ['unitPrice', { unitPrice: 1 }],
-        ['estimatedPrice', { estimatedPrice: 99 }]
-      ];
+        ['orderedQty 3', { purchaseQty: 1, qty: 1, orderedQty: 3 }],
+        ['purchaseQty vs qty', { purchaseQty: 1, qty: 3 }],
+        ['text vs number', { purchaseQty: 1, qty: '3' }],
+        ['unitPrice', { price: 50, unitPrice: 1 }],
+        ['estimatedPrice', { price: 50, estimatedPrice: 99 }]
+      ]; // (none of the numbers is the stored 2 / 100 : a figure that leaves the other names at the stored number is an old bundle's edit - see R4-1)
       const id = await draft();
       const before = snap(id);
       for (const [label, over] of bad) {
@@ -775,6 +776,149 @@ d('PR write hardening (kla round 2)', () => {
       // a line of it that CHANGES must obey the rules : the other name (1000) now disagrees with the new qty -> 400
       setStatus('PR-OLD3', 'SUBMITTED');
       expect((await call('asst', 'PUT', '/api/prs/PR-OLD3', { items: [{ ...old[0], purchaseQty: 2, qty: 2 }, old[1]], totalAmount: 100 })).status).toBe(400);
+    });
+
+    // ───────────── kla round 4 : an OLD bundle's payloads work again, the holes that were left are closed ─────────────
+    it('R4-1. old bundle : a qty / price edit that leaves the alias names at the STORED number is the new figure ; 3 numbers, a new PR, a stored line that disagrees with itself are still a 400', async () => {
+      const id = await draft(); // 2 x 100 : every name stored with the same number
+      // qty : {purchaseQty 5, qty 5, quantity 2, orderedQty 2} (stored = 2 on every name)
+      const q = await call('req', 'PUT', `/api/prs/${id}`, { items: one({ purchaseQty: 5, qty: 5, quantity: 2, orderedQty: 2 }), totalAmount: 500 });
+      expect(q.status, JSON.stringify(q.json)).toBe(200);
+      let l = itemsOf(id)[0];
+      expect([l.purchaseQty, l.qty, l.quantity, l.orderedQty]).toEqual([5, 5, 5, 5]);
+      expect(row(id).totalAmount).toBe(500);
+      // price : {price 150, unitPrice 100, estimatedPrice 100} with the stored 100 (qty 5 x 150 = 750)
+      const pr = await call('req', 'PUT', `/api/prs/${id}`, { items: one({ purchaseQty: 5, qty: 5, quantity: 5, orderedQty: 5, price: 150, unitPrice: 100, estimatedPrice: 100 }), totalAmount: 750 });
+      expect(pr.status, JSON.stringify(pr.json)).toBe(200);
+      l = itemsOf(id)[0];
+      expect([l.price, l.unitPrice, l.estimatedPrice]).toEqual([150, 150, 150]);
+      expect(row(id).totalAmount).toBe(750);
+      // the new figure may be the one that comes first OR last in the reading order, and the admin goes through the same function
+      expect((await call('adm', 'PUT', `/api/prs/${id}`, { items: one({ purchaseQty: 5, qty: 5, quantity: 6, orderedQty: 5, price: 150 }), totalAmount: 900 })).status).toBe(200); // 6 is new, 5 is stored
+      expect(itemsOf(id)[0].orderedQty).toBe(6);
+      // three different numbers / two numbers that are neither the stored one : 400, nothing written
+      const before = snap(id);
+      for (const over of [{ purchaseQty: 7, qty: 8, quantity: 6 }, { purchaseQty: 7, qty: 7, quantity: 8, orderedQty: 8 }, { purchaseQty: 7, qty: 8 }, { price: 1, unitPrice: 2, estimatedPrice: 150 }, { price: 1, unitPrice: 2 }]) {
+        expect((await call('req', 'PUT', `/api/prs/${id}`, { items: one({ purchaseQty: 6, qty: 6, quantity: 6, orderedQty: 6, price: 150, ...over }), totalAmount: 900 })).status, JSON.stringify(over)).toBe(400);
+      }
+      expect(snap(id)).toBe(before);
+      // a NEW PR has no stored line : names that disagree are a 400
+      expect((await call('req', 'POST', '/api/prs', body({ id: `PR-NEW-${n}`, items: one({ purchaseQty: 5, qty: 5, quantity: 2, orderedQty: 2 }), totalAmount: 500 }))).status).toBe(400);
+      expect(count()).toBe(1);
+      // a stored line that disagrees with itself (an old PR) : still a 400 (test 11 above), also for the price
+      sdb.prepare("INSERT INTO prs (id, prNumber, department, requesterId, requesterName, status, totalAmount, itemsJson, extraJson) VALUES ('PR-OLD4', 'OLD-4', 'PD', 'REQUESTER_PD', 'Old', 'SUBMITTED', 100, ?, '{}')")
+        .run(JSON.stringify([{ productId: 'P1', code: 'C1', name: 'Pen', purchaseQty: 1, qty: 1, price: 100, unitPrice: 90, productUrl: '' }]));
+      expect((await call('asst', 'PUT', '/api/prs/PR-OLD4', { items: one({ purchaseQty: 1, qty: 1, price: 120, unitPrice: 90 }), totalAmount: 120 })).status).toBe(400);
+    });
+
+    it('R4-2. old bundle : a discountPercent read back from the typed amount (rounded to 2 places) is consistent - the amount is the figure ; any other disagreement is a 400', async () => {
+      let k = 0; let lastId = '';
+      const mk = (over, total = 6900) => { k += 1; lastId = `PR-D${k}`; return call('req', 'POST', '/api/prs', body({ id: lastId, status: 'DRAFT', items: [LINE({ qty: 1, purchaseQty: 1, price: 7000, productUrl: '', ...over })], totalAmount: total, financials: undefined })); };
+      const r = await mk({ discountPercent: 1.43, discountAmount: 100 }); // 100 / 7000 = 1.4285..% -> 1.43 -> 100.10 when the percent is applied back
+      expect(r.status, JSON.stringify(r.json)).toBe(200);
+      const id = lastId;
+      expect(itemsOf(id)[0]).toMatchObject({ discountAmount: 100, discountPercent: 1.43, total: 6900 });
+      expect(row(id).totalAmount).toBe(6900);
+      // the server's later reads of that line use the amount too : a requester repeating it (PUT) is a no-op, the reviewer's edit of another figure keeps 100
+      expect((await call('req', 'PUT', `/api/prs/${id}`, { items: itemsOf(id), totalAmount: 6900 })).status).toBe(200);
+      expect(row(id).totalAmount).toBe(6900);
+      // a percent that is NOT the ratio of the amount : 400 (and the plain old rules)
+      expect((await mk({ discountPercent: 2, discountAmount: 100 })).status).toBe(400);
+      expect((await mk({ discountPercent: 1.44, discountAmount: 100 })).status).toBe(400);
+      expect((await mk({ discountPercent: 1.43, discountAmount: 150 })).status).toBe(400);
+      const plain = await mk({ discountPercent: 10, discountAmount: 700 }, 6300); // the plain agreeing case, as before
+      expect(plain.status, JSON.stringify(plain.json)).toBe(200);
+      expect(itemsOf(lastId)[0]).toMatchObject({ discountPercent: 10, discountAmount: 700 });
+    });
+
+    it('R4-3. one reader of the qty for the amounts AND the PO ceiling : an old PR {purchaseQty: "" | 0, qty: 100} is 100 in both', async () => {
+      for (const [i, pq] of [[1, ''], [2, 0]]) {
+        const old = [{ productId: 'P1', code: 'C1', name: 'Pen', purchaseQty: pq, qty: 100, price: 10, conversionRate: 1, productUrl: '' }];
+        sdb.prepare("INSERT INTO prs (id, prNumber, department, requesterId, requesterName, status, totalAmount, itemsJson, extraJson) VALUES (?, ?, 'PD', 'REQUESTER_PD', 'Old', 'SUBMITTED', 1000, ?, ?)")
+          .run(`PR-OLDQ${i}`, `OLDQ-${i}`, JSON.stringify(old), JSON.stringify({ financials: FIN({ subtotal: 1000, grandTotal: 1000 }) }));
+        // the reviewer changes the price : the qty of the line is 100 (it used to be 0 -> a 400 or an amount of 0)
+        const r = await call('asst', 'PUT', `/api/prs/PR-OLDQ${i}`, { items: [{ ...old[0], price: 20 }], totalAmount: 2000 });
+        expect(r.status, `${pq} ${JSON.stringify(r.json)}`).toBe(200);
+        expect(row(`PR-OLDQ${i}`).totalAmount).toBe(2000);
+        expect(itemsOf(`PR-OLDQ${i}`)[0]).toMatchObject({ purchaseQty: 100, qty: 100, quantity: 100, orderedQty: 100, price: 20 });
+      }
+      // an old APPROVED PR that was never touched : the amounts read 100 x 10 and the PO ceiling is 100 too (not 1, not 0)
+      const old = [{ productId: 'P1', code: 'C1', name: 'Pen', purchaseQty: '', qty: 100, price: 10, conversionRate: 1, productUrl: '' }];
+      sdb.prepare("INSERT INTO prs (id, prNumber, department, requesterId, requesterName, status, totalAmount, itemsJson, extraJson) VALUES ('PR-OLDQ9', 'OLDQ-9', 'PD', 'REQUESTER_PD', 'Old', 'APPROVED', 1000, ?, '{}')").run(JSON.stringify(old));
+      const po = (no, qty) => ({ id: `PO-Q-${no}`, poNo: `PO-PD-${YEAR}-8${String(no).padStart(2, '0')}`, prId: 'PR-OLDQ9', prNo: 'OLDQ-9', department: 'PD', status: 'ISSUED', vendorName: 'V', totalAmount: 1000, grandTotal: 1000, purchaseChannel: 'SELF', items: [{ productId: 'P1', code: 'C1', name: 'Pen', qty, price: 10 }] });
+      expect((await call('pm', 'POST', '/api/pos', po(1, 101))).status).toBe(400);
+      expect((await call('pm', 'POST', '/api/pos', po(2, 100))).status).toBe(200);
+    });
+
+    it('R4-4. an online purchaser saving an existing PO (PUT, POST upsert) cannot raise a qty over the PR ; the same qty / a lower one / receiving fields still pass ; the qty names follow one figure', async () => {
+      const prId = await create(); // 2 x Pen + 1 x Ink
+      setStatus(prId, 'APPROVED');
+      const poBody = (no, pen, ink = true) => ({ id: `PO-R4-${no}`, poNo: `PO-PD-${YEAR}-7${String(no).padStart(2, '0')}`, prId, prNo: row(prId).prNumber, department: 'PD', status: 'ISSUED', vendorName: 'V', totalAmount: 250, grandTotal: 250, purchaseChannel: 'ONLINE', items: [{ productId: 'P1', code: 'C1', name: 'Pen', price: 100, qty: pen, purchaseQty: pen }, ...(ink ? [{ productId: 'P2', code: 'C2', name: 'Ink', price: 50, qty: 1, purchaseQty: 1 }] : [])] });
+      expect((await call('pm', 'POST', '/api/pos', poBody(1, 1))).status).toBe(200);
+      const poItems = (id) => JSON.parse(sdb.prepare('SELECT itemsJson FROM pos WHERE id = ?').get(id).itemsJson);
+      const putQty = (who, id, over0, route = 'PUT') => {
+        const items = poItems(id).map((x, i) => (i === 0 ? { ...x, ...over0 } : x));
+        return route === 'PUT' ? call(who, 'PUT', `/api/pos/${id}`, { items }) : call(who, 'POST', '/api/pos', { id, items });
+      };
+      const q0 = (id) => { const l = poItems(id)[0]; return [l.purchaseQty, l.qty, l.quantity, l.orderedQty]; };
+      // the same qty, and the lines sent back with received fields (the receiving flow) : fine
+      expect((await putQty('onl', 'PO-R4-1', {})).status).toBe(200);
+      expect((await putQty('onl', 'PO-R4-1', { receivedQty: 1, goodQty: 1 })).status).toBe(200);
+      expect(poItems('PO-R4-1')[0]).toMatchObject({ receivedQty: 1, goodQty: 1 });
+      // received -> the lines are locked for the online purchaser too (started) : a raise is ignored (stored qty kept), never an over-order
+      expect(q0('PO-R4-1')).toEqual([1, 1, undefined, undefined]);
+      // a fresh PO (nothing received) to play with
+      const prId2 = await create(); setStatus(prId2, 'APPROVED');
+      const mk2 = { ...poBody(2, 1), prId: prId2, prNo: row(prId2).prNumber };
+      expect((await call('pm', 'POST', '/api/pos', mk2)).status).toBe(200);
+      // raise within the PR (1 -> 2 of 2) : OK, written on every name the line carries
+      expect((await putQty('onl', 'PO-R4-2', { qty: 2, purchaseQty: 2 })).status).toBe(200);
+      expect(poItems('PO-R4-2')[0]).toMatchObject({ qty: 2, purchaseQty: 2 });
+      // over the PR (3 of 2) : 400 with the message of a new PO, nothing written
+      const over = await putQty('onl', 'PO-R4-2', { qty: 3, purchaseQty: 3 });
+      expect(over.status).toBe(400);
+      expect(over.json.error || over.json.message).toBe('จำนวนใน PO รวมแล้วเกินจำนวนใน PR');
+      expect(q0('PO-R4-2').slice(0, 2)).toEqual([2, 2]);
+      // the POST upsert of an existing PO is held to the same ceiling ; so is a raise written on four names at once
+      expect((await putQty('onl', 'PO-R4-2', { qty: 5, purchaseQty: 5 }, 'POST')).status).toBe(400);
+      expect((await putQty('onl', 'PO-R4-2', { orderedQty: 9, quantity: 9, qty: 9, purchaseQty: 9 })).status).toBe(400);
+      // names that disagree : read in the PR's order (purchaseQty first), written as ONE figure - qty 99 beside purchaseQty 2 can not be smuggled in
+      expect((await putQty('onl', 'PO-R4-2', { purchaseQty: 2, qty: 99, quantity: 99 })).status).toBe(200);
+      expect(q0('PO-R4-2')).toEqual([2, 2, 2, undefined]);
+      // lower again : fine
+      expect((await putQty('onl', 'PO-R4-2', { qty: 1, purchaseQty: 1, quantity: 1 })).status).toBe(200);
+      expect(q0('PO-R4-2')).toEqual([1, 1, 1, undefined]);
+      // the other PO of the same PR takes the room : PO-R4-3 takes 1 of 2, then PO-R4-2 can only go to 1 (a raise to 2 = 3 of 2 -> 400)
+      expect((await call('pm', 'POST', '/api/pos', { ...poBody(3, 1, false), prId: prId2, prNo: row(prId2).prNumber })).status).toBe(200);
+      expect((await putQty('onl', 'PO-R4-2', { qty: 2, purchaseQty: 2, quantity: 2 })).status).toBe(400); // 1 (PO-R4-3) + 2 = 3 > 2
+      expect((await putQty('onl', 'PO-R4-2', { qty: 1, purchaseQty: 1, quantity: 1 })).status).toBe(200); // the same figure : not checked
+      expect((await putQty('adm', 'PO-R4-2', { qty: 5, purchaseQty: 5, quantity: 5 })).status).toBe(200); // admin may correct anything, as before
+    });
+
+    it('R4-5. an admin edit of the lines without a total : the total follows the lines (like every other role) ; a total he sets that differs is still audited', async () => {
+      const id = await create(); // 250
+      setStatus(id, 'APPROVED');
+      const auditRows2 = (action) => sdb.prepare('SELECT * FROM audit_logs WHERE action = ?').all(action);
+      const items = [LINE({ qty: 4, purchaseQty: 4, productUrl: 'https://shop.example/pen' }), LINES()[1]]; // 400 + 50
+      const r = await call('adm', 'PUT', `/api/prs/${id}`, { items });
+      expect(r.status, JSON.stringify(r.json)).toBe(200);
+      expect(row(id).totalAmount).toBe(450);
+      expect(extraOf(id).financials).toMatchObject({ subtotal: 450, grandTotal: 450 });
+      expect(itemsOf(id)[0]).toMatchObject({ qty: 4, total: 400 });
+      expect(auditRows2('PR_TOTAL_OVERRIDE')).toHaveLength(0);
+      // POST upsert is the same
+      const r2b = await call('adm', 'POST', '/api/prs', { id, department: 'PD', items: [LINE({ qty: 1, purchaseQty: 1, productUrl: 'https://shop.example/pen' }), LINES()[1]] });
+      expect(r2b.status, JSON.stringify(r2b.json)).toBe(200);
+      expect(row(id).totalAmount).toBe(150);
+      // lines changed + a total of his own that is not the lines' : kept, audited (unchanged behaviour)
+      expect((await call('adm', 'PUT', `/api/prs/${id}`, { items: [LINE({ qty: 2, purchaseQty: 2, productUrl: 'https://shop.example/pen' }), LINES()[1]], totalAmount: 10 })).status).toBe(200);
+      expect(row(id).totalAmount).toBe(10);
+      const a = auditRows2('PR_TOTAL_OVERRIDE');
+      expect(a).toHaveLength(1);
+      // an unchanged echo (no differ) with no total : nothing moves
+      const view = (await call('adm', 'GET', '/api/prs')).json.find((x) => x.id === id);
+      expect((await call('adm', 'PUT', `/api/prs/${id}`, { items: view.items })).status).toBe(200);
+      expect(row(id).totalAmount).toBe(10);
     });
   });
 });
