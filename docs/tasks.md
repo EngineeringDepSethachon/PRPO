@@ -11,7 +11,7 @@
 # M11 — Phase 3 v1.2.0: FR-03 การ์ดงานจัดซื้อออนไลน์ (เริ่มหลัง v1.1.0 ขึ้น main ; ผู้ใช้ตอบ Q12 = A ทุกแท็บ)
 ลำดับ (สมชาย): A1 ∥ A2 → A3 → A4 → A5 (QA → kla ลิงก์ภายนอก/clipboard) → A6 bump 1.2.0
 - [x] A1 urlHelper.getLinkLabel(url, platform) → {label, host} + tests/url_link_label.test.js (84 ผ่าน) — nong ; host ชนะ platform, จับ label โดเมนทีละส่วน, scheme อันตรายคืนค่าว่าง
-- [ ] A2 src/components/procurement/ProductActionCard.jsx + AttachmentThumbnail prop + OnlineOrderCard โหมด pending (~2271-2455): รูป w-24 sm:w-28 คลิก lightbox, CTA min-h-[44px] "เปิดลิงก์ร้านค้าออนไลน์ ↗" + ป้ายแพลตฟอร์ม + คัดลอกลิงก์, ProductRemarkNote, จำนวน/หน่วย/ราคาอนุมัติ text-base/lg ; คง input/handler เดิมทั้งหมด — malee
+- [x] A2+A3 (malee) เสร็จ เทสต์ 280 ผ่าน (รวมใหม่ 22) build ผ่าน ; ProductActionCard props +nameExtra ; ทุกแท็บ ; กำลัง QA (prae) → A4/A5: src/components/procurement/ProductActionCard.jsx + AttachmentThumbnail prop + OnlineOrderCard โหมด pending (~2271-2455): รูป w-24 sm:w-28 คลิก lightbox, CTA min-h-[44px] "เปิดลิงก์ร้านค้าออนไลน์ ↗" + ป้ายแพลตฟอร์ม + คัดลอกลิงก์, ProductRemarkNote, จำนวน/หน่วย/ราคาอนุมัติ text-base/lg ; คง input/handler เดิมทั้งหมด — malee
 - [ ] A3 OnlineOrderCard โหมด read-only (~2456-2650) ใช้ ProductActionCard คงป้ายเคลม/คืนเงิน/สมการ/ตัวกรอง — malee (คนเดิม)
 - [ ] A4 tests/online_product_action_card.test.jsx + regression (po_procurement, qa_product_remark, claim_state_machine_evidence, inventory_grn, cf_private_files_ui, cf_p4_*, cf_qa_r5) + npm test/build — nong
 - [ ] A5 prae → kla (ลิงก์ภายนอก, clipboard) — [ ] A6 bump 1.2.0 + CHANGELOG → preview → main
