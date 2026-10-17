@@ -270,7 +270,7 @@ export default function StockCardView({
               {products.length} SKUs
             </span>
           </div>
-          <p className="text-xs sm:text-xs text-slate-600 mt-0.5 font-normal break-words">
+          <p className="text-xs text-slate-600 mt-0.5 font-normal break-words">
             ระบบบริหารสินค้าคงคลัง ตรวจสอบยอดคงเหลือ รับเข้า-เบิกจ่าย และจุดสั่งซื้อซ้ำ
           </p>
         </div>
@@ -552,7 +552,7 @@ export default function StockCardView({
                         {/* ชื่อสินค้า & Location Breadcrumb & Remark Inline Chip */}
                         <td className="py-3 px-4 break-words max-w-md">
                           <div className="flex items-start gap-1.5 flex-wrap">
-                            <span className="font-medium text-slate-900 text-xs sm:text-xs leading-snug">
+                            <span className="font-medium text-slate-900 text-xs leading-snug">
                               {prod.name}
                             </span>
 

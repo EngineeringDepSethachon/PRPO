@@ -1,11 +1,12 @@
 # M12 — Phase 3 v1.3.0: FR-04 ขยายฟอนต์ทั้งระบบ (เริ่มหลัง v1.2.0 ขึ้น main ; ผู้ใช้ตอบ Q11/Q13/Q14 = A)
 ลำดับ (สมชาย): B0 → B1 ∥ B2 ∥ B3 → B4 → B5a ∥ B5b ∥ B5c → B6 → QA → bump 1.3.0
 - [ ] B0 screenshot baseline ก่อนแก้ (playwright ใน scratchpad, 1366×768 + 390×844: Login, Dashboard, Workspace, PR list/create, PR/PO/GRN modal, OnlineTask, Budget, Stock, Admin, Sidebar) — nong (ติดตั้ง Chromium ครั้งเดียว Q14=A)
-- [ ] B1 tailwind.config.js theme.extend.fontSize: xs .875/1.25, sm 1/1.5, base 1.125/1.75, lg 1.25/1.75, xl 1.375/1.875 (2xl+ คงเดิม Q13=A) — nong
+- [x] B1 tailwind.config.js theme.extend.fontSize xs–xl (commit 988f3b1) — nong
+- [x] B4 codemod --write 495 จุด/55 ไฟล์ + tests/font_scale_guard.test.js + แก้ po_procurement:2025 ; npm test 3008 — nong
+- [x] B5a/B5b/B5c เก็บจุดล้น 13+14+21 ไฟล์ (commit 2ba63a5) ; npm test 3008 build ผ่าน ; deploy preview แล้ว ; ตัดสินคงเดิม: stepper h-8, ช่องราคา w-28, แถวสินค้า PRCreateView sm:flex-nowrap, header ตาราง ReceivingModal wrap ได้ ; ReceivingModal ทำใน B5b แล้ว (B5c ข้าม) ; FastIssueModal ไม่ได้แตะ
+- [ ] B0/B6 screenshot ก่อน/หลัง: Chromium Playwright ติดตั้งแล้ว ; รอผู้ใช้อนุญาตเปิด local dev server หรือให้ผู้ใช้ตรวจบน preview แทน
 - [x] B2 PrintablePO.jsx ล็อกขนาดเดิมเป็น px 13 จุด (Q11=A) + เทสต์ไม่มีคลาส text-xs/sm ใน PrintablePO ; po_procurement PrintablePO ผ่าน — malee
 - [x] B3 scripts/codemod-font-scale.mjs (dry-run default, --write) + tests/codemod_font_scale.test.js (40 ผ่าน) — malee ; dry-run: 497 จุด / 54 ไฟล์ ไม่มี warning (มากสุด QuickIssueView 47, OnlineOrderCard 44, PODetailsModal 36) ; **ยังไม่ --write** (รอหลัง v1.2.0)
-- [ ] B4 รัน codemod --write + แก้เทสต์ที่ assert คลาส + tests/font_scale_guard.test.js + npm test/build — nong
-- [ ] B5a/B5b/B5c ไล่เก็บจุดล้น (ตาราง/โครงหน้า ∥ modal ∥ Budget/Stock/Admin) กติกา min-w-0 / break-words / leading-normal / whitespace-nowrap / overflow-x-auto / ห้ามย่อกลับด้วย text-[px] — malee ×3
 - [ ] B6 screenshot หลังแก้ + รายการเทียบ → prae → bump 1.3.0 + CHANGELOG → preview → main
 
 # M11 — Phase 3 v1.2.0: FR-03 การ์ดงานจัดซื้อออนไลน์ (เริ่มหลัง v1.1.0 ขึ้น main ; ผู้ใช้ตอบ Q12 = A ทุกแท็บ)

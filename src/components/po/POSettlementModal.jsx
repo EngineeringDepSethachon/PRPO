@@ -265,7 +265,7 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
                     return (
                       <tr key={item.id || idx} className="hover:bg-slate-50/70">
                         <td className="py-2 px-3">
-                          <div className="font-medium text-slate-800 leading-normal break-words max-w-[220px]" title={item.name}>
+                          <div className="font-medium text-slate-800 leading-normal break-words line-clamp-2 max-w-[220px]" title={item.name}>
                             {item.name}
                           </div>
                           <div className="text-xs font-mono text-slate-400 truncate max-w-[220px]">

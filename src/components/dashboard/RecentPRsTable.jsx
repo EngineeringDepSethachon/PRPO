@@ -37,7 +37,7 @@ export default function RecentPRsTable({ prs = [], onNavigate, onOpenPR }) {
             <FileText className="w-5 h-5" />
           </div>
           <h4 className="text-xs sm:text-sm font-bold text-slate-900 mb-1">ยังไม่มีใบขอซื้อในระบบ</h4>
-          <p className="text-xs sm:text-xs text-slate-400 max-w-xs leading-relaxed mb-4">
+          <p className="text-xs text-slate-400 max-w-xs leading-relaxed mb-4">
             คุณสามารถสร้างใบขอซื้อใหม่เพื่อเริ่มกระบวนการจัดซื้อวัตถุดิบหรืออุปกรณ์
           </p>
           <button

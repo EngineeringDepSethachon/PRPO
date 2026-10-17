@@ -1008,6 +1008,7 @@ export default function PODetailsModal({ selectedPO, currentRole, onClose, onRef
                     type="button"
                     onClick={handlePrint} 
                     disabled={isGeneratingPdf}
+                    aria-label="พิมพ์ PO"
                     className="h-8 px-3 rounded-xl border border-slate-200 hover:bg-slate-50 disabled:opacity-60 disabled:cursor-not-allowed text-xs font-semibold text-slate-700 transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
                     title="พิมพ์ PO / ดาวน์โหลด PDF"
                   >

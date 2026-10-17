@@ -38,7 +38,7 @@ export default function RecentPOsTable({ pos = [], onNavigate, onOpenPO }) {
             <ShoppingCart className="w-5 h-5" />
           </div>
           <h4 className="text-xs sm:text-sm font-bold text-slate-900 mb-1">ยังไม่มีใบสั่งซื้อในระบบ</h4>
-          <p className="text-xs sm:text-xs text-slate-400 max-w-xs leading-relaxed mb-4">
+          <p className="text-xs text-slate-400 max-w-xs leading-relaxed mb-4">
             ใบสั่งซื้อ (PO) จะถูกสร้างอัตโนมัติเมื่อ PR ผ่านการอนุมัติขั้นสุดท้ายจาก Plant Manager
           </p>
           <button

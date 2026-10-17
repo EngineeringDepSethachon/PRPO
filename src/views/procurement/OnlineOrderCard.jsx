@@ -2355,7 +2355,7 @@ export default function OnlineOrderCard({
                                 }
                               }}
                               placeholder="1"
-                              className="w-8 h-6 bg-transparent text-center font-mono text-xs font-bold text-slate-800 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                              className="w-12 h-6 bg-transparent text-center font-mono text-xs font-bold text-slate-800 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
                               title={`จำนวนสั่งซื้อจริง (${pUnit})`}
                             />
                             <button
@@ -2372,7 +2372,7 @@ export default function OnlineOrderCard({
                           </div>
 
                           {/* หน่วยนับ: text-xs text-slate-500 w-8 text-center */}
-                          <span className="text-xs text-slate-500 w-8 text-center shrink-0 truncate" title={pUnit}>
+                          <span className="text-xs text-slate-500 min-w-[2rem] max-w-[4.5rem] text-center shrink-0 truncate" title={pUnit}>
                             {pUnit}
                           </span>
 

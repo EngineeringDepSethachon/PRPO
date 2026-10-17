@@ -1772,7 +1772,7 @@ export default function QuickIssueView({
                             {row.code}
                           </td>
                           <td className="py-3 px-4 font-semibold text-slate-800 max-w-[280px] break-words" title={row.name}>
-                            {row.name}
+                            <span className="line-clamp-2">{row.name}</span>
                           </td>
                           <td className="py-3 px-4 text-center whitespace-nowrap">
                             <span className={`px-2 py-0.5 rounded text-xs font-bold ${
@@ -1893,7 +1893,7 @@ export default function QuickIssueView({
                           </td>
                           <td className="py-3 px-4 max-w-[220px]">
                             <span className="font-mono text-xs font-semibold text-slate-500 block">{log.productCode}</span>
-                            <span className="font-semibold text-slate-800 break-words block text-xs" title={prod?.name || log.productCode}>
+                            <span className="font-semibold text-slate-800 break-words line-clamp-2 block text-xs" title={prod?.name || log.productCode}>
                               {prod?.name || log.productCode}
                             </span>
                           </td>

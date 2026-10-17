@@ -380,7 +380,7 @@ export default function WorkspaceView({
               <h5 className="text-xs sm:text-sm font-bold text-slate-800 break-words">
                 แสดงเฉพาะรายการที่เสร็จสิ้นภายใน 30 วันที่ผ่านมา
               </h5>
-              <p className="text-xs sm:text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-slate-500 mt-0.5">
                 สำหรับเอกสารย้อนหลังทั้งหมด กรุณาดูที่เมนู ใบขอซื้อ (PR) หรือ ใบสั่งซื้อ (PO)
               </p>
             </div>

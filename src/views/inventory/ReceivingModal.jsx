@@ -1874,7 +1874,7 @@ export default function ReceivingModal({
             <button
               type="button"
               disabled
-              className="h-9 px-5 rounded-lg text-slate-500 text-xs sm:text-sm font-bold bg-slate-200 cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap shrink-0 w-full sm:w-auto"
+              className="h-9 px-5 rounded-lg text-slate-500 text-xs sm:text-sm font-bold bg-slate-200 cursor-not-allowed flex items-center justify-center gap-2 text-center leading-normal shrink-0 w-full sm:w-auto"
             >
               <span>กำลังบันทึกตรวจรับ...</span>
             </button>
@@ -1890,7 +1890,7 @@ export default function ReceivingModal({
               type="button"
               onClick={handleConfirmReceiving}
               disabled={isSubmitting || isUploading}
-              className="h-9 px-5 rounded-lg text-white text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer whitespace-nowrap shrink-0 w-full sm:w-auto"
+              className="h-9 px-5 rounded-lg text-white text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer text-center leading-normal shrink-0 w-full sm:w-auto"
             >
               <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>ยืนยันรับเข้าคลังสมบูรณ์ (ปิดงาน PO)</span>
@@ -1901,7 +1901,7 @@ export default function ReceivingModal({
               type="button"
               onClick={handleConfirmReceiving}
               disabled={isSubmitting || isUploading || (!isOnlinePurchase && inlineClaimAction === 'REFUND' && (!inlineRefundAmount || Number(inlineRefundAmount) <= 0))}
-              className={`h-9 px-5 rounded-lg text-white text-xs sm:text-sm font-bold active:scale-98 transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer whitespace-nowrap shrink-0 w-full sm:w-auto ${(!isOnlinePurchase && inlineClaimAction === 'REFUND' && (!inlineRefundAmount || Number(inlineRefundAmount) <= 0)) ? 'bg-slate-300 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'}`}
+              className={`h-9 px-5 rounded-lg text-white text-xs sm:text-sm font-bold active:scale-98 transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer text-center leading-normal shrink-0 w-full sm:w-auto ${(!isOnlinePurchase && inlineClaimAction === 'REFUND' && (!inlineRefundAmount || Number(inlineRefundAmount) <= 0)) ? 'bg-slate-300 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'}`}
             >
               <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>
@@ -1920,7 +1920,7 @@ export default function ReceivingModal({
               type="button"
               onClick={handleConfirmReceiving}
               disabled={isSubmitting || isUploading}
-              className="h-9 px-5 rounded-lg text-white text-xs sm:text-sm font-bold bg-indigo-600 hover:bg-indigo-700 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer whitespace-nowrap shrink-0 w-full sm:w-auto"
+              className="h-9 px-5 rounded-lg text-white text-xs sm:text-sm font-bold bg-indigo-600 hover:bg-indigo-700 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer text-center leading-normal shrink-0 w-full sm:w-auto"
             >
               <Truck className="w-4 h-4 shrink-0" />
               <span>📦 ยืนยันรับพัสดุ (รอบที่ {currentRound})</span>
