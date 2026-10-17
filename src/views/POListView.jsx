@@ -306,14 +306,14 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
     <div className="w-full space-y-5 animate-fade-in pb-10">
       {/* ── 1. Header & Main Action ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div className={`w-10 h-10 rounded-2xl flex items-center justify-center shadow-2xs border shrink-0 ${
             isOnlinePurchaser ? 'bg-purple-50 text-purple-600 border-purple-100' : 'bg-emerald-50 text-emerald-600 border-emerald-100'
           }`}>
             <ShoppingBag className="w-5 h-5" strokeWidth={1.75} />
           </div>
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-tight break-words">
               {isOnlinePurchaser ? 'ประวัติใบสั่งซื้อออนไลน์ (Online Purchase Orders)' : 'รายการใบสั่งซื้อ (Purchase Orders)'}
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 font-normal mt-0.5">
@@ -330,7 +330,7 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
         {/* Card 1: Total Volume */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between min-h-[84px]">
           <div className="min-w-0 flex-1">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block truncate">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block break-words">
               ยอดสั่งซื้อ ({periodLabel})
             </span>
             <div className="text-2xl font-black font-mono text-slate-900 tracking-tight mt-1 tabular-nums truncate">
@@ -341,7 +341,7 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
             <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100/80 flex items-center justify-center shadow-2xs">
               <WalletCards className="w-5 h-5" strokeWidth={1.75} />
             </div>
-            <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
+            <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 leading-normal whitespace-nowrap rounded-md border border-slate-200/60">
               {metrics.totalCount} ฉบับ
             </span>
           </div>
@@ -350,21 +350,21 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
         {/* Card 2: Pending Receipt */}
         <div className="p-4 rounded-2xl bg-white border border-amber-200/80 bg-linear-to-br from-white to-amber-50/30 shadow-xs flex items-center justify-between min-h-[84px]">
           <div className="min-w-0 flex-1">
-            <span className="text-xs font-bold text-amber-700 uppercase tracking-wider block truncate">
+            <span className="text-xs font-bold text-amber-700 uppercase tracking-wider block break-words">
               รอตรวจรับของ ({periodLabel})
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-2xl font-black font-mono text-amber-600 tracking-tight tabular-nums">
                 {metrics.pendingCount}
               </span>
-              <span className="text-xs font-semibold text-amber-700/80">รายการ</span>
+              <span className="text-xs font-semibold text-amber-700/80 whitespace-nowrap">รายการ</span>
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0 ml-3">
             <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/70 flex items-center justify-center shadow-2xs">
               <Truck className="w-5 h-5" strokeWidth={1.75} />
             </div>
-            <span className="text-xs font-mono font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded-md border border-amber-200/60">
+            <span className="text-xs font-mono font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 leading-normal whitespace-nowrap rounded-md border border-amber-200/60">
               ฿{metrics.pendingAmount.toLocaleString()}
             </span>
           </div>
@@ -373,21 +373,21 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
         {/* Card 3: Completed */}
         <div className="p-4 rounded-2xl bg-white border border-emerald-200/80 bg-linear-to-br from-white to-emerald-50/30 shadow-xs flex items-center justify-between min-h-[84px]">
           <div className="min-w-0 flex-1">
-            <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider block truncate">
+            <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider block break-words">
               ตรวจรับครบ / ปิดงาน ({periodLabel})
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-2xl font-black font-mono text-emerald-600 tracking-tight tabular-nums">
                 {metrics.completedCount}
               </span>
-              <span className="text-xs font-semibold text-emerald-700/80">รายการ</span>
+              <span className="text-xs font-semibold text-emerald-700/80 whitespace-nowrap">รายการ</span>
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0 ml-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/70 flex items-center justify-center shadow-2xs">
               <CheckCircle2 className="w-5 h-5" strokeWidth={1.75} />
             </div>
-            <span className="text-xs font-bold text-emerald-700 bg-emerald-100/70 px-2.5 py-0.5 rounded-md border border-emerald-200/60">
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-100/70 px-2.5 py-0.5 leading-normal whitespace-nowrap rounded-md border border-emerald-200/60">
               ตรวจรับครบ
             </span>
           </div>
@@ -457,7 +457,7 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
           </div>
 
           {/* ฝั่งขวา: Dropdown ปฏิทินเลือกเดือน & แผนก */}
-          <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
+          <div className="flex items-center flex-wrap justify-end gap-2.5 max-w-full sm:shrink-0 self-end sm:self-auto">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-emerald-600">
                 <Calendar size={15} strokeWidth={1.75} />
@@ -514,7 +514,7 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
               <col className="w-[12%]" />
             </colgroup>
             <thead>
-              <tr className="bg-slate-50/75 border-b border-slate-200/80 text-xs font-semibold text-slate-600">
+              <tr className="bg-slate-50/75 border-b border-slate-200/80 text-xs font-semibold text-slate-600 whitespace-nowrap">
                 <th className="w-[16%] min-w-[140px] pl-6 pr-4 py-3 text-left">เลขที่เอกสาร</th>
                 <th className="w-[22%] min-w-[190px] px-4 py-3 text-left">ร้านค้า / ผู้ขาย</th>
                 <th className="w-[20%] min-w-[170px] px-4 py-3 text-left">รายการสินค้า</th>
@@ -545,7 +545,7 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
                       {/* Col 1: เลขที่เอกสาร */}
                       <td className="w-[16%] min-w-[140px] pl-6 pr-4 py-3.5 align-middle text-left">
                         <div className="flex flex-col items-start">
-                          <span className="text-sm font-bold font-mono text-slate-900 tracking-tight">
+                          <span className="text-sm font-bold font-mono text-slate-900 tracking-tight whitespace-nowrap">
                             {po.poNo}
                           </span>
                           <div className="text-xs text-slate-400 mt-0.5 truncate font-mono">
@@ -556,27 +556,27 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
 
                       {/* Col 2: ร้านค้า / ผู้ขาย */}
                       <td className="w-[22%] min-w-[190px] px-4 py-3.5 align-middle text-left min-w-0">
-                        <div className="text-sm font-semibold text-slate-800 truncate flex items-center gap-1.5" title={po.vendorName || (po.purchaseChannel === 'ONLINE' ? 'สั่งซื้อออนไลน์ (Shopee/Lazada)' : 'ยังไม่ระบุ')}>
+                        <div className="text-sm font-semibold text-slate-800 flex items-center gap-1.5 min-w-0 max-w-[16rem]" title={po.vendorName || (po.purchaseChannel === 'ONLINE' ? 'สั่งซื้อออนไลน์ (Shopee/Lazada)' : 'ยังไม่ระบุ')}>
                           {po.purchaseChannel === 'ONLINE' ? (
                             <Store className="w-4 h-4 text-purple-600 shrink-0" />
                           ) : (
                             <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
                           )}
-                          <span className="truncate">{po.vendorName || (po.purchaseChannel === 'ONLINE' ? 'สั่งซื้อออนไลน์' : 'ยังไม่ระบุ')}</span>
+                          <span className="min-w-0 break-words line-clamp-2">{po.vendorName || (po.purchaseChannel === 'ONLINE' ? 'สั่งซื้อออนไลน์' : 'ยังไม่ระบุ')}</span>
                         </div>
                         <div className="text-xs text-slate-400 mt-0.5 flex items-center gap-1 truncate">
                           <Building2 size={12} className="text-slate-400 shrink-0" />
-                          <span className="truncate">ฝ่าย {po.department}</span>
+                          <span className="truncate min-w-0">ฝ่าย {po.department}</span>
                         </div>
                       </td>
 
                       {/* Col 3: รายการสินค้า */}
                       <td className="w-[20%] min-w-[170px] px-4 py-3.5 align-middle text-left min-w-0">
                         <div className="min-w-0 max-w-full">
-                          <div className="text-sm text-slate-700 font-medium truncate block max-w-full" title={itemsList.map(i => i?.name || '').filter(Boolean).join(', ')}>
+                          <div className="text-sm text-slate-700 font-medium line-clamp-2 break-words block max-w-[18rem]" title={itemsList.map(i => i?.name || '').filter(Boolean).join(', ')}>
                             {firstItemName}
                           </div>
-                          <div className="text-xs text-slate-400 font-mono mt-0.5">
+                          <div className="text-xs text-slate-400 font-mono mt-0.5 whitespace-nowrap">
                             ({itemsList.length} รายการ)
                           </div>
                         </div>
@@ -585,11 +585,11 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
                       {/* Col 4: ช่องทาง */}
                       <td className="w-[10%] min-w-[95px] px-3 py-3.5 text-center align-middle whitespace-nowrap">
                         {po.purchaseChannel === 'ONLINE' ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/60 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 leading-normal rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/60 whitespace-nowrap">
                             🛒 ออนไลน์
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200/60 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 leading-normal rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200/60 whitespace-nowrap">
                             🏢 ภายใน
                           </span>
                         )}
@@ -605,7 +605,7 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
                             ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                           {po.settlementStatus === 'SETTLED' && (
-                            <span className="text-xs text-emerald-700 font-sans font-bold bg-emerald-50 px-1.5 py-0.5 rounded border border-emerald-200 mt-0.5">
+                            <span className="text-xs text-emerald-700 font-sans font-bold bg-emerald-50 px-1.5 py-0.5 leading-normal whitespace-nowrap rounded border border-emerald-200 mt-0.5">
                               {Number(po.savingsAmount) > 0 ? `ประหยัด ฿${Number(po.savingsAmount).toLocaleString()}` : 'ปิดยอดแล้ว'}
                             </span>
                           )}
@@ -614,9 +614,9 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
 
                       {/* Col 6: สถานะ */}
                       <td className="w-[10%] min-w-[105px] px-3 py-3.5 text-center align-middle whitespace-nowrap">
-                        <span className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap border shadow-2xs ${statusConf.color}`}>
+                        <span className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-0.5 leading-normal rounded-full text-xs font-semibold whitespace-nowrap border shadow-2xs ${statusConf.color}`}>
                           <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 shrink-0"></span>
-                          <span className="truncate">{statusConf.label}</span>
+                          <span className="whitespace-nowrap">{statusConf.label}</span>
                         </span>
                       </td>
 
@@ -625,7 +625,7 @@ export default function POListView({ pos = EMPTY_ARRAY, departments: propDepartm
                         <button 
                           type="button"
                           onClick={() => handleViewPODetails(po)}
-                          className="inline-flex items-center justify-end gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-lg shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer"
+                          className="inline-flex items-center justify-end gap-1.5 px-3 py-1.5 text-xs font-medium text-slate-700 bg-white hover:bg-slate-50 border border-slate-200 hover:border-slate-300 rounded-lg shadow-sm transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer whitespace-nowrap shrink-0"
                         >
                           <Eye className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                           <span>ดูรายละเอียด</span>

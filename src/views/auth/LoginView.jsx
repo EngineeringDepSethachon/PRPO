@@ -118,7 +118,7 @@ export default function LoginView() {
           {errorMessage && (
             <div className="mb-5 p-3.5 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs flex items-start gap-2.5 animate-shake">
               <span className="text-base leading-none">⚠️</span>
-              <div className="flex-1 font-medium">{errorMessage}</div>
+              <div className="flex-1 min-w-0 break-words font-medium">{errorMessage}</div>
             </div>
           )}
 
@@ -148,14 +148,14 @@ export default function LoginView() {
 
             {/* Password Input */}
             <div>
-              <div className="flex justify-between items-center mb-1.5">
-                <label htmlFor="password-input" className="block text-xs font-semibold text-slate-700 font-mono uppercase tracking-wider">
+              <div className="flex justify-between items-center gap-2 mb-1.5">
+                <label htmlFor="password-input" className="block min-w-0 text-xs font-semibold text-slate-700 font-mono uppercase tracking-wider">
                   Password / รหัสผ่าน
                 </label>
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer"
+                  className="text-xs text-indigo-600 hover:text-indigo-800 font-medium cursor-pointer whitespace-nowrap shrink-0"
                 >
                   {showPassword ? 'ซ่อน Password' : 'แสดง Password'}
                 </button>

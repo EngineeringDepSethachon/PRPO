@@ -292,12 +292,12 @@ export default function PRListView({
       
       {/* ── 1. Header & Main Action ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shadow-2xs shrink-0">
             <ClipboardList className="w-5 h-5" strokeWidth={1.75} />
           </div>
           <div>
-            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-tight">
+            <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight leading-tight break-words">
               รายการใบขอซื้อ (Purchase Requisitions)
             </h2>
             <p className="text-xs sm:text-sm text-slate-500 font-normal mt-0.5">
@@ -309,7 +309,7 @@ export default function PRListView({
         {currentRole?.canCreatePR && (
           <button 
             onClick={() => onNavigate('pr-create')}
-            className="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white text-sm font-semibold rounded-xl shadow-xs hover:shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0"
+            className="h-10 px-4 bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white text-sm font-semibold rounded-xl shadow-xs hover:shadow-sm transition-all flex items-center justify-center gap-2 cursor-pointer shrink-0 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" strokeWidth={2} />
             <span>สร้างใบ PR ใหม่</span>
@@ -322,7 +322,7 @@ export default function PRListView({
         {/* Card 1: Total Amount */}
         <div className="p-4 rounded-2xl bg-white border border-slate-200/80 shadow-xs flex items-center justify-between min-h-[84px]">
           <div className="min-w-0 flex-1">
-            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block truncate">
+            <span className="text-xs font-bold text-slate-500 uppercase tracking-wider block break-words">
               ยอดรวม PR ({periodLabel})
             </span>
             <div className="text-2xl font-black font-mono text-slate-900 tracking-tight mt-1 tabular-nums truncate">
@@ -333,7 +333,7 @@ export default function PRListView({
             <div className="w-10 h-10 rounded-xl bg-indigo-50 text-indigo-600 border border-indigo-100/80 flex items-center justify-center shadow-2xs">
               <WalletCards className="w-5 h-5" strokeWidth={1.75} />
             </div>
-            <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200/60">
+            <span className="text-xs font-mono font-bold text-slate-600 bg-slate-100 px-2 py-0.5 leading-normal whitespace-nowrap rounded-md border border-slate-200/60">
               {metrics.totalCount} ใบ
             </span>
           </div>
@@ -342,21 +342,21 @@ export default function PRListView({
         {/* Card 2: Pending Approval */}
         <div className="p-4 rounded-2xl bg-white border border-amber-200/80 bg-linear-to-br from-white to-amber-50/30 shadow-xs flex items-center justify-between min-h-[84px]">
           <div className="min-w-0 flex-1">
-            <span className="text-xs font-bold text-amber-700 uppercase tracking-wider block truncate">
+            <span className="text-xs font-bold text-amber-700 uppercase tracking-wider block break-words">
               รออนุมัติ ({periodLabel})
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-2xl font-black font-mono text-amber-600 tracking-tight tabular-nums">
                 {metrics.pendingCount}
               </span>
-              <span className="text-xs font-semibold text-amber-700/80">รายการ</span>
+              <span className="text-xs font-semibold text-amber-700/80 whitespace-nowrap">รายการ</span>
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0 ml-3">
             <div className="w-10 h-10 rounded-xl bg-amber-50 text-amber-600 border border-amber-200/70 flex items-center justify-center shadow-2xs">
               <Clock className="w-5 h-5" strokeWidth={1.75} />
             </div>
-            <span className="text-xs font-mono font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 rounded-md border border-amber-200/60">
+            <span className="text-xs font-mono font-bold text-amber-800 bg-amber-100/70 px-2 py-0.5 leading-normal whitespace-nowrap rounded-md border border-amber-200/60">
               ฿{metrics.pendingAmount.toLocaleString()}
             </span>
           </div>
@@ -365,21 +365,21 @@ export default function PRListView({
         {/* Card 3: Approved */}
         <div className="p-4 rounded-2xl bg-white border border-emerald-200/80 bg-linear-to-br from-white to-emerald-50/30 shadow-xs flex items-center justify-between min-h-[84px]">
           <div className="min-w-0 flex-1">
-            <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider block truncate">
+            <span className="text-xs font-bold text-emerald-700 uppercase tracking-wider block break-words">
               อนุมัติแล้ว / ออก PO ({periodLabel})
             </span>
             <div className="flex items-baseline gap-2 mt-1">
               <span className="text-2xl font-black font-mono text-emerald-600 tracking-tight tabular-nums">
                 {metrics.approvedCount}
               </span>
-              <span className="text-xs font-semibold text-emerald-700/80">รายการ</span>
+              <span className="text-xs font-semibold text-emerald-700/80 whitespace-nowrap">รายการ</span>
             </div>
           </div>
           <div className="flex flex-col items-end gap-1.5 shrink-0 ml-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-50 text-emerald-600 border border-emerald-200/70 flex items-center justify-center shadow-2xs">
               <CheckCircle2 className="w-5 h-5" strokeWidth={1.75} />
             </div>
-            <span className="text-xs font-bold text-emerald-700 bg-emerald-100/70 px-2.5 py-0.5 rounded-md border border-emerald-200/60">
+            <span className="text-xs font-bold text-emerald-700 bg-emerald-100/70 px-2.5 py-0.5 leading-normal whitespace-nowrap rounded-md border border-emerald-200/60">
               ผ่านอนุมัติ
             </span>
           </div>
@@ -449,7 +449,7 @@ export default function PRListView({
           </div>
 
           {/* ฝั่งขวา: Dropdown ปฏิทินเลือกเดือน & แผนก */}
-          <div className="flex items-center gap-2.5 shrink-0 self-end sm:self-auto">
+          <div className="flex items-center flex-wrap justify-end gap-2.5 max-w-full sm:shrink-0 self-end sm:self-auto">
             <div className="relative">
               <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-indigo-600">
                 <Calendar size={15} strokeWidth={1.75} />
@@ -498,7 +498,7 @@ export default function PRListView({
         <div className="flex-1 overflow-x-auto">
           <table className="w-full min-w-[880px] text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/80 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200/80">
+              <tr className="bg-slate-50/80 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap border-b border-slate-200/80">
                 <th className="w-36 px-4 py-3">เลขที่เอกสาร</th>
                 <th className="w-44 px-4 py-3">ผู้ขอ / หน่วยงาน</th>
                 <th className="min-w-[220px] px-4 py-3">รายการสินค้า</th>
@@ -532,9 +532,9 @@ export default function PRListView({
                       {/* เลขที่เอกสาร: w-36 font-mono font-bold text-slate-900 */}
                       <td className="w-36 px-4 py-3.5 align-middle">
                         <div className="flex flex-col items-start gap-0.5">
-                          <span className="text-sm font-bold font-mono text-slate-900 tracking-tight">{pr.prNo}</span>
+                          <span className="text-sm font-bold font-mono text-slate-900 tracking-tight whitespace-nowrap">{pr.prNo}</span>
                           <div className="flex items-center gap-1.5 flex-wrap mt-0.5">
-                            <span className="text-xs text-slate-400 font-mono">{pr.requestedDate}</span>
+                            <span className="text-xs text-slate-400 font-mono whitespace-nowrap">{pr.requestedDate}</span>
                             {pr.memo && (
                               <span className="inline-flex items-center gap-0.5 bg-amber-50 text-amber-700 border border-amber-200/80 text-xs font-bold px-1.5 py-0.2 rounded-full whitespace-nowrap" title="มี MEMO แนบ">
                                 <Tag size={10} /> MEMO
@@ -546,22 +546,22 @@ export default function PRListView({
 
                       {/* ผู้ขอ / หน่วยงาน: w-44 */}
                       <td className="w-44 px-4 py-3.5 align-middle">
-                        <div className="text-sm font-semibold text-slate-800 truncate" title={pr.requestedBy}>
+                        <div className="text-sm font-semibold text-slate-800 break-words max-w-[11rem]" title={pr.requestedBy}>
                           {pr.requestedBy}
                         </div>
                         <div className="text-xs text-slate-500 flex items-center gap-1 mt-0.5 truncate">
                           <Building2 size={12} className="text-slate-400 shrink-0" />
-                          <span className="truncate">ฝ่าย {pr.department}</span>
+                          <span className="truncate min-w-0">ฝ่าย {pr.department}</span>
                         </div>
                       </td>
 
                       {/* รายการสินค้า: flex-1 / min-w-[220px] */}
                       <td className="min-w-[220px] px-4 py-3.5 align-middle">
                         <div className="min-w-0 max-w-full">
-                          <div className="text-sm text-slate-700 font-medium truncate block max-w-full" title={itemsList.map(i => i?.name || '').filter(Boolean).join(', ')}>
+                          <div className="text-sm text-slate-700 font-medium line-clamp-2 break-words block max-w-[22rem]" title={itemsList.map(i => i?.name || '').filter(Boolean).join(', ')}>
                             {firstItemName}
                           </div>
-                          <div className="text-xs text-slate-400 font-mono mt-0.5">
+                          <div className="text-xs text-slate-400 font-mono mt-0.5 whitespace-nowrap">
                             ({itemsList.length} รายการ)
                           </div>
                         </div>
@@ -570,11 +570,11 @@ export default function PRListView({
                       {/* ช่องทาง: w-28 text-center */}
                       <td className="w-28 px-2 py-3.5 text-center align-middle whitespace-nowrap">
                         {(pr.purchaseChannel === 'ONLINE' || pr.purchaseChannel === 'ONLINE_PURCHASE' || (Array.isArray(pr.items) && pr.items.some(item => !!(item.productUrl || item.onlineUrl || item.url)))) ? (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/60 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 leading-normal rounded-full text-xs font-semibold bg-purple-50 text-purple-700 border border-purple-200/60 whitespace-nowrap">
                             🛒 ออนไลน์
                           </span>
                         ) : (
-                          <span className="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200/60 whitespace-nowrap">
+                          <span className="inline-flex items-center gap-1 px-2.5 py-1 leading-normal rounded-full text-xs font-semibold bg-slate-100 text-slate-700 border border-slate-200/60 whitespace-nowrap">
                             🏢 ภายใน
                           </span>
                         )}
@@ -587,9 +587,9 @@ export default function PRListView({
 
                       {/* สถานะ: w-32 text-center */}
                       <td className="w-32 px-2 py-3.5 text-center align-middle whitespace-nowrap">
-                        <span className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold whitespace-nowrap border shadow-2xs ${statusConf.color}`}>
+                        <span className={`inline-flex items-center justify-center gap-1.5 px-2.5 py-0.5 leading-normal rounded-full text-xs font-semibold whitespace-nowrap border shadow-2xs ${statusConf.color}`}>
                           <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 shrink-0"></span>
-                          <span className="truncate">{statusConf.label}</span>
+                          <span className="whitespace-nowrap">{statusConf.label}</span>
                         </span>
                       </td>
 
@@ -599,7 +599,7 @@ export default function PRListView({
                           <button
                             type="button"
                             onClick={() => onEditPR(pr)}
-                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all whitespace-nowrap cursor-pointer"
+                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all whitespace-nowrap shrink-0 cursor-pointer"
                             title="แก้ไขใบ PR"
                           >
                             <Pencil className="w-3.5 h-3.5 text-slate-500 shrink-0" />
@@ -609,7 +609,7 @@ export default function PRListView({
                           <button 
                             type="button"
                             onClick={() => setSelectedPR(pr)}
-                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all whitespace-nowrap cursor-pointer"
+                            className="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 hover:border-slate-300 text-slate-700 text-xs font-semibold shadow-2xs transition-all whitespace-nowrap shrink-0 cursor-pointer"
                             title={canAction ? 'ดำเนินการอนุมัติ / ตรวจสอบ' : 'ดูรายละเอียดใบ PR'}
                           >
                             <Eye className="w-3.5 h-3.5 text-slate-500 shrink-0" />

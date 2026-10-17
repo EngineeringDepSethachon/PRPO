@@ -207,10 +207,10 @@ export default function UserCRUDModal({
               <Users className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <h3 className="font-bold text-slate-900 text-base tracking-tight">
+              <h3 className="font-bold text-slate-900 text-base tracking-tight break-words">
                 {isEdit ? 'แก้ไขผู้ใช้งานและสิทธิ์เข้าถึง' : 'เพิ่มผู้ใช้งานใหม่ (Add User)'}
               </h3>
-              <p className="text-xs text-slate-500 font-normal truncate mt-0.5">
+              <p className="text-xs text-slate-500 font-normal break-words mt-0.5">
                 กำหนดบทบาท แผนกหลัก และขอบเขตแผนกที่ได้รับสิทธิ์ข้ามสายงาน
               </p>
             </div>
@@ -230,7 +230,7 @@ export default function UserCRUDModal({
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-2.5 text-xs text-rose-700">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{error}</span>
+              <span className="min-w-0 break-words">{error}</span>
             </div>
           )}
 
@@ -238,7 +238,7 @@ export default function UserCRUDModal({
           {isSelf && (
             <div className="p-3.5 bg-amber-50 border border-amber-200/80 rounded-2xl flex items-start gap-3 text-xs text-amber-800">
               <ShieldAlert className="w-4 h-4 shrink-0 text-amber-600 mt-0.5" />
-              <div className="space-y-0.5">
+              <div className="space-y-0.5 min-w-0 break-words">
                 <span className="font-bold block">ระบบป้องกัน Self-Lockout Guard กำลังทำงาน</span>
                 <span className="text-amber-700">
                   คุณกำลังแก้ไขบัญชีของตนเอง ไม่อนุญาตให้ปิดการใช้งานหรือลดสิทธิ์ตนเองเพื่อป้องกันปัญหาไม่สามารถเข้าสู่ระบบได้
@@ -251,7 +251,7 @@ export default function UserCRUDModal({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                <User className="w-3.5 h-3.5 text-slate-400" />
+                <User className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>ชื่อแสดงผล (Display Name)</span>
                 <span className="text-rose-500">*</span>
               </label>
@@ -266,7 +266,7 @@ export default function UserCRUDModal({
 
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
-                <Mail className="w-3.5 h-3.5 text-slate-400" />
+                <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                 <span>ชื่อผู้ใช้ / Username</span>
                 <span className="text-rose-500">*</span>
               </label>
@@ -284,7 +284,7 @@ export default function UserCRUDModal({
           {/* Position Field */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-              <User className="w-3.5 h-3.5 text-indigo-600" />
+              <User className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
               <span>ตำแหน่ง (Position)</span>
             </label>
             <input
@@ -299,7 +299,7 @@ export default function UserCRUDModal({
           {/* Role & Position Selection */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-              <Shield className="w-3.5 h-3.5 text-indigo-600" />
+              <Shield className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
               <span>บทบาทหน้าที่ (Role & Workflow Position)</span>
               <span className="text-rose-500">*</span>
             </label>
@@ -334,7 +334,7 @@ export default function UserCRUDModal({
           {/* Primary Department Selection */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-slate-500" />
+              <Building2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <span>แผนกหลัก (Primary Department)</span>
               <span className="text-rose-500">*</span>
             </label>
@@ -355,8 +355,8 @@ export default function UserCRUDModal({
                       : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                   }`}
                 >
-                  <span className="w-2 h-2 rounded-full bg-indigo-500" />
-                  <span className="truncate">{dept.name} ({dept.code})</span>
+                  <span className="w-2 h-2 rounded-full bg-indigo-500 shrink-0" />
+                  <span className="min-w-0 break-words text-center">{dept.name} ({dept.code})</span>
                 </button>
               ))}
 
@@ -383,7 +383,7 @@ export default function UserCRUDModal({
             <div className="flex items-center justify-between">
               <div>
                 <label className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-4 h-4 text-indigo-600" />
+                  <CheckCircle2 className="w-4 h-4 text-indigo-600 shrink-0" />
                   <span>ขอบเขตแผนกที่ดูแล / มีสิทธิ์ (Authorized Departments)</span>
                 </label>
                 <p className="text-xs text-slate-500 mt-0.5">
@@ -398,7 +398,7 @@ export default function UserCRUDModal({
               <button
                 type="button"
                 onClick={() => handleToggleDept('*')}
-                className={`px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 py-1.5 rounded-xl text-xs font-bold whitespace-nowrap border transition-all cursor-pointer flex items-center gap-1.5 ${
                   allowedDepts.includes('*')
                     ? 'bg-slate-900 text-white border-slate-900 shadow-xs ring-2 ring-indigo-500/20'
                     : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50'
@@ -417,7 +417,7 @@ export default function UserCRUDModal({
                     key={dept}
                     type="button"
                     onClick={() => handleToggleDept(dept)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold border transition-all cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap border transition-all cursor-pointer flex items-center gap-1.5 ${
                       isSelected
                         ? dept === 'PD'
                           ? 'bg-blue-50 border-blue-300 text-blue-800 font-bold shadow-2xs'
@@ -440,7 +440,7 @@ export default function UserCRUDModal({
                 <button
                   type="button"
                   onClick={() => setShowAddDeptInput(true)}
-                  className="px-2.5 py-1.5 rounded-xl border border-dashed border-slate-300 hover:border-indigo-400 text-slate-500 hover:text-indigo-600 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 bg-white hover:bg-indigo-50/50"
+                  className="px-2.5 py-1.5 rounded-xl border border-dashed border-slate-300 hover:border-indigo-400 text-slate-500 hover:text-indigo-600 text-xs font-semibold transition-all cursor-pointer flex items-center gap-1 whitespace-nowrap bg-white hover:bg-indigo-50/50"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>เพิ่มแผนกใหม่</span>
@@ -494,14 +494,14 @@ export default function UserCRUDModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0"
             >
               ยกเลิก
             </button>
             <button
               type="submit"
               disabled={isSaving || !name.trim() || !username.trim()}
-              className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
+              className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 whitespace-nowrap shrink-0"
             >
               <Check className="w-3.5 h-3.5" />
               <span>{isSaving ? 'กำลังบันทึก...' : isEdit ? 'บันทึกการแก้ไข' : 'สร้างผู้ใช้ใหม่'}</span>

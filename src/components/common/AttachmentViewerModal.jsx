@@ -90,16 +90,16 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
         onClick={e => e.stopPropagation()}
       >
         {/* Modal Top Header Bar */}
-        <div className="px-6 py-4 bg-slate-800/90 border-b border-slate-700/80 flex items-center justify-between gap-2">
+        <div className="px-6 py-4 bg-slate-800/90 border-b border-slate-700/80 flex items-center justify-between gap-3">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-10 h-10 rounded-lg bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400 shrink-0">
               {isImage ? <ImageIcon className="w-5 h-5" /> : isShoppingStore ? <Globe className="w-5 h-5" /> : <FileText className="w-5 h-5" />}
             </div>
             <div className="min-w-0">
-              <h3 className="text-base font-bold text-white truncate max-w-md" title={fileName}>
+              <h3 className="text-base font-bold text-white truncate max-w-md leading-normal" title={fileName}>
                 {fileName}
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5 font-medium flex items-center gap-2">
+              <p className="text-xs text-slate-400 mt-0.5 font-medium flex items-center gap-x-2 flex-wrap leading-normal">
                 <span>
                   {isDrive && !proxied.fileId ? 'Google Drive Cloud Storage' : isImage ? 'รูปภาพแนบ (Image)' : isPdf ? 'เอกสาร PDF (Quotation/Doc)' : isShoppingStore ? 'ลิงก์ร้านค้าออนไลน์ (Online Store)' : 'เอกสารประกอบ'}
                 </span>
@@ -109,7 +109,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
           </div>
 
           {/* Controls */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 shrink-0">
             {isImage && (!isDrive || useProxy || targetUrl.startsWith('blob:') || targetUrl.startsWith('data:')) && (
               <div className="hidden sm:flex items-center gap-1 bg-slate-700/60 p-1 rounded-lg border border-slate-600">
                 <button
@@ -164,7 +164,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
             <button
               type="button"
               onClick={onClose}
-              className="p-2 hover:bg-rose-500/20 hover:text-rose-400 bg-slate-800 border border-slate-600 rounded-lg transition-colors text-slate-400"
+              className="p-2 hover:bg-rose-500/20 hover:text-rose-400 bg-slate-800 border border-slate-600 rounded-lg transition-colors text-slate-400 shrink-0"
               title="ปิดหน้าต่าง (Close)"
             >
               <X className="w-5 h-5" />
@@ -227,8 +227,8 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
                     <FileText className="w-8 h-8" />
                   </div>
                   <div>
-                    <h4 className="font-bold text-lg text-white">{fileName}</h4>
-                    <p className="text-xs text-slate-400 mt-1 max-w-md">
+                    <h4 className="font-bold text-lg text-white break-words leading-normal">{fileName}</h4>
+                    <p className="text-xs text-slate-400 mt-1 max-w-md leading-normal">
                       เอกสาร Quotation / PDF พร้อมสำหรับการตรวจสอบและพิมพ์
                     </p>
                   </div>
@@ -237,7 +237,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
                       href={targetUrl}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-sm shadow-indigo-600/30 flex items-center gap-2 transition-all cursor-pointer"
+                      className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs rounded-lg shadow-sm shadow-indigo-600/30 flex items-center gap-2 transition-all cursor-pointer whitespace-nowrap"
                     >
                       <ExternalLink className="w-4 h-4" />
                       เปิดดูเอกสาร PDF เต็มหน้าจอ
@@ -252,7 +252,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
                 <Globe className="w-8 h-8" />
               </div>
               <div className="space-y-1.5">
-                <h4 className="font-bold text-base text-white">ลิงก์สั่งซื้อสินค้าออนไลน์</h4>
+                <h4 className="font-bold text-base text-white leading-normal">ลิงก์สั่งซื้อสินค้าออนไลน์</h4>
                 <p className="text-xs text-purple-300 font-mono break-all bg-slate-900/80 p-3 rounded-lg border border-slate-700/60">
                   {targetUrl}
                 </p>
@@ -261,7 +261,7 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
                 href={targetUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm rounded-lg shadow-sm shadow-purple-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer"
+                className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-bold text-sm rounded-lg shadow-sm shadow-purple-600/30 flex items-center justify-center gap-2 transition-all cursor-pointer leading-normal"
               >
                 <ExternalLink className="w-4 h-4" />
                 เปิดหน้าเว็บร้านค้าภายนอก (Shopee / Lazada)
@@ -286,15 +286,15 @@ export default function AttachmentViewerModal({ file, url, title, onClose }) {
         </div>
 
         {/* Modal Bottom Footer */}
-        <div className="px-6 py-3 bg-slate-800/80 border-t border-slate-700/80 flex items-center justify-between text-xs text-slate-400">
-          <div className="flex items-center gap-2">
-            <ShieldCheck className="w-4 h-4 text-emerald-400" />
-            <span>ระบบรักษาความปลอดภัยเอกสารจัดซื้อ{isDrive && !proxied.fileId ? ' • Google Drive Verified' : ''}</span>
+        <div className="px-6 py-3 bg-slate-800/80 border-t border-slate-700/80 flex items-center justify-between flex-wrap gap-2 text-xs text-slate-400">
+          <div className="flex items-center gap-2 min-w-0">
+            <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0" />
+            <span className="min-w-0 leading-normal break-words">ระบบรักษาความปลอดภัยเอกสารจัดซื้อ{isDrive && !proxied.fileId ? ' • Google Drive Verified' : ''}</span>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-lg transition-colors"
+            className="px-4 py-1.5 bg-slate-700 hover:bg-slate-600 text-white font-bold rounded-lg transition-colors whitespace-nowrap shrink-0"
           >
             ปิด
           </button>

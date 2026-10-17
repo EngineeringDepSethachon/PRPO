@@ -170,12 +170,12 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
       {/* ── Metric Summary Cards ── */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-3.5">
         {/* Card 1: All Users */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs flex items-start justify-between">
-          <div>
-            <p className="text-xs font-medium text-slate-500">ผู้ใช้งานในระบบทั้งหมด</p>
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-slate-500 break-words">ผู้ใช้งานในระบบทั้งหมด</p>
             <div className="flex items-baseline gap-1.5 mt-2">
-              <span className="text-2xl font-bold font-mono text-slate-900 tracking-tight">{totalCount}</span>
-              <span className="text-xs font-medium text-slate-400">คน</span>
+              <span className="min-w-0 break-all tabular-nums text-2xl font-bold font-mono text-slate-900 tracking-tight">{totalCount}</span>
+              <span className="text-xs font-medium text-slate-400 whitespace-nowrap">คน</span>
             </div>
           </div>
           <div className="w-9 h-9 rounded-xl bg-indigo-50 text-indigo-600 flex items-center justify-center border border-indigo-100/60 shadow-2xs shrink-0">
@@ -184,12 +184,12 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
         </div>
 
         {/* Card 2: Registered E-Sig */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs flex items-start justify-between">
-          <div>
-            <p className="text-xs font-medium text-slate-500">ลงทะเบียนลายเซ็นแล้ว (E-Sig)</p>
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-slate-500 break-words">ลงทะเบียนลายเซ็นแล้ว (E-Sig)</p>
             <div className="flex items-baseline gap-1.5 mt-2">
-              <span className="text-2xl font-bold font-mono text-slate-900 tracking-tight">{signedCount}</span>
-              <span className="text-xs font-medium text-slate-400">คน</span>
+              <span className="min-w-0 break-all tabular-nums text-2xl font-bold font-mono text-slate-900 tracking-tight">{signedCount}</span>
+              <span className="text-xs font-medium text-slate-400 whitespace-nowrap">คน</span>
             </div>
           </div>
           <div className="w-9 h-9 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center border border-emerald-100/60 shadow-2xs shrink-0">
@@ -198,12 +198,12 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
         </div>
 
         {/* Card 3: Pending E-Sig */}
-        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs flex items-start justify-between">
-          <div>
-            <p className="text-xs font-medium text-slate-500">ยังไม่มีลายเซ็นดิจิทัล</p>
+        <div className="bg-white border border-slate-200/80 rounded-2xl p-4 shadow-2xs flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-xs font-medium text-slate-500 break-words">ยังไม่มีลายเซ็นดิจิทัล</p>
             <div className="flex items-baseline gap-1.5 mt-2">
-              <span className="text-2xl font-bold font-mono text-slate-900 tracking-tight">{pendingCount}</span>
-              <span className="text-xs font-medium text-slate-400">คน</span>
+              <span className="min-w-0 break-all tabular-nums text-2xl font-bold font-mono text-slate-900 tracking-tight">{pendingCount}</span>
+              <span className="text-xs font-medium text-slate-400 whitespace-nowrap">คน</span>
             </div>
           </div>
           <div className="w-9 h-9 rounded-xl bg-amber-50 text-amber-600 flex items-center justify-center border border-amber-100/60 shadow-2xs shrink-0">
@@ -217,12 +217,12 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
         {/* Left Side: Department Switcher + Secondary Filters */}
         <div className="flex flex-wrap items-center gap-2.5">
           {/* กลุ่มที่ 1: Department Switcher Capsule */}
-          <div className="inline-flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl overflow-x-auto custom-scrollbar">
+          <div className="inline-flex items-center gap-1 max-w-full bg-slate-100/80 p-1 rounded-xl overflow-x-auto custom-scrollbar">
             {[{ code: 'ALL', label: 'ทุกแผนก' }, ...departmentsList.filter(d => d.isActive).map(d => ({ code: d.code, label: d.code }))].map(dept => (
               <button
                 key={dept.code}
                 onClick={() => setDeptFilter(dept.code)}
-                className={`h-7 px-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+                className={`h-7 px-2.5 rounded-lg text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                   deptFilter === dept.code 
                     ? 'bg-white text-slate-900 shadow-2xs font-bold' 
                     : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
@@ -241,7 +241,7 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
             <select
               value={roleFilter}
               onChange={e => setRoleFilter(e.target.value)}
-              className="h-9 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-all"
+              className="h-9 max-w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-all"
             >
               <option value="ALL">ทุกบทบาทหน้าที่ (All Roles)</option>
               {ROLE_OPTIONS.map(r => (
@@ -253,7 +253,7 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
             <select
               value={sigFilter}
               onChange={e => setSigFilter(e.target.value)}
-              className="h-9 bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-all"
+              className="h-9 max-w-full bg-slate-50 hover:bg-slate-100/80 border border-slate-200 rounded-xl px-3 text-xs font-semibold text-slate-700 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 cursor-pointer transition-all"
             >
               <option value="ALL">ทุกลายเซ็น (All)</option>
               <option value="HAS_SIG">✓ มีลายเซ็นดิจิทัลแล้ว</option>
@@ -299,7 +299,7 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
           {/* Add User Button */}
           <button
             onClick={handleOpenAdd}
-            className="h-9 px-4 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-semibold rounded-xl flex items-center gap-2 shadow-xs transition-all cursor-pointer shrink-0"
+            className="h-9 px-4 bg-slate-900 hover:bg-slate-800 active:scale-95 text-white text-xs font-semibold rounded-xl flex items-center gap-2 shadow-xs transition-all cursor-pointer shrink-0 whitespace-nowrap"
           >
             <Plus className="w-4 h-4" />
             <span>เพิ่มผู้ใช้ใหม่</span>
@@ -311,7 +311,7 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
       <div className="bg-white rounded-2xl border border-slate-200/80 shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs sm:text-sm">
-            <thead className="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 font-bold text-xs uppercase tracking-wider">
+            <thead className="bg-slate-50/80 border-b border-slate-200/70 text-slate-500 font-bold text-xs uppercase tracking-wider whitespace-nowrap">
               <tr>
                 <th className="py-3.5 pl-5">รหัสพนักงาน</th>
                 <th className="py-3.5 px-4">ชื่อ-นามสกุล / ข้อมูลผู้ใช้</th>
@@ -342,23 +342,23 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
                   return (
                     <tr key={user.id} className="hover:bg-slate-50/80 transition-colors">
                       {/* 1. Employee ID */}
-                      <td className="py-3.5 pl-5 font-mono text-xs font-bold text-slate-700">
+                      <td className="py-3.5 pl-5 font-mono text-xs font-bold text-slate-700 whitespace-nowrap">
                         <span className="bg-slate-100 px-2 py-1 rounded-md border border-slate-200/60">
                           {user.employeeId || '-'}
                         </span>
                       </td>
 
                       {/* 2. Full Name & Profile */}
-                      <td className="py-3.5 px-4">
+                      <td className="py-3.5 px-4 min-w-[180px]">
                         <div className="flex items-center gap-2.5">
                           <div className="w-9 h-9 rounded-full bg-slate-100 border border-slate-200 text-slate-700 flex items-center justify-center font-bold text-xs shrink-0">
                             {user.name ? user.name.charAt(0) : <User className="w-4 h-4 text-slate-400" />}
                           </div>
                           <div className="min-w-0">
-                            <p className="font-bold text-slate-900 text-xs sm:text-sm truncate">
+                            <p className="font-bold text-slate-900 text-xs sm:text-sm break-words">
                               {user.name || user.employeeName}
                             </p>
-                            <p className="text-xs text-slate-400 font-mono mt-0.5">
+                            <p className="text-xs text-slate-400 font-mono mt-0.5 break-all">
                               @{user.username}
                             </p>
                           </div>
@@ -366,7 +366,7 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
                       </td>
 
                       {/* 3. Position / Title */}
-                      <td className="py-3.5 px-3 text-slate-700 font-medium text-xs">
+                      <td className="py-3.5 px-3 text-slate-700 font-medium text-xs min-w-[120px] break-words">
                         {user.position || user.title || '-'}
                       </td>
 
@@ -379,12 +379,12 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
                               : [user.primaryDepartment || user.department].filter(Boolean);
                             const isAll = depts.includes('*') || depts.includes('ALL');
                             if (isAll) return (
-                              <span className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200">
+                              <span className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-bold px-2 py-0.5 rounded-full border bg-indigo-50 text-indigo-700 border-indigo-200">
                                 <Building2 className="w-3 h-3" />ALL
                               </span>
                             );
                             return depts.map(d => (
-                              <span key={d} className="inline-flex items-center gap-1 text-xs font-bold px-2 py-0.5 rounded-full border bg-slate-100 text-slate-700 border-slate-200">
+                              <span key={d} className="inline-flex items-center gap-1 whitespace-nowrap text-xs font-bold px-2 py-0.5 rounded-full border bg-slate-100 text-slate-700 border-slate-200">
                                 {d}
                               </span>
                             ));
@@ -393,14 +393,14 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
                       </td>
 
                       {/* 5. Role */}
-                      <td className="py-3.5 px-3">
-                        <span className={`inline-block px-2.5 py-0.5 rounded-md text-xs font-bold border ${roleCfg.color}`}>
+                      <td className="py-3.5 px-3 whitespace-nowrap">
+                        <span className={`inline-block whitespace-nowrap px-2.5 py-0.5 rounded-md text-xs font-bold border ${roleCfg.color}`}>
                           {roleCfg.label.split(' - ')[0]}
                         </span>
                       </td>
 
                       {/* 6. Signature Preview */}
-                      <td className="py-3.5 px-3 text-center">
+                      <td className="py-3.5 px-3 text-center whitespace-nowrap">
                         {hasSignature ? (
                           <div 
                             onClick={() => setPreviewingSig(user)}
@@ -430,7 +430,7 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
                       </td>
 
                       {/* 7. Status */}
-                      <td className="py-3.5 px-3 text-center">
+                      <td className="py-3.5 px-3 text-center whitespace-nowrap">
                         <span className={`inline-block w-2 h-2 rounded-full mr-1.5 ${user.status === 'ACTIVE' ? 'bg-emerald-500' : 'bg-slate-300'}`}></span>
                         <span className="text-xs font-semibold text-slate-600">
                           {user.status === 'ACTIVE' ? 'ใช้งาน' : 'ระงับ'}
@@ -495,9 +495,9 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in">
           <div className="bg-white rounded-2xl p-6 max-w-md w-full border border-slate-200 shadow-2xl space-y-4 animate-zoom-in">
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-2">
-                <PenTool className="w-4 h-4 text-indigo-600" />
-                <h4 className="font-bold text-slate-900 text-sm">ลายเซ็นดิจิทัล (Digital Signature)</h4>
+              <div className="flex items-center gap-2 min-w-0">
+                <PenTool className="w-4 h-4 text-indigo-600 shrink-0" />
+                <h4 className="font-bold text-slate-900 text-sm break-words min-w-0">ลายเซ็นดิจิทัล (Digital Signature)</h4>
               </div>
               <button 
                 onClick={() => setPreviewingSig(null)}
@@ -508,8 +508,8 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
             </div>
 
             <div className="space-y-1">
-              <p className="text-xs font-semibold text-slate-700">{previewingSig.employeeName || previewingSig.name}</p>
-              <p className="text-xs text-slate-400">{previewingSig.title} • {previewingSig.department}</p>
+              <p className="text-xs font-semibold text-slate-700 break-words">{previewingSig.employeeName || previewingSig.name}</p>
+              <p className="text-xs text-slate-400 break-words">{previewingSig.title} • {previewingSig.department}</p>
             </div>
 
             <div className="bg-slate-50 border border-slate-200 rounded-xl p-4 flex items-center justify-center min-h-[120px]">
@@ -522,7 +522,7 @@ export default function UserMasterView({ users: propUsers, departments: propDepa
 
             <div className="bg-emerald-50 text-emerald-800 border border-emerald-200 p-2.5 rounded-xl text-xs flex items-center gap-2">
               <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-600" />
-              <span>ลายเซ็นนี้จะถูกประทับลงใน Audit Stamp ท้ายเอกสาร PO PDF อัตโนมัติ</span>
+              <span className="min-w-0 break-words">ลายเซ็นนี้จะถูกประทับลงใน Audit Stamp ท้ายเอกสาร PO PDF อัตโนมัติ</span>
             </div>
 
             <button
@@ -786,23 +786,23 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
     <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 bg-slate-900/60 backdrop-blur-xs animate-fade-in overflow-y-auto">
       <div className="bg-white rounded-3xl border border-slate-200 max-w-2xl w-full shadow-2xl my-6 flex flex-col max-h-[92vh] overflow-hidden animate-zoom-in">
         {/* Modal Header */}
-        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between shrink-0 bg-slate-50/70">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3 shrink-0 bg-slate-50/70">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-indigo-600 text-white flex items-center justify-center shadow-xs shrink-0">
               <Users className="w-4 h-4" />
             </div>
-            <div>
-              <h3 className="text-base font-bold text-slate-900">
+            <div className="min-w-0">
+              <h3 className="text-base font-bold text-slate-900 break-words">
                 {isEdit ? 'แก้ไขข้อมูลผู้ใช้และลายเซ็นดิจิทัล' : 'เพิ่มผู้ใช้งานใหม่ (User Master)'}
               </h3>
-              <p className="text-xs text-slate-500">
+              <p className="text-xs text-slate-500 break-words">
                 จัดการข้อมูลระบุตัวตน สิทธิ์ในระบบ และลายเซ็นอิเล็กทรอนิกส์ (E-Signature Base64)
               </p>
             </div>
           </div>
           <button 
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-slate-100 transition-all cursor-pointer"
+            className="text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-slate-100 transition-all cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -937,7 +937,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                   <button
                     type="button"
                     onClick={() => toggleDept('ALL')}
-                    className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                    className={`px-3 py-1.5 rounded-xl border text-xs font-bold whitespace-nowrap transition-all cursor-pointer flex items-center gap-1.5 ${
                       assignedDepts.includes('ALL')
                         ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm'
                         : 'bg-white text-slate-600 border-slate-300 hover:border-indigo-400 hover:text-indigo-700'
@@ -953,7 +953,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                       type="button"
                       onClick={() => toggleDept(dept.code)}
                       disabled={assignedDepts.includes('ALL')}
-                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
+                      className={`px-3 py-1.5 rounded-xl border text-xs font-bold text-left break-words max-w-full transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed ${
                         assignedDepts.includes(dept.code)
                           ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
                           : 'bg-white text-slate-600 border-slate-300 hover:border-blue-400 hover:text-blue-700'
@@ -989,11 +989,11 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
               </h4>
 
               {/* Mode Switcher */}
-              <div className="flex items-center gap-1 bg-slate-100 p-1 rounded-xl">
+              <div className="flex flex-wrap items-center gap-1 max-w-full bg-slate-100 p-1 rounded-xl">
                 <button
                   type="button"
                   onClick={() => setSigMode('DRAW')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
                     sigMode === 'DRAW'
                       ? 'bg-white text-slate-900 shadow-xs font-bold'
                       : 'text-slate-600 hover:text-slate-900'
@@ -1005,7 +1005,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                 <button
                   type="button"
                   onClick={() => setSigMode('UPLOAD')}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap transition-all cursor-pointer ${
                     sigMode === 'UPLOAD'
                       ? 'bg-white text-slate-900 shadow-xs font-bold'
                       : 'text-slate-600 hover:text-slate-900'
@@ -1021,10 +1021,10 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
             {sigMode === 'DRAW' && (
               <div className="border border-slate-200 rounded-2xl p-3 bg-slate-50/50 space-y-3">
                 <div className="flex items-center justify-between gap-2 flex-wrap text-xs text-slate-600">
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
                     {/* Pen Color Choices */}
                     <div className="flex items-center gap-1.5">
-                      <span className="text-xs font-semibold text-slate-500">หมึกปากกา:</span>
+                      <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">หมึกปากกา:</span>
                       {[
                         { color: '#0F2370', name: 'น้ำเงินกรมท่า' },
                         { color: '#1E293B', name: 'ดำสนิท' },
@@ -1045,7 +1045,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
 
                     {/* Pen Width */}
                     <div className="flex items-center gap-1.5 ml-2">
-                      <span className="text-xs font-semibold text-slate-500">ขนาด:</span>
+                      <span className="text-xs font-semibold text-slate-500 whitespace-nowrap">ขนาด:</span>
                       {[1.5, 2.5, 3.5].map(w => (
                         <button
                           key={w}
@@ -1064,7 +1064,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                   <button
                     type="button"
                     onClick={clearCanvas}
-                    className="flex items-center gap-1 text-xs text-rose-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg transition-all cursor-pointer"
+                    className="flex items-center gap-1 whitespace-nowrap shrink-0 text-xs text-rose-600 hover:text-rose-700 bg-white hover:bg-rose-50 border border-rose-200 px-2.5 py-1 rounded-lg transition-all cursor-pointer"
                   >
                     <Eraser className="w-3 h-3" />
                     <span>ล้างกระดาน</span>
@@ -1094,14 +1094,14 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                   )}
                 </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-xs text-slate-400">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="min-w-0 break-words text-xs text-slate-400">
                     * เมื่อวาดเสร็จให้กดปุ่ม "บันทึกลายเซ็นจากกระดาน" ด้านขวา
                   </span>
                   <button
                     type="button"
                     onClick={handleApplyCanvasSignature}
-                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+                    className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl flex items-center gap-1.5 whitespace-nowrap shrink-0 shadow-xs transition-all cursor-pointer"
                   >
                     <Sparkles className="w-3.5 h-3.5" />
                     <span>บันทึกลายเซ็นจากกระดาน</span>
@@ -1128,8 +1128,8 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                     <Upload className="w-6 h-6" />
                   </div>
                   <div>
-                    <p className="text-xs font-bold text-slate-800">คลิกเพื่อเลือกไฟล์ภาพลายเซ็น (PNG หรือ JPG)</p>
-                    <p className="text-xs text-slate-400 mt-0.5">แนะนำไฟล์ PNG พื้นหลังโปร่งใส เพื่อความสวยงามบนเอกสาร PDF</p>
+                    <p className="text-xs font-bold text-slate-800 break-words">คลิกเพื่อเลือกไฟล์ภาพลายเซ็น (PNG หรือ JPG)</p>
+                    <p className="text-xs text-slate-400 mt-0.5 break-words">แนะนำไฟล์ PNG พื้นหลังโปร่งใส เพื่อความสวยงามบนเอกสาร PDF</p>
                   </div>
                 </label>
               </div>
@@ -1137,16 +1137,16 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
 
             {/* Current Signature Display Box */}
             <div className="mt-3 p-3.5 bg-slate-50 border border-slate-200 rounded-2xl space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                  <span>ลายเซ็นที่ใช้งานอยู่ในระบบ (Active Signature Preview):</span>
+              <div className="flex items-start justify-between gap-2">
+                <span className="min-w-0 text-xs font-bold text-slate-700 flex items-start gap-1.5">
+                  <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0 mt-0.5" />
+                  <span className="min-w-0 break-words">ลายเซ็นที่ใช้งานอยู่ในระบบ (Active Signature Preview):</span>
                 </span>
                 {signatureDataUrl && (
                   <button
                     type="button"
                     onClick={() => setSignatureDataUrl('')}
-                    className="text-rose-600 hover:text-rose-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                    className="text-rose-600 hover:text-rose-700 text-xs font-semibold flex items-center gap-1 whitespace-nowrap shrink-0 cursor-pointer"
                   >
                     <Trash2 className="w-3 h-3" />
                     <span>ลบลายเซ็น</span>
@@ -1156,7 +1156,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
 
               {signatureDataUrl ? (
                 <div className="bg-white border border-slate-200 rounded-xl p-3 flex items-center justify-between gap-4">
-                  <div className="flex items-center justify-center bg-slate-100/60 p-2 rounded-lg min-w-[140px] max-w-[200px] border border-slate-200/60">
+                  <div className="flex items-center justify-center shrink-0 bg-slate-100/60 p-2 rounded-lg min-w-[140px] max-w-[200px] border border-slate-200/60">
                     <img 
                       src={signatureDataUrl} 
                       alt="Current Signature" 
@@ -1167,7 +1167,7 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
                     <span className="inline-block px-2 py-0.5 bg-emerald-50 text-emerald-700 border border-emerald-200 rounded text-xs font-bold">
                       ✓ E-Signature Verified
                     </span>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-slate-500 mt-1 break-words">
                       ลายเซ็นดิจิทัลพร้อมประทับลงบนกล่อง Audit Stamp ของเอกสาร PO PDF (ระบบจะสแกนและใส่ ISO Hash ให้โดยอัตโนมัติ)
                     </p>
                   </div>
@@ -1187,14 +1187,14 @@ function UserEditSignatureModal({ user, departments = [], onClose, onSaved }) {
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold transition-all cursor-pointer"
+              className="px-4 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer"
             >
               ยกเลิก
             </button>
             <button
               type="submit"
               disabled={isSaving}
-              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 disabled:opacity-60 text-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer flex items-center gap-2"
+              className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 disabled:opacity-60 text-white rounded-xl text-xs font-semibold shadow-sm transition-all cursor-pointer flex items-center gap-2 whitespace-nowrap shrink-0"
             >
               {isSaving ? (
                 <>

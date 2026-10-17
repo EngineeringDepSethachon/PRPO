@@ -103,7 +103,7 @@ export default function ImageLightboxModal({
     >
       {/* ── Top Bar ── */}
       <div 
-        className="w-full max-w-5xl flex items-center justify-between py-2.5 px-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 text-white shrink-0 z-10"
+        className="w-full max-w-5xl flex items-center justify-between gap-3 py-2.5 px-4 rounded-2xl bg-slate-900/80 border border-slate-800/90 text-white shrink-0 z-10"
         onClick={e => e.stopPropagation()}
       >
         <div className="flex items-center gap-2.5 min-w-0">
@@ -111,11 +111,11 @@ export default function ImageLightboxModal({
             <ImageIcon className="w-4 h-4" />
           </div>
           <div className="min-w-0">
-            <h4 className="text-sm font-bold text-white truncate max-w-sm sm:max-w-md md:max-w-lg" title={currentImage.name || title}>
+            <h4 className="text-sm font-bold text-white truncate leading-normal max-w-sm sm:max-w-md md:max-w-lg" title={currentImage.name || title}>
               {currentImage.name || title || 'รูปภาพตัวอย่าง'}
             </h4>
             {title && currentImage.name && currentImage.name !== title && (
-              <p className="text-xs text-slate-400 truncate max-w-sm">{title}</p>
+              <p className="text-xs text-slate-400 break-words leading-normal max-w-sm">{title}</p>
             )}
           </div>
         </div>
@@ -123,7 +123,7 @@ export default function ImageLightboxModal({
         {/* Counter & Action Buttons */}
         <div className="flex items-center gap-2.5 shrink-0">
           {total > 1 && (
-            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700">
+            <span className="text-xs font-mono font-bold px-2.5 py-1 rounded-full bg-slate-800 text-slate-300 border border-slate-700 whitespace-nowrap">
               {currentIndex + 1} / {total}
             </span>
           )}
@@ -134,7 +134,7 @@ export default function ImageLightboxModal({
               href={currentImage.driveViewUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition-all hover:scale-105 cursor-pointer"
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-semibold shadow-xs transition-all hover:scale-105 cursor-pointer whitespace-nowrap shrink-0"
               title={currentImage.isProxyFile ? 'เปิดดูไฟล์' : 'เปิดดูใน Google Drive'}
               onClick={e => { e.stopPropagation(); openViaProxy(e, false); }}
             >
@@ -161,7 +161,7 @@ export default function ImageLightboxModal({
           <button
             type="button"
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white hover:bg-rose-500/20 hover:text-rose-400 rounded-xl transition-colors cursor-pointer"
+            className="p-2 text-slate-400 hover:text-white hover:bg-rose-500/20 hover:text-rose-400 rounded-xl transition-colors cursor-pointer shrink-0"
             title="ปิด (Esc)"
           >
             <X className="w-5 h-5" />
@@ -194,8 +194,8 @@ export default function ImageLightboxModal({
                 <ImageIcon className="w-8 h-8 opacity-50" />
               </div>
               <div>
-                <p className="text-slate-300 font-medium mb-1">ไม่สามารถโหลดรูปภาพได้</p>
-                <p className="text-slate-500 text-sm mb-4">รูปอาจถูกตั้งค่าเป็นส่วนตัวหรือเป็นไฟล์เอกสาร</p>
+                <p className="text-slate-300 font-medium mb-1 leading-normal">ไม่สามารถโหลดรูปภาพได้</p>
+                <p className="text-slate-500 text-sm mb-4 leading-normal break-words">รูปอาจถูกตั้งค่าเป็นส่วนตัวหรือเป็นไฟล์เอกสาร</p>
                 {currentImage.driveViewUrl ? (
                   <a
                     href={currentImage.driveViewUrl}

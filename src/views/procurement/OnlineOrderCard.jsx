@@ -2574,9 +2574,9 @@ export default function OnlineOrderCard({
                   <button 
                     type="button"
                     onClick={() => setStoreClaimStates(prev => ({ ...prev, [group.storeKey]: { ...prev[group.storeKey], showResolutionForm: true } }))} 
-                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 cursor-pointer transition-colors"
+                    className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 cursor-pointer transition-colors whitespace-nowrap"
                   >
-                    <AlertTriangle className="w-3.5 h-3.5" /> จัดการผลการเคลมเฉพาะร้านค้านี้
+                    <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> จัดการผลการเคลมเฉพาะร้านค้านี้
                   </button>
                 </div>
               )}
@@ -2590,9 +2590,9 @@ export default function OnlineOrderCard({
                 return (
                   <div className="p-3 bg-white border-t border-slate-100 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 text-xs text-slate-500">
                     {isWaitingReplacement ? (
-                      <span className="font-semibold text-amber-700">📦 อยู่ระหว่างรอร้านค้าจัดส่งสินค้าทดแทน (ค้างรับ {remainingQty} รายการ)</span>
+                      <span className="font-semibold text-amber-700 min-w-0 break-words leading-normal">📦 อยู่ระหว่างรอร้านค้าจัดส่งสินค้าทดแทน (ค้างรับ {remainingQty} รายการ)</span>
                     ) : (
-                      <span>{remainingQty > 0 ? `ร้านนี้ยังมีสินค้าค้างรับ ${remainingQty} รายการ หากพบปัญหาสามารถกดเปิดดำเนินการเคลมได้` : 'ร้านนี้ตรวจรับครบสมบูรณ์แล้ว หากต้องการแจ้งปัญหาหรือเคลม สามารถกดเปิดดำเนินการเคลมได้'}</span>
+                      <span className="min-w-0 break-words leading-normal">{remainingQty > 0 ? `ร้านนี้ยังมีสินค้าค้างรับ ${remainingQty} รายการ หากพบปัญหาสามารถกดเปิดดำเนินการเคลมได้` : 'ร้านนี้ตรวจรับครบสมบูรณ์แล้ว หากต้องการแจ้งปัญหาหรือเคลม สามารถกดเปิดดำเนินการเคลมได้'}</span>
                     )}
                     
                     {!isWaitingReplacement && (
@@ -2608,9 +2608,9 @@ export default function OnlineOrderCard({
                             } 
                           }));
                         }} 
-                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 cursor-pointer transition-colors shrink-0"
+                        className="inline-flex items-center gap-1.5 text-xs font-semibold text-rose-700 bg-rose-50 hover:bg-rose-100 px-3 py-1.5 rounded-lg border border-rose-200 cursor-pointer transition-colors shrink-0 whitespace-nowrap"
                       >
-                        <AlertTriangle className="w-3.5 h-3.5" /> เปิดดำเนินการเคลมสำหรับร้านนี้
+                        <AlertTriangle className="w-3.5 h-3.5 shrink-0" /> เปิดดำเนินการเคลมสำหรับร้านนี้
                       </button>
                     )}
                   </div>
@@ -2646,12 +2646,12 @@ export default function OnlineOrderCard({
                       return (
                         <div className="mb-3 p-3.5 bg-amber-50/70 border border-amber-200/90 rounded-xl space-y-2.5">
                           <div className="flex items-center justify-between gap-2 flex-wrap text-xs">
-                            <div className="flex items-center gap-1.5 font-bold text-amber-950">
+                            <div className="flex items-center flex-wrap gap-x-1.5 gap-y-0.5 font-bold text-amber-950 leading-normal min-w-0">
                               <span>📌 รายงานจาก:</span>
                               <span className="text-slate-800 font-semibold">{evData.inspectorName}</span>
                               <span className="text-amber-800/80 font-normal font-mono">({evData.inspectedAt})</span>
                             </div>
-                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-100/90 text-amber-900 border border-amber-300/60 text-xs font-semibold">
+                            <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md bg-amber-100/90 text-amber-900 border border-amber-300/60 text-xs font-semibold leading-normal">
                               <AlertTriangle className="w-3.5 h-3.5 text-amber-700 shrink-0" />
                               หลักฐานการตรวจรับ (GRN Evidence)
                             </span>
@@ -2672,8 +2672,8 @@ export default function OnlineOrderCard({
                           {/* แสดงแกลเลอรีรูปภาพ: แสดงรูปภาพ Thumbnail ที่ผู้ตรวจรับแนบมา */}
                           {evData.images && evData.images.length > 0 ? (
                             <div>
-                              <div className="text-xs font-semibold text-slate-600 mb-1.5 flex items-center gap-1">
-                                <ImageIcon className="w-3.5 h-3.5 text-amber-700" />
+                              <div className="text-xs font-semibold text-slate-600 mb-1.5 flex items-start gap-1 leading-normal">
+                                <ImageIcon className="w-3.5 h-3.5 text-amber-700 shrink-0 mt-0.5" />
                                 <span>รูปภาพหลักฐานความเสียหาย ({evData.images.length} รูป) — คลิกเพื่อดูรูปขนาดเต็ม</span>
                               </div>
                               <div className="flex flex-wrap gap-2">
@@ -2711,7 +2711,7 @@ export default function OnlineOrderCard({
 
                     {/* Unified Quick Settlement Action Bar (Modern Linear SaaS Style) */}
                     <div className="bg-slate-50/80 p-2.5 rounded-xl border border-slate-200/70">
-                      <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 text-xs">
+                      <div className="flex flex-wrap items-center gap-2 text-xs">
                         {/* Dropdown แนวทางแก้ไข */}
                         <select 
                           value={currentResolutionType} 
@@ -2750,7 +2750,7 @@ export default function OnlineOrderCard({
                               <span className="text-slate-400 font-mono text-xs">฿</span>
                               <span className="font-mono font-bold text-slate-400 text-xs">0.00</span>
                             </div>
-                            <span className="text-xs text-slate-400 italic leading-tight max-w-[180px]">
+                            <span className="text-xs text-slate-400 italic leading-normal max-w-[180px]">
                               ไม่ได้รับเงินคืน — ปิดเคสทันที
                             </span>
                           </div>
@@ -2879,12 +2879,12 @@ export default function OnlineOrderCard({
           {/* Right: Main Confirm Button (Unlocked when store name is filled for all stores) */}
           <div className="flex flex-col sm:flex-row items-end sm:items-center gap-2 shrink-0">
             {!isAllStoresFilled && (
-              <span className="text-xs text-amber-600 font-medium text-right">
+              <span className="text-xs text-amber-600 font-medium text-right leading-normal">
                 * ระบุชื่อร้านค้าจริงให้ครบ
               </span>
             )}
             {hasInvalidQty && (
-              <span className="text-xs text-rose-600 font-medium text-right">
+              <span className="text-xs text-rose-600 font-medium text-right leading-normal">
                 * ระบุจำนวนให้เป็นจำนวนเต็มบวก
               </span>
             )}
@@ -2892,7 +2892,7 @@ export default function OnlineOrderCard({
               type="button"
               onClick={handleAcknowledgeAndOrder}
               disabled={!isConfirmReady}
-              className={`h-8 px-3.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+              className={`h-8 px-3.5 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 whitespace-nowrap shrink-0 ${
                 !isConfirmReady
                   ? 'bg-slate-200 text-slate-400 cursor-not-allowed border border-slate-300/60 shadow-none'
                   : 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-xs hover:shadow active:scale-[0.98] cursor-pointer'
@@ -3029,16 +3029,16 @@ export default function OnlineOrderCard({
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
-            <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600">
+            <div className="px-5 py-4 bg-slate-50 border-b border-slate-100 flex items-center justify-between gap-3">
+              <div className="flex items-center gap-2 min-w-0">
+                <div className="w-8 h-8 rounded-xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shrink-0">
                   <Paperclip className="w-4 h-4" />
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-slate-900 leading-normal break-words">
                     เอกสารแนบ PR: {po.prNo || po.prNumber}
                   </h3>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-slate-500 leading-normal">
                     มีเอกสารและไฟล์แนบทั้งหมด {prDocs.length} รายการ
                   </p>
                 </div>
@@ -3046,7 +3046,7 @@ export default function OnlineOrderCard({
               <button
                 type="button"
                 onClick={() => setPrDocsModalOpen(false)}
-                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
+                className="p-1.5 text-slate-400 hover:text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer shrink-0"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -3070,7 +3070,7 @@ export default function OnlineOrderCard({
                         <p className="text-xs font-semibold text-slate-800 truncate" title={doc.name}>
                           {doc.name}
                         </p>
-                        <div className="flex items-center gap-1.5 text-xs text-slate-400">
+                        <div className="flex items-center flex-wrap gap-x-1.5 text-xs text-slate-400 leading-normal">
                           <span className={`px-1.5 py-0.2 rounded font-medium ${
                             doc.category === 'QUOTATION' ? 'bg-amber-50 text-amber-700' : 'bg-slate-100 text-slate-600'
                           }`}>
@@ -3094,7 +3094,7 @@ export default function OnlineOrderCard({
                             setViewingDoc(doc);
                           }
                         }}
-                        className="px-2.5 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg border border-indigo-200 transition-colors inline-flex items-center gap-1 cursor-pointer"
+                        className="px-2.5 py-1 text-xs font-medium text-indigo-600 hover:bg-indigo-50 rounded-lg border border-indigo-200 transition-colors inline-flex items-center gap-1 cursor-pointer whitespace-nowrap"
                       >
                         <Eye className="w-3.5 h-3.5" />
                         <span>เปิดดู</span>
@@ -3132,7 +3132,7 @@ export default function OnlineOrderCard({
               <button
                 type="button"
                 onClick={() => setPrDocsModalOpen(false)}
-                className="px-4 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-1.5 bg-white border border-slate-300 hover:bg-slate-100 text-slate-700 text-xs font-semibold rounded-xl transition-colors cursor-pointer whitespace-nowrap"
               >
                 ปิดหน้าต่าง
               </button>

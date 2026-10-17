@@ -1288,7 +1288,7 @@ export default function PRCreateView({
       
       {/* ── Top Header & Navigation ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div className="flex items-center gap-3.5">
+        <div className="flex items-center gap-3.5 min-w-0">
           <button 
             type="button"
             onClick={handleCancelAndBack}
@@ -1297,23 +1297,23 @@ export default function PRCreateView({
           >
             <ArrowLeft className="w-5 h-5" />
           </button>
-          <div>
+          <div className="min-w-0">
             <div className="flex items-center gap-2 flex-wrap">
-              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2 flex-wrap">
+              <h2 className="text-xl sm:text-2xl font-bold text-slate-900 tracking-tight flex items-center gap-2 flex-wrap break-words min-w-0">
                 <span>{editingPR ? `แก้ไขใบขอซื้อ (${editingPR.prNo})` : 'สร้างใบขอซื้อใหม่ (New PR)'}</span>
                 {!editingPR && (
-                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200">
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-mono font-bold bg-indigo-50 text-indigo-700 border border-indigo-200 whitespace-nowrap">
                     เลขที่: {nextPRNumber}
                   </span>
                 )}
               </h2>
               {editingPR?.status && (
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200">
+                <span className="px-2.5 py-0.5 rounded-full text-xs font-semibold bg-amber-50 text-amber-700 border border-amber-200 whitespace-nowrap">
                   {PR_STATUS[editingPR.status]?.label || editingPR.status}
                 </span>
               )}
             </div>
-            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 font-normal">
+            <p className="text-xs sm:text-sm text-slate-500 mt-0.5 font-normal leading-normal break-words">
               {editingPR ? (
                 <>แก้ไขข้อมูลรายการสินค้าและเอกสารแนบเพื่อยื่นส่งใหม่อีกครั้ง</>
               ) : (
@@ -1324,10 +1324,10 @@ export default function PRCreateView({
         </div>
 
         {/* Scope Pill Badge */}
-        <div className="flex items-center gap-2 px-3.5 py-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm w-fit self-start sm:self-auto">
-          <Building2 className="w-4 h-4 text-slate-400" />
-          <span className="text-xs text-slate-500 font-medium">สังกัดฝ่าย:</span>
-          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80">
+        <div className="flex items-center gap-2 px-3.5 py-2 bg-white rounded-2xl border border-slate-200/80 shadow-sm w-fit max-w-full self-start sm:self-auto">
+          <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
+          <span className="text-xs text-slate-500 font-medium whitespace-nowrap">สังกัดฝ่าย:</span>
+          <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-200/80 min-w-0 break-words leading-normal">
             {deptMap[department]?.name ? `${deptMap[department].name} (${department})` : department}
           </span>
         </div>
@@ -1340,10 +1340,10 @@ export default function PRCreateView({
             <AlertTriangle className="w-5 h-5 text-amber-600" />
           </div>
           <div className="space-y-1 min-w-0">
-            <h4 className="font-bold text-amber-900 text-sm sm:text-base">
+            <h4 className="font-bold text-amber-900 text-sm sm:text-base leading-normal break-words">
               ใบขอซื้อนี้ถูกส่งกลับให้แก้ไข (Returned for Correction)
             </h4>
-            <p className="text-xs sm:text-sm text-amber-800 leading-relaxed font-medium">
+            <p className="text-xs sm:text-sm text-amber-800 leading-relaxed font-medium break-words whitespace-pre-wrap">
               {returnReason}
             </p>
           </div>
@@ -1373,11 +1373,11 @@ export default function PRCreateView({
                 </label>
                 {!canChooseDepartment || Boolean(editingPR) ? (
                   <div className="w-full border border-slate-200/80 bg-slate-50/60 rounded-xl px-3.5 py-2 text-xs font-semibold flex items-center justify-between gap-2 text-slate-800">
-                    <div className="flex items-center gap-2">
-                      <Building2 className="w-3.5 h-3.5 text-slate-500" />
-                      <span>{deptMap[department]?.name ? `${deptMap[department].name} (${department})` : department}</span>
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Building2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
+                      <span className="min-w-0 break-words leading-normal">{deptMap[department]?.name ? `${deptMap[department].name} (${department})` : department}</span>
                     </div>
-                    <span className="text-xs font-normal text-slate-400">{editingPR ? '(ตามเอกสาร)' : '(ตามสิทธิ์)'}</span>
+                    <span className="text-xs font-normal text-slate-400 whitespace-nowrap shrink-0">{editingPR ? '(ตามเอกสาร)' : '(ตามสิทธิ์)'}</span>
                   </div>
                 ) : (
                   <select
@@ -1397,7 +1397,7 @@ export default function PRCreateView({
 
               {/* Purchase Channel: Modern Segmented Pill Switcher (Directive 2) */}
               <div>
-                <label className="text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1">
+                <label className="text-xs font-bold text-slate-700 mb-1.5 flex items-center gap-1 flex-wrap leading-normal">
                   <span>ช่องทางจัดซื้อ (Purchase Channel)</span>
                   <span className="text-rose-500">*</span>
                 </label>
@@ -1405,7 +1405,7 @@ export default function PRCreateView({
                   <button
                     type="button"
                     onClick={() => setPurchaseChannel('SELF')}
-                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs transition-all cursor-pointer ${
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap ${
                       purchaseChannel === 'SELF'
                         ? 'bg-white text-indigo-700 shadow-2xs font-bold'
                         : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 font-medium'
@@ -1417,7 +1417,7 @@ export default function PRCreateView({
                   <button
                     type="button"
                     onClick={() => setPurchaseChannel('ONLINE')}
-                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs transition-all cursor-pointer ${
+                    className={`flex-1 sm:flex-initial flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap ${
                       purchaseChannel === 'ONLINE'
                         ? 'bg-white text-indigo-700 shadow-2xs font-bold'
                         : 'text-slate-500 hover:text-slate-800 hover:bg-slate-200/50 font-medium'
@@ -1435,14 +1435,14 @@ export default function PRCreateView({
             {purchaseChannel === 'SELF' && (
               <div className="pt-3 border-t border-slate-100 space-y-2 animate-fade-in">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5">
-                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5">
+                  <label className="text-xs font-bold text-slate-800 flex items-center gap-1.5 flex-wrap leading-normal">
                     <Building className="w-4 h-4 text-indigo-600 shrink-0" />
                     <span>ผู้จัดจำหน่าย (Vendor)</span>
                     <span className="text-rose-500">*</span>
                     <span className="text-xs font-normal text-slate-400 hidden sm:inline">(1 PR = 1 ผู้จัดจำหน่าย)</span>
                   </label>
                   {selectedVendor && (
-                    <span className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 self-start sm:self-auto">
+                    <span className="text-xs font-mono font-bold text-indigo-700 bg-indigo-50 px-2 py-0.5 rounded-md border border-indigo-100 self-start sm:self-auto truncate max-w-full">
                       {selectedVendor.code}
                     </span>
                   )}
@@ -1466,7 +1466,7 @@ export default function PRCreateView({
                       <span><strong>โทร:</strong> {selectedVendor.phone || '-'}</span>
                     </div>
                     {selectedVendor.address && (
-                      <p className="text-slate-500 text-xs leading-relaxed truncate" title={selectedVendor.address}>
+                      <p className="text-slate-500 text-xs leading-relaxed break-words" title={selectedVendor.address}>
                         <strong>ที่อยู่:</strong> {selectedVendor.address}
                       </p>
                     )}
@@ -1478,11 +1478,11 @@ export default function PRCreateView({
 
           {/* Card 2: Minimalist Items Selection List (Directive 4) */}
           <div className="space-y-3">
-            <div className="flex items-center justify-between pb-1 px-1">
-              <h3 className="text-sm font-bold text-slate-800">
+            <div className="flex items-center justify-between gap-2 pb-1 px-1">
+              <h3 className="text-sm font-bold text-slate-800 min-w-0 leading-normal">
                 รายการสินค้าที่ขอซื้อ
               </h3>
-              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono">
+              <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-50 text-indigo-700 border border-indigo-100 font-mono whitespace-nowrap shrink-0">
                 {prItems.length} รายการ
               </span>
             </div>
@@ -1609,7 +1609,7 @@ export default function PRCreateView({
                         )}
 
                         {/* ยอดเงินรวมรายบรรทัด */}
-                        <span className="font-mono font-bold text-slate-900 text-xs sm:text-sm text-right min-w-[85px] sm:min-w-[90px] tabular-nums shrink-0">
+                        <span className="font-mono font-bold text-slate-900 text-xs sm:text-sm text-right min-w-[85px] sm:min-w-[90px] tabular-nums shrink-0 whitespace-nowrap">
                           ฿{(item.qty * item.price).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                         </span>
 
@@ -1641,14 +1641,14 @@ export default function PRCreateView({
                       <div className="flex flex-wrap items-center gap-2.5">
                         {/* Segmented Location Switch (Directive 2) */}
                         <div className="inline-flex items-center gap-1.5 shrink-0">
-                          <span className="text-xs font-medium text-slate-500 flex items-center gap-1">
+                          <span className="text-xs font-medium text-slate-500 flex items-center gap-1 whitespace-nowrap">
                             📍 ใช้งานที่:
                           </span>
                           <div className="inline-flex p-0.5 rounded-lg bg-slate-100 border border-slate-200 text-xs">
                             <button
                               type="button"
                               onClick={() => handleItemChange(idx, 'usageLocation', 'FACTORY')}
-                              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                                 (item.usageLocation || item.source || 'FACTORY') === 'FACTORY'
                                   ? 'bg-white text-indigo-700 shadow-2xs font-bold'
                                   : 'text-slate-500 hover:text-slate-800'
@@ -1659,7 +1659,7 @@ export default function PRCreateView({
                             <button
                               type="button"
                               onClick={() => handleItemChange(idx, 'usageLocation', 'OFFICE')}
-                              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer ${
+                              className={`px-2.5 py-1 rounded-md text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
                                 (item.usageLocation || item.source) === 'OFFICE'
                                   ? 'bg-white text-indigo-700 shadow-2xs font-bold'
                                   : 'text-slate-500 hover:text-slate-800'
@@ -1672,7 +1672,7 @@ export default function PRCreateView({
 
                         {/* Stock Info (Directive 3) */}
                         {selProd && (
-                          <div className="flex items-center gap-1.5 text-xs text-slate-500 font-mono">
+                          <div className="flex items-start gap-1.5 text-xs text-slate-500 font-mono leading-normal break-words min-w-0">
                             <span>•</span>
                             <span>
                               คงเหลือในระบบ: <strong className="font-semibold text-slate-700">{selProd.stockBalance ?? 0} {selProd.stockUnit || selProd.unit || 'ชิ้น'}</strong>
@@ -1692,8 +1692,8 @@ export default function PRCreateView({
 
                           if (effectiveRate > 1 || item.overrideUnit) {
                             return (
-                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium border border-indigo-200/70">
-                                <Sparkles className="w-3 h-3 text-indigo-500" />
+                              <span className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-indigo-50 text-indigo-700 text-xs font-medium border border-indigo-200/70 leading-normal">
+                                <Sparkles className="w-3 h-3 text-indigo-500 shrink-0" />
                                 <span>เข้าคลัง: {(Number(item.qty || 0) * effectiveRate).toLocaleString()} {effectiveStockUnit}</span>
                               </span>
                             );
@@ -1703,7 +1703,7 @@ export default function PRCreateView({
                       </div>
 
                       {/* Right: Ghost Action Text (Directive 3) & Item-Level Image Input */}
-                      <div className="flex items-center gap-3 ml-auto">
+                      <div className="flex items-center flex-wrap gap-x-3 gap-y-1 ml-auto">
                         <input
                           type="file"
                           accept="image/*"
@@ -1725,7 +1725,7 @@ export default function PRCreateView({
                                 handleItemChange(idx, 'customStockUnit', selProd.stockUnit || selProd.unit);
                               }
                             }}
-                            className={`text-xs font-medium transition-colors cursor-pointer ${
+                            className={`text-xs font-medium transition-colors cursor-pointer whitespace-nowrap ${
                               item.overrideUnit ? 'text-indigo-600 font-semibold' : 'text-slate-400 hover:text-slate-700'
                             }`}
                           >
@@ -1736,7 +1736,7 @@ export default function PRCreateView({
                         <button
                           type="button"
                           onClick={() => handleToggleCustomItem(idx)}
-                          className="text-xs font-medium text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                          className="text-xs font-medium text-slate-400 hover:text-slate-700 transition-colors cursor-pointer whitespace-nowrap"
                         >
                           {item.isCustom ? '← เลือกจากระบบ' : '+ นอกแคตาล็อก'}
                         </button>
@@ -1746,8 +1746,8 @@ export default function PRCreateView({
                     {/* Collapsible Unit Mapping Override Panel */}
                     {selProd && item.overrideUnit && (
                       <div className="p-3 bg-slate-50/80 border border-slate-200 rounded-xl flex flex-col sm:flex-row sm:items-end gap-3 animate-fade-in">
-                        <div className="flex-1">
-                          <label className="text-xs font-bold text-slate-500 uppercase block mb-1">หน่วยขอซื้อ</label>
+                        <div className="flex-1 min-w-0">
+                          <label className="text-xs font-bold text-slate-500 uppercase block mb-1 leading-normal">หน่วยขอซื้อ</label>
                           <input
                             type="text"
                             value={item.customPurchaseUnit || selProd.purchaseUnit || selProd.unit || ''}
@@ -1756,8 +1756,8 @@ export default function PRCreateView({
                             className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-semibold text-slate-800 outline-none focus:ring-1 focus:ring-indigo-500"
                           />
                         </div>
-                        <div className="flex-1">
-                          <label className="text-xs font-bold text-slate-500 uppercase block mb-1">อัตราแปลงเป็นสต็อก</label>
+                        <div className="flex-1 min-w-0">
+                          <label className="text-xs font-bold text-slate-500 uppercase block mb-1 leading-normal">อัตราแปลงเป็นสต็อก</label>
                           <input
                             type="number"
                             min="0.001"
@@ -1768,8 +1768,8 @@ export default function PRCreateView({
                             className="w-full px-2.5 py-1.5 bg-white border border-slate-300 rounded-lg text-xs font-mono font-bold text-indigo-700 text-center outline-none focus:ring-1 focus:ring-indigo-500"
                           />
                         </div>
-                        <div className="flex-1">
-                          <label className="text-xs font-bold text-slate-500 uppercase block mb-1">หน่วยเข้าคลัง</label>
+                        <div className="flex-1 min-w-0">
+                          <label className="text-xs font-bold text-slate-500 uppercase block mb-1 leading-normal">หน่วยเข้าคลัง</label>
                           <input
                             type="text"
                             value={item.customStockUnit || selProd.stockUnit || selProd.unit || ''}
@@ -1785,7 +1785,7 @@ export default function PRCreateView({
                     {/* Smart Item Link & Gen-Z Media Strip for Online Procurement (Directives 1 & 2) */}
                     {purchaseChannel === 'ONLINE' && (
                       <div className="space-y-2.5 animate-fade-in">
-                        <div className="mt-2.5 pt-2 border-t border-slate-150/60 flex items-center gap-2">
+                        <div className="mt-2.5 pt-2 border-t border-slate-150/60 flex items-center flex-wrap gap-2">
                           {/* Dropdown / Chip เลือกแพลตฟอร์ม */}
                           <select 
                             value={item.platform || 'Shopee'} 
@@ -1799,7 +1799,7 @@ export default function PRCreateView({
                           </select>
 
                           {/* ช่องกรอก URL สินค้า พร้อมระบบ Auto-detect แพลตฟอร์ม */}
-                          <div className="relative flex-1">
+                          <div className="relative flex-1 min-w-[12rem]">
                             <input
                               type="url"
                               placeholder="วางลิงก์หน้าสินค้า (Product URL)..."
@@ -1831,22 +1831,22 @@ export default function PRCreateView({
                               onDrop={(e) => handleItemImageDrop(idx, e)}
                               className="mt-2.5 flex items-center gap-2.5 px-3.5 py-2.5 rounded-xl border border-dashed border-rose-300 bg-rose-50/50 hover:bg-rose-50 text-rose-700 cursor-pointer transition-all group"
                             >
-                              <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-sm group-hover:scale-110 transition-transform">
+                              <div className="w-7 h-7 rounded-lg bg-rose-100 text-rose-600 flex items-center justify-center font-bold text-sm group-hover:scale-110 transition-transform shrink-0">
                                 📷
                               </div>
-                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2">
+                              <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-2 min-w-0 leading-normal break-words">
                                 <span className="text-xs font-bold">แนบรูปภาพสินค้าจริง *</span>
                                 <span className="text-xs text-rose-500 font-medium">(จำเป็นสำหรับจัดซื้อออนไลน์ — คลิกหรือลากวางรูปภาพที่นี่)</span>
                               </div>
                             </div>
-                            <div className="flex items-center gap-1 pl-1 text-xs font-semibold text-rose-600">
+                            <div className="flex items-center gap-1 pl-1 text-xs font-semibold text-rose-600 leading-normal break-words">
                               <span>* กรุณาแนบรูปสินค้าจริงสำหรับจัดซื้อออนไลน์</span>
                             </div>
                           </div>
                         ) : (
                           /* State B: แนบรูปแล้ว (Filled Modern Gallery) */
                           <div className="mt-2.5 flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md flex items-center gap-1 shrink-0">
+                            <span className="text-xs font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-md flex items-center gap-1 shrink-0 whitespace-nowrap">
                               ✓ แนบแล้ว ({itemImages.length})
                             </span>
 
@@ -1896,7 +1896,7 @@ export default function PRCreateView({
                       <div className="mt-2.5 pt-2 border-t border-slate-100">
                         {hasImages ? (
                           <div className="flex items-center gap-2 flex-wrap">
-                            <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-1 rounded-md flex items-center gap-1 shrink-0">
+                            <span className="text-xs font-bold text-slate-700 bg-slate-100 border border-slate-200 px-2 py-1 rounded-md flex items-center gap-1 shrink-0 whitespace-nowrap">
                               📷 รูปแนบ ({itemImages.length})
                             </span>
                             {itemImages.map((img, imgIdx) => {
@@ -1936,7 +1936,7 @@ export default function PRCreateView({
                           <button
                             type="button"
                             onClick={() => triggerUpload(item.id || idx)}
-                            className="text-xs font-medium text-slate-400 hover:text-indigo-600 flex items-center gap-1 transition-colors cursor-pointer"
+                            className="text-xs font-medium text-slate-400 hover:text-indigo-600 flex items-center gap-1 transition-colors cursor-pointer text-left"
                             title="แนบรูปภาพสำหรับสินค้ารายการนี้ (ทางเลือก)"
                           >
                             <span>📷 แนบรูปสินค้า (ทางเลือก)</span>
@@ -1954,7 +1954,7 @@ export default function PRCreateView({
             <button
               type="button"
               onClick={handleAddItemRow}
-              className="w-full py-3 border border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/40 text-slate-600 hover:text-indigo-600 rounded-2xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs group"
+              className="w-full py-3 border border-dashed border-slate-300 hover:border-indigo-400 hover:bg-indigo-50/40 text-slate-600 hover:text-indigo-600 rounded-2xl text-xs font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer shadow-2xs group whitespace-nowrap"
             >
               <Plus className="w-4 h-4 text-slate-400 group-hover:text-indigo-600 transition-colors" />
               <span>+ เพิ่มรายการสินค้า</span>
@@ -2022,12 +2022,12 @@ export default function PRCreateView({
 
               {/* Card Header */}
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-slate-100">
-                <div className="flex items-center gap-3">
+                <div className="flex items-center gap-3 min-w-0">
                   <div className="w-9 h-9 rounded-xl bg-amber-50 border border-amber-200/80 flex items-center justify-center shrink-0">
                     <FileText className="w-5 h-5 text-amber-600" />
                   </div>
-                  <div>
-                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                  <div className="min-w-0">
+                    <h4 className="text-sm font-bold text-slate-900 flex items-center gap-2 leading-normal break-words">
                       บันทึกข้อความเสนอขออนุมัติ (Memo ถึง ผจก.โรงงาน)
                     </h4>
                     <p className="text-xs text-slate-500 mt-0.5">
@@ -2035,7 +2035,7 @@ export default function PRCreateView({
                     </p>
                   </div>
                 </div>
-                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0 self-start sm:self-auto">
+                <span className="px-2.5 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300 shrink-0 self-start sm:self-auto whitespace-nowrap">
                   เกณฑ์ยอดจัดซื้อ ≥ ฿20,000
                 </span>
               </div>
@@ -2114,9 +2114,9 @@ export default function PRCreateView({
           
           {/* Box 1: Payment Summary Card (Directive 1 & 2) */}
           <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-4">
-            <div className="flex items-center justify-between pb-2 border-b border-slate-100">
-              <div className="flex items-center gap-2 text-slate-900">
-                <Receipt className="w-4 h-4 text-indigo-600" />
+            <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-2 pb-2 border-b border-slate-100">
+              <div className="flex items-center gap-2 text-slate-900 min-w-0">
+                <Receipt className="w-4 h-4 text-indigo-600 shrink-0" />
                 <h3 className="text-sm font-bold">สรุปรายการชำระเงิน</h3>
               </div>
               {purchaseChannel === 'SELF' ? (
@@ -2124,7 +2124,7 @@ export default function PRCreateView({
                   <button
                     type="button"
                     onClick={() => setHasVat(true)}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer whitespace-nowrap ${
                       hasVat ? 'bg-white text-indigo-600 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
@@ -2133,7 +2133,7 @@ export default function PRCreateView({
                   <button
                     type="button"
                     onClick={() => setHasVat(false)}
-                    className={`px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-md font-medium transition-all cursor-pointer whitespace-nowrap ${
                       !hasVat ? 'bg-white text-slate-800 shadow-sm' : 'text-slate-500 hover:text-slate-800'
                     }`}
                   >
@@ -2149,26 +2149,26 @@ export default function PRCreateView({
 
             {/* Financial Breakdown Items */}
             <div className="space-y-2 text-xs">
-              <div className="flex justify-between items-center text-slate-600">
-                <span>ยอดรวมสินค้า (Subtotal)</span>
-                <span className="font-mono font-semibold text-slate-900 tabular-nums">
+              <div className="flex justify-between items-center gap-3 text-slate-600">
+                <span className="min-w-0 leading-normal">ยอดรวมสินค้า (Subtotal)</span>
+                <span className="font-mono font-semibold text-slate-900 tabular-nums whitespace-nowrap">
                   ฿{subtotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
 
               {itemDiscountTotal > 0 && (
-                <div className="flex justify-between items-center text-rose-600">
-                  <span>ส่วนลดรายชิ้น</span>
-                  <span className="font-mono font-semibold tabular-nums">
+                <div className="flex justify-between items-center gap-3 text-rose-600">
+                  <span className="min-w-0 leading-normal">ส่วนลดรายชิ้น</span>
+                  <span className="font-mono font-semibold tabular-nums whitespace-nowrap">
                     -฿{itemDiscountTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               )}
 
               {combinedDiscountAmount > 0 && (
-                <div className="flex justify-between items-center text-rose-600">
-                  <span>ส่วนลดท้ายบิล</span>
-                  <span className="font-mono font-semibold tabular-nums">
+                <div className="flex justify-between items-center gap-3 text-rose-600">
+                  <span className="min-w-0 leading-normal">ส่วนลดท้ายบิล</span>
+                  <span className="font-mono font-semibold tabular-nums whitespace-nowrap">
                     -฿{combinedDiscountAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
@@ -2176,13 +2176,13 @@ export default function PRCreateView({
 
               {/* VAT Row (Directive 3) */}
               {purchaseChannel === 'SELF' && (
-                <div className={`flex justify-between items-center pt-1 border-t border-slate-100 ${
+                <div className={`flex justify-between items-center gap-3 pt-1 border-t border-slate-100 ${
                   hasVat ? 'text-indigo-700' : 'text-slate-400'
                 }`}>
-                  <span className="font-medium">
+                  <span className="font-medium min-w-0 leading-normal">
                     ภาษีมูลค่าเพิ่ม {hasVat ? '(VAT 7%)' : '(0%)'}
                   </span>
-                  <span className="font-mono font-bold tabular-nums">
+                  <span className="font-mono font-bold tabular-nums whitespace-nowrap">
                     {hasVat 
                       ? `+฿${vatAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
                       : '฿0.00'}
@@ -2192,18 +2192,18 @@ export default function PRCreateView({
 
               {/* Extra Costs: Shipping & Rounding (if set) */}
               {parseFloat(shippingCost) > 0 && (
-                <div className="flex justify-between items-center text-slate-700">
-                  <span>ค่าจัดส่ง</span>
-                  <span className="font-mono font-semibold tabular-nums">
+                <div className="flex justify-between items-center gap-3 text-slate-700">
+                  <span className="min-w-0 leading-normal">ค่าจัดส่ง</span>
+                  <span className="font-mono font-semibold tabular-nums whitespace-nowrap">
                     +฿{parseFloat(shippingCost).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
               )}
 
               {parseFloat(roundingAdj) !== 0 && (
-                <div className="flex justify-between items-center text-amber-700">
-                  <span>ปรับเศษทศนิยม</span>
-                  <span className="font-mono font-semibold tabular-nums">
+                <div className="flex justify-between items-center gap-3 text-amber-700">
+                  <span className="min-w-0 leading-normal">ปรับเศษทศนิยม</span>
+                  <span className="font-mono font-semibold tabular-nums whitespace-nowrap">
                     {parseFloat(roundingAdj) > 0 ? `+฿${parseFloat(roundingAdj).toFixed(2)}` : `-฿${Math.abs(parseFloat(roundingAdj)).toFixed(2)}`}
                   </span>
                 </div>
@@ -2217,21 +2217,21 @@ export default function PRCreateView({
                   <button
                     type="button"
                     onClick={() => setShowExtraAdjustments(true)}
-                    className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-xl border border-dashed border-slate-200 hover:border-indigo-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer"
+                    className="w-full py-2 text-xs font-semibold text-slate-500 hover:text-indigo-600 hover:bg-indigo-50/50 rounded-xl border border-dashed border-slate-200 hover:border-indigo-300 transition-all flex items-center justify-center gap-1.5 cursor-pointer whitespace-nowrap"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     <span>+ เพิ่มค่าส่ง / ส่วนลดท้ายบิล</span>
                   </button>
                 ) : (
                   <div className="p-3 bg-slate-50/80 rounded-xl border border-slate-200/80 space-y-2.5 animate-fade-in">
-                    <div className="flex items-center justify-between">
-                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-xs font-bold text-slate-700 uppercase tracking-wider min-w-0 leading-normal">
                         ส่วนลดท้ายบิล & ค่าจัดส่ง
                       </span>
                       <button
                         type="button"
                         onClick={() => setShowExtraAdjustments(false)}
-                        className="text-xs text-slate-400 hover:text-slate-600 transition-colors"
+                        className="text-xs text-slate-400 hover:text-slate-600 transition-colors whitespace-nowrap shrink-0"
                       >
                         ซ่อน
                       </button>
@@ -2268,7 +2268,7 @@ export default function PRCreateView({
 
                     {/* Shipping Cost Input */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-slate-500">ค่าจัดส่ง (฿)</span>
+                      <span className="text-xs text-slate-500 min-w-0 leading-normal">ค่าจัดส่ง (฿)</span>
                       <input
                         type="number"
                         min="0"
@@ -2282,7 +2282,7 @@ export default function PRCreateView({
 
                     {/* Rounding Adjustment Input */}
                     <div className="flex items-center justify-between gap-2">
-                      <span className="text-xs text-slate-500">ปรับเศษสตางค์ (฿)</span>
+                      <span className="text-xs text-slate-500 min-w-0 leading-normal">ปรับเศษสตางค์ (฿)</span>
                       <input
                         type="number"
                         step="0.01"
@@ -2299,9 +2299,9 @@ export default function PRCreateView({
 
             {/* Grand Total Display Box */}
             <div className="p-4 bg-slate-50 border border-slate-200/90 rounded-xl space-y-1">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold text-slate-700">ยอดรวมสุทธิ (Grand Total)</span>
-                <span className={`px-2 py-0.5 rounded-full text-xs font-bold border ${
+              <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-1">
+                <span className="text-xs font-bold text-slate-700 leading-normal min-w-0">ยอดรวมสุทธิ (Grand Total)</span>
+                <span className={`px-2 py-0.5 rounded-full text-xs font-bold border whitespace-nowrap ${
                   purchaseChannel === 'SELF'
                     ? (hasVat 
                         ? 'bg-emerald-50 text-emerald-700 border-emerald-200' 
@@ -2314,7 +2314,7 @@ export default function PRCreateView({
                 </span>
               </div>
               <div className="text-right">
-                <span className="text-2xl font-black font-mono text-indigo-600 tracking-tight tabular-nums">
+                <span className="text-2xl font-black font-mono text-indigo-600 tracking-tight tabular-nums break-all">
                   ฿{grandTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                 </span>
               </div>
@@ -2324,18 +2324,18 @@ export default function PRCreateView({
             {requiresMemo && (
               <div className="mt-3 p-3 rounded-xl bg-amber-50 border border-amber-200/90 animate-fade-in">
                 <div className="flex items-start gap-2.5">
-                  <span className="text-base">📋</span>
-                  <div className="flex-1">
-                    <div className="text-xs font-bold text-amber-900 leading-tight">
+                  <span className="text-base shrink-0">📋</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-xs font-bold text-amber-900 leading-normal">
                       ต้องแนบ Memo ผจก.โรงงาน
                     </div>
-                    <p className="text-xs text-amber-700 mt-0.5 leading-snug">
+                    <p className="text-xs text-amber-700 mt-0.5 leading-normal">
                       ยอดคำนวณสุทธิแตะเกณฑ์ ฿20,000 ขึ้นไป
                     </p>
                     <button
                       type="button"
                       onClick={() => memoSectionRef.current?.scrollIntoView({ behavior: 'smooth' })}
-                      className="mt-2 text-xs font-bold text-amber-900 bg-amber-200/60 hover:bg-amber-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
+                      className="mt-2 text-xs font-bold text-amber-900 bg-amber-200/60 hover:bg-amber-200 px-2.5 py-1 rounded-lg transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap"
                     >
                       <span>กรอกข้อมูล Memo</span>
                       <span>↓</span>
@@ -2349,14 +2349,14 @@ export default function PRCreateView({
           {/* Box 2: Department Budget Usage Bar (Directive 1) */}
           {budgetInfo && (
             <div className="bg-white border border-slate-200/80 rounded-2xl p-5 shadow-sm space-y-3">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-2">
-                  <Wallet className="w-4 h-4 text-slate-500" />
-                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider">
+              <div className="flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Wallet className="w-4 h-4 text-slate-500 shrink-0" />
+                  <h4 className="text-xs font-bold text-slate-900 uppercase tracking-wider leading-normal break-words">
                     งบประมาณแผนก ({department})
                   </h4>
                 </div>
-                <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded-full ${
+                <span className={`text-xs font-bold font-mono px-2 py-0.5 rounded-full whitespace-nowrap shrink-0 ${
                   budgetInfo.isOverBudget 
                     ? 'bg-rose-50 text-rose-700 border border-rose-200' 
                     : 'bg-indigo-50 text-indigo-700 border border-indigo-100'
@@ -2381,29 +2381,29 @@ export default function PRCreateView({
 
               {/* Budget Metrics Breakdown */}
               <div className="space-y-1.5 text-xs">
-                <div className="flex justify-between items-center text-slate-500">
-                  <span>งบที่ได้รับจัดสรร</span>
-                  <span className="font-mono font-medium text-slate-800">
+                <div className="flex justify-between items-center gap-3 text-slate-500">
+                  <span className="min-w-0 leading-normal">งบที่ได้รับจัดสรร</span>
+                  <span className="font-mono font-medium text-slate-800 whitespace-nowrap">
                     ฿{budgetInfo.allocated.toLocaleString()}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-slate-500">
-                  <span>ใช้ไปแล้ว (Actual + Commit)</span>
-                  <span className="font-mono font-medium text-slate-800">
+                <div className="flex justify-between items-center gap-3 text-slate-500">
+                  <span className="min-w-0 leading-normal">ใช้ไปแล้ว (Actual + Commit)</span>
+                  <span className="font-mono font-medium text-slate-800 whitespace-nowrap">
                     ฿{budgetInfo.spent.toLocaleString()}
                   </span>
                 </div>
-                <div className="flex justify-between items-center text-indigo-600 font-semibold">
-                  <span>ใบนี้เพิ่ม (This PR)</span>
-                  <span className="font-mono tabular-nums">
+                <div className="flex justify-between items-center gap-3 text-indigo-600 font-semibold">
+                  <span className="min-w-0 leading-normal">ใบนี้เพิ่ม (This PR)</span>
+                  <span className="font-mono tabular-nums whitespace-nowrap">
                     +฿{budgetInfo.prAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
-                <div className="flex justify-between items-center pt-1.5 border-t border-slate-100">
-                  <span className={`font-semibold ${budgetInfo.isOverBudget ? 'text-rose-600' : 'text-slate-700'}`}>
+                <div className="flex justify-between items-center gap-3 pt-1.5 border-t border-slate-100">
+                  <span className={`min-w-0 leading-normal font-semibold ${budgetInfo.isOverBudget ? 'text-rose-600' : 'text-slate-700'}`}>
                     {budgetInfo.isOverBudget ? 'เกินงบประมาณ' : 'งบประมาณคงเหลือ'}
                   </span>
-                  <span className={`font-mono font-bold tabular-nums ${budgetInfo.isOverBudget ? 'text-rose-600' : 'text-emerald-600'}`}>
+                  <span className={`font-mono font-bold tabular-nums whitespace-nowrap ${budgetInfo.isOverBudget ? 'text-rose-600' : 'text-emerald-600'}`}>
                     {budgetInfo.isOverBudget ? '-' : ''}฿{Math.abs(budgetInfo.remaining).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </span>
                 </div>
@@ -2416,7 +2416,7 @@ export default function PRCreateView({
             {/* Vendor validation warning */}
             {isMissingVendor && (
               <div className="p-2.5 bg-rose-50 border border-rose-200/80 rounded-xl text-center">
-                <p className="text-xs text-rose-600 font-semibold flex items-center justify-center gap-1">
+                <p className="text-xs text-rose-600 font-semibold flex items-center justify-center gap-1 leading-normal">
                   <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
                   <span>* กรุณาระบุผู้จัดจำหน่าย (Vendor) ที่หัวเอกสาร</span>
                 </p>
@@ -2428,7 +2428,7 @@ export default function PRCreateView({
               type="button"
               disabled={isSubmitting || isMissingVendor}
               onClick={(e) => handleCreateSubmit(e, false)}
-              className={`h-11 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer ${
+              className={`h-11 w-full rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs hover:shadow-sm active:scale-98 transition-all flex items-center justify-center gap-2 cursor-pointer whitespace-nowrap ${
                 isSubmitting || isMissingVendor ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
               }`}
             >
@@ -2449,7 +2449,7 @@ export default function PRCreateView({
               type="button"
               disabled={isSubmitting}
               onClick={(e) => handleCreateSubmit(e, true)}
-              className={`h-10 w-full rounded-xl font-semibold text-xs text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-2xs hover:shadow-xs transition-all cursor-pointer ${
+              className={`h-10 w-full rounded-xl font-semibold text-xs text-slate-700 bg-white hover:bg-slate-50 border border-slate-300 shadow-2xs hover:shadow-xs transition-all cursor-pointer whitespace-nowrap ${
                 isSubmitting ? 'opacity-50 cursor-not-allowed pointer-events-none' : ''
               }`}
             >
@@ -2494,7 +2494,7 @@ export default function PRCreateView({
                     e.preventDefault();
                     openProxiedFile(previewImage).then((ok) => { if (!ok) window.open(getDriveFileViewUrl(previewImage), '_blank', 'noopener,noreferrer'); });
                   }}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 text-xs font-semibold rounded-lg transition-colors whitespace-nowrap min-w-0"
                 >
                   <svg className="w-3.5 h-3.5 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -2505,7 +2505,7 @@ export default function PRCreateView({
               <button 
                 type="button"
                 onClick={() => setPreviewImage(null)}
-                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-sm shadow-xs transition-colors cursor-pointer"
+                className="w-8 h-8 rounded-full bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-bold text-sm shadow-xs transition-colors cursor-pointer shrink-0"
                 title="ปิดหน้าต่าง"
               >
                 ✕
@@ -2539,7 +2539,7 @@ export default function PRCreateView({
               <h3 className="text-lg font-bold text-slate-900">
                 {successModalInfo.title || 'ดำเนินการสำเร็จ'}
               </h3>
-              <p className="text-xs sm:text-sm text-slate-500 mt-1">
+              <p className="text-xs sm:text-sm text-slate-500 mt-1 leading-normal break-words">
                 {successModalInfo.message || 'สร้างและยื่นส่งใบขอซื้อ (PR) สำเร็จ'}
               </p>
             </div>

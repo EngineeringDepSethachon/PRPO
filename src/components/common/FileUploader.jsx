@@ -141,7 +141,7 @@ export default function FileUploader({
           onDragLeave={handleDrag}
           onDragOver={handleDrag}
           onDrop={handleDrop}
-          className={`relative border border-dashed rounded-xl px-3.5 py-2.5 h-[62px] transition-all flex items-center justify-between gap-3 cursor-pointer group select-none ${
+          className={`relative border border-dashed rounded-xl px-3.5 py-2.5 min-h-[62px] transition-all flex items-center justify-between gap-3 cursor-pointer group select-none ${
             isDragging 
               ? 'border-indigo-500 bg-indigo-50/70 shadow-xs ring-2 ring-indigo-500/10' 
               : 'border-slate-300 bg-slate-50/50 hover:bg-white hover:border-indigo-300 shadow-2xs'
@@ -164,16 +164,16 @@ export default function FileUploader({
               <UploadCloud className="w-4 h-4" />
             </div>
             <div className="min-w-0">
-              <p className="text-xs font-semibold text-slate-800 truncate">
+              <p className="text-xs font-semibold text-slate-800 break-words leading-normal">
                 {label} {required && <span className="text-rose-500">*</span>}
               </p>
-              <p className="text-xs text-slate-400 truncate">
+              <p className="text-xs text-slate-400 break-words leading-normal">
                 {helperText || `คลิกหรือลากไฟล์มาวาง (${accept.includes('pdf') ? 'PDF/รูป' : 'รูปภาพ'})`}
               </p>
             </div>
           </div>
 
-          <span className="text-xs font-semibold text-indigo-600 bg-indigo-50/80 group-hover:bg-indigo-100/70 border border-indigo-100 px-2.5 py-1 rounded-lg shrink-0 transition-colors pointer-events-none">
+          <span className="text-xs font-semibold text-indigo-600 bg-indigo-50/80 group-hover:bg-indigo-100/70 border border-indigo-100 px-2.5 py-1 rounded-lg shrink-0 whitespace-nowrap transition-colors pointer-events-none">
             แนบไฟล์
           </span>
         </div>
@@ -215,11 +215,11 @@ export default function FileUploader({
 
   return (
     <div className="w-full animate-fade-in">
-      <div className="flex justify-between items-end mb-2">
-        <label className="text-xs font-bold text-slate-700">
+      <div className="flex justify-between items-end flex-wrap gap-x-3 gap-y-1 mb-2">
+        <label className="text-xs font-bold text-slate-700 min-w-0 leading-normal break-words">
           {label} {required && <span className="text-rose-500">*</span>}
         </label>
-        {helperText && <span className="text-xs text-slate-500">{helperText}</span>}
+        {helperText && <span className="text-xs text-slate-500 leading-normal break-words">{helperText}</span>}
       </div>
 
       <div

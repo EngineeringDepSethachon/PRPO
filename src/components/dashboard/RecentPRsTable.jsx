@@ -9,13 +9,13 @@ export default function RecentPRsTable({ prs = [], onNavigate, onOpenPR }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
       {/* Header Bar */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2 font-bold text-slate-800 text-sm">
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2 flex-wrap min-w-0 font-bold text-slate-800 text-sm">
           <span className="p-1.5 rounded-lg bg-indigo-50 text-indigo-600 text-base leading-none">📄</span>
           <span>ใบขอซื้อล่าสุด</span>
           <span className="text-xs font-normal text-slate-400 font-sans hidden sm:inline">(Recent PRs)</span>
           {recentPRs.length > 0 && (
-            <span className="text-xs font-semibold text-indigo-700 bg-indigo-50/80 px-2 py-0.5 rounded-full border border-indigo-100/60 ml-1">
+            <span className="text-xs font-semibold text-indigo-700 bg-indigo-50/80 px-2 py-0.5 leading-normal whitespace-nowrap rounded-full border border-indigo-100/60 ml-1">
               {recentPRs.length} รายการ
             </span>
           )}
@@ -23,7 +23,7 @@ export default function RecentPRsTable({ prs = [], onNavigate, onOpenPR }) {
         <button
           type="button"
           onClick={() => onNavigate && onNavigate('pr-list')}
-          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors flex items-center gap-1 cursor-pointer"
+          className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
         >
           <span>ดูทั้งหมด</span>
           <ArrowRight className="w-3.5 h-3.5" />
@@ -69,11 +69,11 @@ export default function RecentPRsTable({ prs = [], onNavigate, onOpenPR }) {
                 {/* Left: PR Meta & Items Info */}
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono font-bold text-xs sm:text-sm text-slate-900 group-hover:text-indigo-600 transition-colors">
+                    <span className="font-mono font-bold text-xs sm:text-sm text-slate-900 group-hover:text-indigo-600 transition-colors whitespace-nowrap">
                       {pr.prNo}
                     </span>
                     <span
-                      className={`text-xs font-bold px-2 py-0.5 rounded-md border ${
+                      className={`text-xs font-bold px-2 py-0.5 leading-normal whitespace-nowrap rounded-md border ${
                         pr.department === 'PD'
                           ? 'bg-blue-50 text-blue-700 border-blue-200'
                           : 'bg-amber-50 text-amber-700 border-amber-200'
@@ -82,12 +82,12 @@ export default function RecentPRsTable({ prs = [], onNavigate, onOpenPR }) {
                       {pr.department}
                     </span>
                     {pr.purchaseChannel === 'ONLINE' && (
-                      <span className="text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 rounded-md flex items-center gap-1">
-                        <ShoppingCart className="w-3 h-3 text-purple-600" />
+                      <span className="text-xs font-semibold text-purple-700 bg-purple-50 border border-purple-200 px-1.5 py-0.5 leading-normal whitespace-nowrap rounded-md flex items-center gap-1">
+                        <ShoppingCart className="w-3 h-3 text-purple-600 shrink-0" />
                         <span>Online</span>
                       </span>
                     )}
-                    <span className="text-xs text-slate-400 font-normal truncate">
+                    <span className="text-xs text-slate-400 font-normal truncate min-w-0 max-w-full">
                       • {pr.requestedBy}
                     </span>
                   </div>
@@ -98,19 +98,19 @@ export default function RecentPRsTable({ prs = [], onNavigate, onOpenPR }) {
                 </div>
 
                 {/* Right: Amount & Status Dot */}
-                <div className="flex items-center gap-2 shrink-0 text-right">
-                  <div>
-                    <div className="font-mono font-bold text-xs sm:text-sm text-slate-900 tabular-nums">
+                <div className="flex items-center gap-2 shrink-0 max-w-[55%] sm:max-w-none text-right">
+                  <div className="min-w-0">
+                    <div className="font-mono font-bold text-xs sm:text-sm text-slate-900 tabular-nums whitespace-nowrap">
                       ฿{(pr.totalAmount || 0).toLocaleString()}
                     </div>
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold border mt-0.5 ${statusInfo.color}`}
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold leading-normal max-w-full border mt-0.5 ${statusInfo.color}`}
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 animate-pulse"></span>
-                      <span>{statusInfo.label}</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 animate-pulse shrink-0"></span>
+                      <span className="min-w-0 break-words text-left">{statusInfo.label}</span>
                     </span>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
+                  <ChevronRight className="w-4 h-4 shrink-0 text-slate-300 group-hover:text-indigo-600 group-hover:translate-x-0.5 transition-all" />
                 </div>
               </div>
             );
@@ -120,9 +120,9 @@ export default function RecentPRsTable({ prs = [], onNavigate, onOpenPR }) {
 
       {/* Footer Total */}
       {recentPRs.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium gap-2">
           <span>รวม {recentPRs.length} รายการล่าสุด</span>
-          <span className="font-mono font-bold text-slate-900 tabular-nums">
+          <span className="font-mono font-bold text-slate-900 tabular-nums whitespace-nowrap">
             ยอดรวม ฿{recentPRTotal.toLocaleString()}
           </span>
         </div>

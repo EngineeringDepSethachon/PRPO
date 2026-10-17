@@ -36,7 +36,7 @@ export default function MasterDataNav({
   return (
     <div 
       data-testid="master-data-nav"
-      className="flex gap-1.5 bg-slate-100/80 p-1.5 rounded-2xl w-fit border border-slate-200/60 shadow-2xs overflow-x-auto custom-scrollbar"
+      className="flex gap-1.5 bg-slate-100/80 p-1.5 rounded-2xl w-fit max-w-full border border-slate-200/60 shadow-2xs overflow-x-auto custom-scrollbar"
     >
       {visibleTabs.map(tab => {
         const Icon = tab.icon;
@@ -51,7 +51,7 @@ export default function MasterDataNav({
             aria-label={tab.label}
             aria-selected={active}
             onClick={() => onTabChange && onTabChange(tab.id)}
-            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap ${
+            className={`inline-flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               active
                 ? 'bg-white text-slate-900 shadow-xs font-bold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/50'
@@ -59,7 +59,7 @@ export default function MasterDataNav({
           >
             <Icon className={`w-4 h-4 ${tab.iconColor}`} />
             <span>{tab.label}</span>
-            <span className="px-1.5 py-0.5 rounded-full text-xs font-mono bg-slate-100 text-slate-600">
+            <span className="px-1.5 py-0.5 rounded-full text-xs font-mono tabular-nums bg-slate-100 text-slate-600">
               {count}
             </span>
           </button>

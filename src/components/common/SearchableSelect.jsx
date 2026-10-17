@@ -192,7 +192,7 @@ export default function SearchableSelect({
         disabled={disabled}
         onClick={() => !disabled && setIsOpen(!isOpen)}
         onKeyDown={handleKeyDown}
-        className={`w-full h-[38px] min-h-[38px] flex items-center justify-between text-left border rounded-xl px-3.5 text-xs sm:text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer ${
+        className={`w-full min-h-[38px] flex items-center justify-between text-left border rounded-xl px-3.5 text-xs sm:text-sm transition-all focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 cursor-pointer ${
           disabled
             ? 'bg-slate-100 border-slate-200 text-slate-400 cursor-not-allowed'
             : isOpen
@@ -208,7 +208,7 @@ export default function SearchableSelect({
                   {selectedOption.code}
                 </span>
               )}
-              <span className="font-medium text-slate-800 text-xs sm:text-sm truncate block leading-none">
+              <span className="font-medium text-slate-800 text-xs sm:text-sm truncate block leading-normal">
                 {selectedOption.label}
               </span>
             </div>
@@ -251,7 +251,7 @@ export default function SearchableSelect({
                   setIsOpen(false);
                   onAddOption();
                 }}
-                className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer"
+                className="w-full py-2 px-3 rounded-xl bg-indigo-600 hover:bg-indigo-700 active:scale-[0.99] text-white text-xs font-bold flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer whitespace-nowrap"
               >
                 <Plus className="w-3.5 h-3.5" />
                 <span>{addOptionLabel}</span>
@@ -321,7 +321,7 @@ export default function SearchableSelect({
                             {opt.code}
                           </span>
                         )}
-                        <span className="font-semibold text-slate-900 truncate text-xs">{opt.label}</span>
+                        <span className="font-semibold text-slate-900 break-words min-w-0 leading-normal text-xs">{opt.label}</span>
                         {opt.badge && (
                           <span className="text-xs font-semibold px-1.5 py-0.2 rounded border bg-indigo-50 text-indigo-700 border-indigo-100 shrink-0">
                             {opt.badge}
@@ -329,7 +329,7 @@ export default function SearchableSelect({
                         )}
                       </div>
                       {opt.subLabel && (
-                        <div className="text-xs text-slate-500 font-normal mt-0.5 truncate">
+                        <div className="text-xs text-slate-500 font-normal mt-0.5 break-words leading-normal">
                           {opt.subLabel}
                         </div>
                       )}

@@ -197,9 +197,9 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
       {/* ── 1. Two-Tier Card Header (Directive 1) ── */}
       <div>
         {/* บรรทัดที่ 1: เลขที่เอกสาร (ซ้าย) vs สถานะงาน (ขวา) */}
-        <div className="flex items-center justify-between gap-2 mb-1.5">
-          <div className="inline-flex items-center gap-1.5">
-            <span className={`px-2 py-0.5 rounded-md border text-xs font-mono font-bold ${
+        <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1.5 mb-1.5">
+          <div className="inline-flex items-center gap-1.5 min-w-0 max-w-full">
+            <span className={`px-2 py-0.5 leading-normal truncate min-w-0 rounded-md border text-xs font-mono font-bold ${
               isPR 
                 ? 'bg-indigo-50 border-indigo-100 text-indigo-700' 
                 : 'bg-emerald-50 border-emerald-100 text-emerald-700'
@@ -207,11 +207,11 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
               {task.type || (isPR ? 'PR' : 'PO')}: {docNo}
             </span>
           </div>
-          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-xs font-medium border shrink-0 ${
+          <span className={`inline-flex items-center gap-1 px-2.5 py-0.5 leading-normal max-w-full rounded-full text-xs font-medium border ${
             statusInfo?.color || 'bg-amber-50 text-amber-700 border-amber-200'
           }`}>
-            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80"></span>
-            <span>{task.statusLabel || statusInfo?.label || task.status || 'รออนุมัติ'}</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 shrink-0"></span>
+            <span className="min-w-0 break-words">{task.statusLabel || statusInfo?.label || task.status || 'รออนุมัติ'}</span>
           </span>
         </div>
 
@@ -225,7 +225,7 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
         {isClaimInProcess && (
           <div className="mb-2.5 p-2 bg-amber-50 border border-amber-200/90 rounded-xl flex items-center gap-1.5 text-xs font-bold text-amber-800 animate-fade-in">
             <AlertTriangle className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-            <span>⚠️ ได้รับของบางส่วน (กำลังเคลมส่วนที่เหลือ)</span>
+            <span className="min-w-0 break-words">⚠️ ได้รับของบางส่วน (กำลังเคลมส่วนที่เหลือ)</span>
           </div>
         )}
 
@@ -233,7 +233,7 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
           <div className="mb-2.5 space-y-1.5 animate-fade-in">
             <div className="p-2 bg-emerald-50 border border-emerald-200/90 rounded-xl flex items-center gap-1.5 text-xs font-bold text-emerald-800">
               <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-              <span>✓ ได้รับเงินคืน ฿{Number(task.refundAmount || task.claimResolution?.refundAmount || 0).toLocaleString()} เรียบร้อย</span>
+              <span className="min-w-0 break-words">✓ ได้รับเงินคืน ฿{Number(task.refundAmount || task.claimResolution?.refundAmount || 0).toLocaleString()} เรียบร้อย</span>
             </div>
             <button
               type="button"
@@ -251,7 +251,7 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
       {/* ── 2. Card Body: Item Name & Minimal Metadata Chip ── */}
       <div className="flex-1 mt-1">
         <h4 
-          className="text-sm font-bold text-slate-900 line-clamp-1 leading-snug group-hover:text-indigo-600 transition-colors" 
+          className="text-sm font-bold text-slate-900 line-clamp-1 break-words leading-snug group-hover:text-indigo-600 transition-colors" 
           title={title}
         >
           {title}
@@ -263,21 +263,21 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
           ) : (
             <Store className="w-3.5 h-3.5 text-slate-400 shrink-0" />
           )}
-          <span className="truncate font-medium text-slate-700 flex-1" title={entityName}>
+          <span className="truncate min-w-0 font-medium text-slate-700 flex-1" title={entityName}>
             {entityName}
           </span>
-          <span className="text-slate-300">•</span>
-          <span className="text-indigo-600 font-semibold text-xs shrink-0">
+          <span className="text-slate-300 shrink-0">•</span>
+          <span className="text-indigo-600 font-semibold text-xs shrink-0 whitespace-nowrap">
             {channelLabel}
           </span>
         </div>
       </div>
 
       {/* ── 3. Card Footer: Net Amount & Minimal Action Button on same baseline ── */}
-      <div className="border-t border-slate-100 pt-3.5 mt-4 flex items-center justify-between gap-3">
-        <div>
+      <div className="border-t border-slate-100 pt-3.5 mt-4 flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+        <div className="min-w-0">
           <p className="text-xs font-bold text-slate-400 uppercase tracking-wider">มูลค่าสุทธิ</p>
-          <p className="text-base font-black font-mono text-slate-900 leading-tight tabular-nums">
+          <p className="text-base font-black font-mono text-slate-900 leading-tight tabular-nums whitespace-nowrap">
             {canViewPrice 
               ? `฿${Number(amount).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` 
               : '฿ ••••••'}
@@ -287,13 +287,13 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
         {isClaimActionPending ? (
           <button
             type="button"
-            className="h-8 px-3.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95 whitespace-nowrap cursor-pointer shrink-0 max-w-[160px]"
+            className="h-8 px-3.5 rounded-xl bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95 whitespace-nowrap cursor-pointer shrink-0 max-w-[220px]"
           >
             <span className="truncate">จัดการเคลม / ติดต่อร้าน</span>
             <span className="text-xs shrink-0">➔</span>
           </button>
         ) : isPartialPO ? (
-          <div className="flex items-center gap-2 shrink-0 max-w-[160px]">
+          <div className="flex items-center gap-2 shrink-0 max-w-[200px]">
             {task.purchaseChannel !== 'ONLINE' && task.status !== 'WAITING_DELIVERY_ROUND_2' && task.claimStatus !== 'PENDING' && task.claimStatus !== 'IN_CLAIM' && (
               <span className="text-xs font-medium text-amber-600 underline cursor-pointer hover:text-amber-800 whitespace-nowrap hidden sm:inline-block">
                 ส่งเคลม
@@ -310,10 +310,10 @@ export default function TaskCard({ task, activeTab, currentRole, onClick, onReor
         ) : (
           <button
             type="button"
-            className="h-8 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95 whitespace-nowrap cursor-pointer"
+            className="h-8 px-3.5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold flex items-center gap-1.5 shadow-2xs hover:shadow-xs transition-all active:scale-95 whitespace-nowrap cursor-pointer shrink-0"
           >
             <span>{actionText}</span>
-            <span className="text-xs">➔</span>
+            <span className="text-xs shrink-0">➔</span>
           </button>
         )}
       </div>

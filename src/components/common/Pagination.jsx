@@ -43,13 +43,13 @@ export default function Pagination({
   return (
     <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-4 py-3.5 border-t border-slate-200/80 bg-white/70 text-xs text-slate-600 select-none">
       {/* Left: Summary & Rows per page */}
-      <div className="flex items-center gap-3 font-medium text-slate-500">
-        <span>
+      <div className="flex items-center gap-3 min-w-0 font-medium text-slate-500">
+        <span className="min-w-0">
           แสดง <span className="font-mono font-semibold text-slate-800">{startItem}</span> - <span className="font-mono font-semibold text-slate-800">{endItem}</span> จากทั้งหมด <span className="font-mono font-semibold text-slate-800">{totalItems.toLocaleString()}</span> รายการ
         </span>
 
         {onPageSizeChange && (
-          <div className="hidden sm:flex items-center gap-1.5 pl-2 border-l border-slate-200">
+          <div className="hidden sm:flex items-center gap-1.5 pl-2 border-l border-slate-200 whitespace-nowrap shrink-0">
             <span className="text-xs text-slate-400">แสดง:</span>
             <select
               value={pageSize}
@@ -67,9 +67,9 @@ export default function Pagination({
       </div>
 
       {/* Right: Controls & Page Info */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-center flex-wrap gap-2 max-w-full">
         {/* Subtle Page Indicator Badge */}
-        <span className="text-xs font-medium text-slate-500 bg-white px-2 py-1 rounded-md border border-slate-200/80 shadow-2xs font-mono">
+        <span className="text-xs font-medium text-slate-500 bg-white px-2 py-1 rounded-md border border-slate-200/80 shadow-2xs font-mono whitespace-nowrap leading-normal">
           หน้า <strong className="font-mono font-bold text-slate-800 px-0.5">{currentPage}</strong> / <span className="font-mono">{validTotalPages}</span>
         </span>
 
@@ -77,7 +77,7 @@ export default function Pagination({
           type="button"
           onClick={() => onPageChange && onPageChange(currentPage - 1)}
           disabled={currentPage <= 1}
-          className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs inline-flex items-center gap-1 cursor-pointer"
+          className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
           title="หน้าก่อนหน้า"
           aria-label="Previous Page"
         >
@@ -101,7 +101,7 @@ export default function Pagination({
                   key={page}
                   type="button"
                   onClick={() => onPageChange && onPageChange(page)}
-                  className={`min-w-[28px] h-7 px-2 font-mono text-xs rounded-lg transition-all cursor-pointer ${
+                  className={`min-w-[28px] h-7 px-2 shrink-0 font-mono text-xs rounded-lg transition-all cursor-pointer ${
                     isActive
                       ? 'bg-slate-900 text-white font-semibold shadow-2xs'
                       : 'bg-white hover:bg-slate-100 text-slate-600 border border-slate-200'
@@ -118,7 +118,7 @@ export default function Pagination({
           type="button"
           onClick={() => onPageChange && onPageChange(currentPage + 1)}
           disabled={currentPage >= validTotalPages}
-          className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs inline-flex items-center gap-1 cursor-pointer"
+          className="px-3 py-1.5 rounded-xl border border-slate-200 bg-white text-slate-700 font-medium hover:bg-slate-50 disabled:opacity-40 disabled:pointer-events-none transition-all shadow-2xs inline-flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
           title="หน้าถัดไป"
           aria-label="Next Page"
         >

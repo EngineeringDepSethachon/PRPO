@@ -202,12 +202,12 @@ export default function WorkspaceView({
     <div className="w-full space-y-6 animate-fade-in pb-10">
       {/* ── 1. Header & Summary Hero Banner ── */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2.5 tracking-tight">
-            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shadow-2xs">
+            <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shadow-2xs shrink-0">
               <Sparkles className="w-5 h-5" />
             </div>
-            <span>พื้นที่ทำงานของฉัน (My Workspace)</span>
+            <span className="min-w-0 break-words">พื้นที่ทำงานของฉัน (My Workspace)</span>
           </h2>
           <p className="text-xs sm:text-sm text-slate-500 mt-1 font-normal">
             ศูนย์รวมงานที่คุณต้องดำเนินการ และติดตามสถานะงานที่คุณเกี่ยวข้องทั้งหมด
@@ -215,17 +215,17 @@ export default function WorkspaceView({
         </div>
 
         {/* Quick Stats Strip */}
-        <div className="inline-flex items-center gap-2.5 px-3.5 py-2 rounded-2xl bg-white border border-slate-200/80 shadow-xs text-xs">
-          <div className="flex items-center gap-1.5 font-medium text-slate-700">
-            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+        <div className="inline-flex flex-wrap items-center gap-x-2.5 gap-y-1 max-w-full px-3.5 py-2 rounded-2xl bg-white border border-slate-200/80 shadow-xs text-xs">
+          <div className="flex items-center gap-1.5 font-medium text-slate-700 whitespace-nowrap">
+            <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0" />
             <span>รอคุณดำเนินการ</span>
             <span className="font-mono font-bold text-rose-600 tabular-nums">
               {tabCounts.todo}
             </span>
             <span>รายการ</span>
           </div>
-          <span className="text-slate-300">•</span>
-          <div className="flex items-center gap-1.5 text-slate-600">
+          <span className="text-slate-300 hidden sm:inline">•</span>
+          <div className="flex items-center gap-1.5 text-slate-600 whitespace-nowrap">
             <span>มูลค่ารวม</span>
             {currentRole?.canViewBudget ? (
               <span className="font-mono font-bold text-slate-900 tabular-nums">
@@ -244,7 +244,7 @@ export default function WorkspaceView({
           <button
             type="button"
             onClick={() => setActiveTab('todo')}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs transition-all whitespace-nowrap cursor-pointer ${
+            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               (activeTab === 'todo' || activeTab === 'action')
                 ? 'bg-white text-slate-900 shadow-sm font-semibold'
                 : 'text-slate-600 hover:text-slate-900'
@@ -253,7 +253,7 @@ export default function WorkspaceView({
             <Flame size={15} strokeWidth={2} className="text-rose-500" />
             <span>ต้องดำเนินการ (To Do)</span>
             {tabCounts.todo > 0 && (
-              <span className="bg-rose-500 text-white font-bold px-2 py-0.5 rounded-full text-xs font-mono shadow-2xs">
+              <span className="bg-rose-500 text-white font-bold px-2 py-0.5 leading-normal rounded-full text-xs font-mono shadow-2xs">
                 {tabCounts.todo}
               </span>
             )}
@@ -262,7 +262,7 @@ export default function WorkspaceView({
           <button
             type="button"
             onClick={() => setActiveTab('in_progress')}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs transition-all whitespace-nowrap cursor-pointer ${
+            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               (activeTab === 'in_progress' || activeTab === 'waiting')
                 ? 'bg-white text-slate-900 shadow-sm font-semibold'
                 : 'text-slate-600 hover:text-slate-900'
@@ -271,7 +271,7 @@ export default function WorkspaceView({
             <Timer size={15} strokeWidth={2} className="text-amber-500" />
             <span>รอผู้อื่นดำเนินการ (In Progress)</span>
             {tabCounts.inProgress > 0 && (
-              <span className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full text-xs font-mono border border-amber-200/60">
+              <span className="bg-amber-100 text-amber-800 font-bold px-2 py-0.5 leading-normal rounded-full text-xs font-mono border border-amber-200/60">
                 {tabCounts.inProgress}
               </span>
             )}
@@ -280,7 +280,7 @@ export default function WorkspaceView({
           <button
             type="button"
             onClick={() => setActiveTab('completed')}
-            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs transition-all whitespace-nowrap cursor-pointer ${
+            className={`flex items-center gap-2 rounded-xl px-4 py-2 text-xs transition-all whitespace-nowrap shrink-0 cursor-pointer ${
               activeTab === 'completed'
                 ? 'bg-white text-slate-900 shadow-sm font-semibold'
                 : 'text-slate-600 hover:text-slate-900'
@@ -289,7 +289,7 @@ export default function WorkspaceView({
             <CheckCheck size={15} strokeWidth={2} className="text-emerald-500" />
             <span>เสร็จสิ้นแล้ว (Completed)</span>
             {tabCounts.completed > 0 && (
-              <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full text-xs font-mono border border-emerald-200/60">
+              <span className="bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 leading-normal rounded-full text-xs font-mono border border-emerald-200/60">
                 {tabCounts.completed}
               </span>
             )}
@@ -298,13 +298,13 @@ export default function WorkspaceView({
 
         {/* Sub-type Pills Filter (Directive 2: [ทั้งหมด], [เฉพาะ PR], [เฉพาะ PO]) */}
         {activeTab === 'completed' && (
-          <div className="flex items-center gap-2 self-start sm:self-auto animate-fade-in">
+          <div className="flex items-center gap-2 self-start sm:self-auto animate-fade-in whitespace-nowrap">
             <span className="text-xs text-slate-400 font-medium hidden md:inline">กรองประเภท:</span>
             <div className="inline-flex p-1 bg-slate-100/90 rounded-xl border border-slate-200/70 shadow-2xs">
               <button
                 type="button"
                 onClick={() => setCompletedTypeFilter('ALL')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-3 py-1 leading-normal whitespace-nowrap rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   completedTypeFilter === 'ALL'
                     ? 'bg-white text-slate-900 shadow-2xs font-bold'
                     : 'text-slate-500 hover:text-slate-800'
@@ -315,7 +315,7 @@ export default function WorkspaceView({
               <button
                 type="button"
                 onClick={() => setCompletedTypeFilter('PR')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-3 py-1 leading-normal whitespace-nowrap rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   completedTypeFilter === 'PR'
                     ? 'bg-white text-indigo-700 shadow-2xs font-bold'
                     : 'text-slate-500 hover:text-slate-800'
@@ -326,7 +326,7 @@ export default function WorkspaceView({
               <button
                 type="button"
                 onClick={() => setCompletedTypeFilter('PO')}
-                className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                className={`px-3 py-1 leading-normal whitespace-nowrap rounded-lg text-xs font-semibold transition-all cursor-pointer ${
                   completedTypeFilter === 'PO'
                     ? 'bg-white text-emerald-700 shadow-2xs font-bold'
                     : 'text-slate-500 hover:text-slate-800'
@@ -343,7 +343,7 @@ export default function WorkspaceView({
       {activeTab === 'completed' && (
         <div className="flex items-center gap-2 text-xs text-slate-500 pt-1 pb-0.5 px-1 animate-fade-in">
           <Calendar className="w-3.5 h-3.5 text-slate-400 shrink-0" />
-          <span>แสดงรายการที่เสร็จสิ้นภายใน 30 วันล่าสุด ({currentTabTasks.length} รายการ)</span>
+          <span className="min-w-0 break-words">แสดงรายการที่เสร็จสิ้นภายใน 30 วันล่าสุด ({currentTabTasks.length} รายการ)</span>
         </div>
       )}
 
@@ -372,12 +372,12 @@ export default function WorkspaceView({
       {/* ── 4. Archive Banner & Handoff Navigation Links (Directive 3) ── */}
       {activeTab === 'completed' && (
         <div className="mt-8 p-4 sm:p-5 bg-slate-50/90 border border-slate-200/80 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-4 animate-fade-in shadow-2xs">
-          <div className="flex items-start sm:items-center gap-3">
+          <div className="flex items-start sm:items-center gap-3 min-w-0">
             <div className="w-9 h-9 rounded-xl bg-blue-50 text-blue-600 border border-blue-100 flex items-center justify-center shrink-0">
               <Info className="w-4 h-4" />
             </div>
-            <div>
-              <h5 className="text-xs sm:text-sm font-bold text-slate-800">
+            <div className="min-w-0">
+              <h5 className="text-xs sm:text-sm font-bold text-slate-800 break-words">
                 แสดงเฉพาะรายการที่เสร็จสิ้นภายใน 30 วันที่ผ่านมา
               </h5>
               <p className="text-xs sm:text-xs text-slate-500 mt-0.5">
@@ -386,13 +386,13 @@ export default function WorkspaceView({
             </div>
           </div>
 
-          <div className="flex items-center gap-2 shrink-0">
+          <div className="flex flex-wrap items-center gap-2 sm:shrink-0">
             <button
               type="button"
               onClick={() => {
                 if (onNavigate) onNavigate('pr-list');
               }}
-              className="px-3.5 py-2 bg-white hover:bg-slate-100 text-indigo-600 border border-slate-200/80 rounded-xl text-xs font-semibold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 bg-white hover:bg-slate-100 text-indigo-600 border border-slate-200/80 rounded-xl text-xs font-semibold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
             >
               <span>ดูใบขอซื้อ (PR) ทั้งหมด</span>
               <ArrowRight className="w-3.5 h-3.5" />
@@ -402,7 +402,7 @@ export default function WorkspaceView({
               onClick={() => {
                 if (onNavigate) onNavigate('po-list');
               }}
-              className="px-3.5 py-2 bg-white hover:bg-slate-100 text-emerald-600 border border-slate-200/80 rounded-xl text-xs font-semibold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer"
+              className="px-3.5 py-2 bg-white hover:bg-slate-100 text-emerald-600 border border-slate-200/80 rounded-xl text-xs font-semibold transition-all shadow-2xs flex items-center gap-1.5 cursor-pointer whitespace-nowrap shrink-0"
             >
               <span>ดูใบสั่งซื้อ (PO) ทั้งหมด</span>
               <ArrowRight className="w-3.5 h-3.5" />

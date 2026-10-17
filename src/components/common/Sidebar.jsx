@@ -389,12 +389,12 @@ export default function Sidebar({
               <h1 className="text-sm font-black tracking-tight text-slate-900 leading-none truncate">
                 PR/PO & Stock
               </h1>
-              <div className="flex items-center gap-1 mt-1">
+              <div className="flex items-center gap-1 mt-1 min-w-0">
                 {(() => {
                   const userDepts = getUserDepartments(currentRole || currentUser).filter(d => d !== 'ALL' && d !== '*');
                   const deptText = userDepts.length > 0 ? userDepts.join(', ') : (isOnlinePurchaser ? 'Online' : 'ส่วนกลาง');
                   return (
-                    <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md leading-none">
+                    <span className="text-xs font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md leading-normal truncate min-w-0">
                       {deptText}
                     </span>
                   );
@@ -475,7 +475,7 @@ export default function Sidebar({
                       const isActive = navActive || activeView === item.id;
                       return (
                         <>
-                          <div className="flex items-center gap-3 min-w-0">
+                          <div className="flex items-center gap-3 min-w-0 flex-1">
                             <Icon 
                               size={20} 
                               strokeWidth={1.8} 
@@ -490,14 +490,14 @@ export default function Sidebar({
 
                           {item.id === 'online-tasks' ? (
                             urgentTaskCount > 0 && (
-                              <span className={`ml-auto px-2 py-0.5 rounded-full text-xs font-bold text-white bg-rose-500 ${isActive ? 'shadow-sm ring-2 ring-slate-900' : 'shadow-xs'}`}>
+                              <span className={`ml-auto shrink-0 min-w-[1.5rem] text-center px-2 py-0.5 rounded-full text-xs font-bold text-white bg-rose-500 ${isActive ? 'shadow-sm ring-2 ring-slate-900' : 'shadow-xs'}`}>
                                 {urgentTaskCount}
                               </span>
                             )
                           ) : (
                             item.badge && Number(item.badge) > 0 && (
                               isActive ? (
-                                <span className="ml-auto px-1.5 py-0.5 rounded-full font-mono text-xs font-bold bg-white/20 text-white leading-none shrink-0">
+                                <span className="ml-auto px-1.5 py-0.5 min-w-[1.5rem] text-center rounded-full font-mono text-xs font-bold bg-white/20 text-white leading-none shrink-0">
                                   {item.badge}
                                 </span>
                               ) : (item.id === 'my-tasks' || item.id === 'my-workspace') ? (
@@ -506,12 +506,12 @@ export default function Sidebar({
                                     <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                                     <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
                                   </span>
-                                  <span className="px-1.5 py-0.5 rounded-full font-mono text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 leading-none">
+                                  <span className="px-1.5 py-0.5 min-w-[1.5rem] text-center rounded-full font-mono text-xs font-bold bg-rose-50 text-rose-600 border border-rose-200 leading-none">
                                     {item.badge}
                                   </span>
                                 </span>
                               ) : (
-                                <span className="ml-auto px-1.5 py-0.5 rounded-full font-mono text-xs font-bold bg-slate-100 text-slate-600 group-hover:bg-slate-200 transition-colors leading-none shrink-0">
+                                <span className="ml-auto px-1.5 py-0.5 min-w-[1.5rem] text-center rounded-full font-mono text-xs font-bold bg-slate-100 text-slate-600 group-hover:bg-slate-200 transition-colors leading-none shrink-0">
                                   {item.badge}
                                 </span>
                               )
@@ -558,10 +558,10 @@ export default function Sidebar({
                 onClick={() => setShowProfileModal(true)}
                 title="คลิกเพื่อดูข้อมูลโปรไฟล์และสลับบทบาท"
               >
-                <span className="text-xs font-semibold text-slate-900 truncate block leading-tight hover:text-indigo-600 transition-colors">
+                <span className="text-xs font-semibold text-slate-900 truncate block leading-snug hover:text-indigo-600 transition-colors">
                   {currentRole?.name || 'ผู้ใช้งาน'}
                 </span>
-                <span className="text-xs font-normal text-slate-500 truncate block leading-tight mt-0.5" title={displayRole}>
+                <span className="text-xs font-normal text-slate-500 truncate block leading-snug mt-0.5" title={displayRole}>
                   {displayRole}
                 </span>
               </div>

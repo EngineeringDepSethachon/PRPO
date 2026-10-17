@@ -229,15 +229,15 @@ export default function DashboardView({
       <div className="mt-5 bg-white rounded-2xl border border-rose-200/80 shadow-xs overflow-hidden">
         {/* Header Bar with Department Filter Tabs */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between p-4 sm:p-5 border-b border-rose-100 bg-linear-to-r from-rose-50/50 to-white gap-3">
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 min-w-0">
             <div className="w-10 h-10 rounded-xl bg-rose-100 text-rose-600 flex items-center justify-center shadow-2xs border border-rose-200/60 shrink-0">
                <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-pulse"></span>
             </div>
-            <div>
+            <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-sm sm:text-base font-bold text-rose-900 tracking-tight">สินค้าใกล้หมด / แจ้งเตือน ROP</h3>
+                <h3 className="text-sm sm:text-base font-bold text-rose-900 tracking-tight break-words">สินค้าใกล้หมด / แจ้งเตือน ROP</h3>
                 {!isMultiDeptUser && (
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold border ${
+                  <span className={`inline-flex items-center px-2 py-0.5 leading-normal whitespace-nowrap rounded-md text-xs font-bold border ${
                     matchDepartment(effectiveUser?.department, 'QC')
                       ? 'bg-amber-50 text-amber-700 border-amber-200'
                       : 'bg-blue-50 text-blue-700 border-blue-200'
@@ -246,14 +246,14 @@ export default function DashboardView({
                   </span>
                 )}
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">สินค้าที่ระดับสต็อกคงเหลือต่ำกว่าหรือเท่ากับจุดสั่งซื้อซ้ำ</p>
+              <p className="text-xs text-slate-500 mt-0.5 break-words">สินค้าที่ระดับสต็อกคงเหลือต่ำกว่าหรือเท่ากับจุดสั่งซื้อซ้ำ</p>
             </div>
           </div>
 
           <div className="flex items-center gap-2 flex-wrap self-start sm:self-auto">
             {/* Multi-Dept Switcher Tabs */}
             {isMultiDeptUser && (
-              <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/70 shrink-0 overflow-x-auto">
+              <div className="flex items-center gap-1 bg-slate-100/90 p-1 rounded-xl border border-slate-200/70 min-w-0 max-w-full overflow-x-auto">
                 {deptTabs.map(tab => {
                   const isSelected = dashboardDeptFilter === tab.id;
                   return (
@@ -261,7 +261,7 @@ export default function DashboardView({
                       key={tab.id}
                       type="button"
                       onClick={() => setDashboardDeptFilter(tab.id)}
-                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+                      className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0 ${
                         isSelected
                           ? tab.id === 'PD' 
                             ? 'bg-blue-600 text-white shadow-xs' 
@@ -282,7 +282,7 @@ export default function DashboardView({
               <button
                 type="button"
                 onClick={handleBatchQuickPR}
-                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 shrink-0 cursor-pointer"
+                className="px-4 py-2 bg-rose-600 hover:bg-rose-700 active:scale-[0.98] text-white text-xs font-bold rounded-xl shadow-xs transition-all flex items-center gap-2 shrink-0 whitespace-nowrap cursor-pointer"
               >
                 <span>⚡ ขอซื้อทั้งหมด ({lowStockItems.length})</span>
               </button>
@@ -311,7 +311,7 @@ export default function DashboardView({
           <div className="w-full overflow-x-auto">
             <table className="w-full min-w-[800px] text-left border-collapse">
               <thead>
-                <tr className="bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider border-b border-slate-200/80">
+                <tr className="bg-slate-50 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap border-b border-slate-200/80">
                   <th className="px-5 py-3.5 w-[42%]">รหัส / ชื่อสินค้า</th>
                   <th className="px-5 py-3.5 w-[18%] text-right">คงเหลือ</th>
                   <th className="px-5 py-3.5 w-[20%] text-right">จุดสั่งซื้อซ้ำ (ROP)</th>
@@ -323,8 +323,8 @@ export default function DashboardView({
                   <tr key={item.sku || item.id} className="hover:bg-rose-50/30 transition-colors">
                     <td className="px-5 py-4">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="font-bold text-sm text-slate-800">{item.name || 'สินค้าไม่มีชื่อ'}</span>
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-md text-xs font-bold border ${
+                        <span className="font-bold text-sm text-slate-800 min-w-0 break-words">{item.name || 'สินค้าไม่มีชื่อ'}</span>
+                        <span className={`inline-flex items-center px-2 py-0.5 leading-normal whitespace-nowrap rounded-md text-xs font-bold border ${
                           matchDepartment(item.department, 'PD')
                             ? 'bg-blue-50 text-blue-700 border-blue-200'
                             : matchDepartment(item.department, 'QC')
@@ -336,13 +336,13 @@ export default function DashboardView({
                       </div>
                       <div className="text-xs text-slate-400 font-mono mt-0.5">{item.sku || item.code || '-'}</div>
                     </td>
-                    <td className="px-5 py-4 text-right">
+                    <td className="px-5 py-4 text-right whitespace-nowrap">
                       <span className="text-rose-600 font-bold tabular-nums text-sm">
                         {Number(item.currentStock ?? item.stock ?? 0).toLocaleString()}
                       </span>
                       <span className="text-xs text-slate-500 ml-1.5">{item.unit || 'ชิ้น'}</span>
                     </td>
-                    <td className="px-5 py-4 text-right">
+                    <td className="px-5 py-4 text-right whitespace-nowrap">
                       <span className="text-slate-700 font-bold tabular-nums text-sm">
                         {Number(item.rop ?? item.reorderPoint ?? 0).toLocaleString()}
                       </span>
@@ -352,7 +352,7 @@ export default function DashboardView({
                       <button
                         type="button"
                         onClick={() => handleSingleQuickPR(item)}
-                        className="inline-flex items-center justify-center px-4 py-2 bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200 hover:border-rose-200 text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer"
+                        className="inline-flex items-center justify-center px-4 py-2 bg-white hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200 hover:border-rose-200 text-xs font-bold rounded-xl shadow-2xs transition-all cursor-pointer whitespace-nowrap shrink-0"
                       >
                         + เปิดใบขอซื้อ
                       </button>

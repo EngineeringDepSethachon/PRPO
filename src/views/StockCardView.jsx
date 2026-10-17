@@ -261,16 +261,16 @@ export default function StockCardView({
       
       {/* ── 1. Modern Minimalist SaaS Header & Action Hub ── */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pt-1">
-        <div>
-          <div className="flex items-center gap-2">
-            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+            <h1 className="text-xl sm:text-2xl font-semibold tracking-tight text-slate-900 break-words">
               คลังสินค้า & สต็อก
             </h1>
-            <span className="text-xs font-mono font-medium text-slate-500 bg-slate-100/80 px-2 py-0.5 rounded-md border border-slate-200/60">
+            <span className="text-xs font-mono font-medium tabular-nums whitespace-nowrap text-slate-500 bg-slate-100/80 px-2 py-0.5 rounded-md border border-slate-200/60">
               {products.length} SKUs
             </span>
           </div>
-          <p className="text-xs sm:text-xs text-slate-600 mt-0.5 font-normal">
+          <p className="text-xs sm:text-xs text-slate-600 mt-0.5 font-normal break-words">
             ระบบบริหารสินค้าคงคลัง ตรวจสอบยอดคงเหลือ รับเข้า-เบิกจ่าย และจุดสั่งซื้อซ้ำ
           </p>
         </div>
@@ -282,7 +282,7 @@ export default function StockCardView({
             {/* Ghost Outline Secondary Button */}
             <button
               onClick={() => setShowAdjustStock(true)}
-              className="group inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 active:scale-[0.98] text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-medium px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer shadow-2xs"
+              className="group inline-flex items-center gap-1.5 bg-white hover:bg-slate-50 active:scale-[0.98] text-slate-700 hover:text-slate-900 border border-slate-200 text-xs font-medium px-3.5 py-2 rounded-xl transition-all duration-150 cursor-pointer shadow-2xs whitespace-nowrap shrink-0"
               title="ปรับปรุงยอดสต็อก (+/-)"
             >
               <SlidersHorizontal className="w-3.5 h-3.5 text-slate-400 group-hover:text-slate-600 transition-colors" />
@@ -292,7 +292,7 @@ export default function StockCardView({
             {/* Solid Dark Minimal Primary Button */}
             <button
               onClick={() => setShowManualIn(true)}
-              className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white text-xs font-medium px-4 py-2 rounded-xl transition-all duration-150 cursor-pointer shadow-xs hover:shadow-sm"
+              className="inline-flex items-center gap-1.5 bg-slate-900 hover:bg-slate-800 active:scale-[0.98] text-white text-xs font-medium px-4 py-2 rounded-xl transition-all duration-150 cursor-pointer shadow-xs hover:shadow-sm whitespace-nowrap shrink-0"
               title="บันทึกรับสินค้าเข้าคลัง"
             >
               <PackagePlus className="w-3.5 h-3.5 text-slate-200" />
@@ -312,7 +312,7 @@ export default function StockCardView({
               <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
             </span>
 
-            <div className="text-xs text-amber-950 font-normal truncate">
+            <div className="text-xs text-amber-950 font-normal min-w-0 break-words">
               <span className="font-semibold text-amber-900 mr-1.5">ตรวจพบสินค้าแตะจุด ROP</span>
               <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-mono font-bold bg-amber-200/70 text-amber-900 border border-amber-300/80 mr-2">
                 {lowStockCount} รายการ
@@ -329,7 +329,7 @@ export default function StockCardView({
                 const firstLow = sortedAndFilteredProducts.find(p => (p.isActive !== false && String(p.status || '').toUpperCase() !== 'INACTIVE') && p.stockBalance <= p.reorderPoint);
                 if (firstLow) onQuickPR(firstLow);
               }}
-              className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-900/90 hover:bg-amber-950 active:scale-[0.98] text-amber-50 text-xs font-medium rounded-full transition-all cursor-pointer shrink-0 shadow-2xs self-end sm:self-auto"
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-900/90 hover:bg-amber-950 active:scale-[0.98] text-amber-50 text-xs font-medium rounded-full transition-all cursor-pointer shrink-0 whitespace-nowrap shadow-2xs self-end sm:self-auto"
             >
               <span>เปิด PR ด่วน</span>
               <ArrowUpRight className="w-3 h-3 text-amber-300" />
@@ -346,7 +346,7 @@ export default function StockCardView({
           <div className="flex items-center p-1 bg-slate-100/70 rounded-xl shrink-0 overflow-x-auto custom-scrollbar border border-slate-200/50">
             <button
               onClick={() => setActiveTab('stock-list')}
-              className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'stock-list' 
                   ? 'bg-white text-slate-900 shadow-2xs font-semibold' 
                   : 'text-slate-500 hover:text-slate-900'
@@ -354,14 +354,14 @@ export default function StockCardView({
             >
               <Warehouse className="w-3.5 h-3.5 text-slate-500" />
               <span>รายการสต็อก</span>
-              <span className="text-xs font-mono px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600">
+              <span className="text-xs font-mono tabular-nums px-1.5 py-0.2 rounded-md bg-slate-100 text-slate-600">
                 {sortedAndFilteredProducts.length}
               </span>
             </button>
 
             <button
               onClick={() => setActiveTab('rop-analysis')}
-              className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap ${
+              className={`flex items-center gap-2 px-3 py-1.5 text-xs font-medium rounded-lg transition-all duration-150 cursor-pointer whitespace-nowrap shrink-0 ${
                 activeTab === 'rop-analysis' 
                   ? 'bg-white text-slate-900 shadow-2xs font-semibold' 
                   : 'text-slate-500 hover:text-slate-900'
@@ -370,7 +370,7 @@ export default function StockCardView({
               <BarChart3 className="w-3.5 h-3.5 text-slate-500" />
               <span>วิเคราะห์ ROP</span>
               {lowStockCount > 0 && (
-                <span className="text-xs font-mono font-bold px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800">
+                <span className="text-xs font-mono font-bold tabular-nums px-1.5 py-0.2 rounded-md bg-amber-100 text-amber-800">
                   {lowStockCount}
                 </span>
               )}
@@ -382,11 +382,11 @@ export default function StockCardView({
             
             {/* Department Segmented Filter */}
             {hasMultipleDepts ? (
-              <div className="flex items-center p-1 bg-slate-100/70 rounded-xl shrink-0 border border-slate-200/50">
+              <div className="flex items-center p-1 bg-slate-100/70 rounded-xl shrink-0 max-w-full overflow-x-auto custom-scrollbar border border-slate-200/50">
                 <button
                   type="button"
                   onClick={() => setCategoryFilter('ALL')}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                     categoryFilter === 'ALL' 
                       ? 'bg-white text-slate-900 shadow-2xs font-semibold' 
                       : 'text-slate-500 hover:text-slate-900'
@@ -399,7 +399,7 @@ export default function StockCardView({
                     key={d.code}
                     type="button"
                     onClick={() => setCategoryFilter(d.code)}
-                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                       categoryFilter === d.code 
                         ? 'bg-white text-indigo-700 shadow-2xs font-semibold' 
                         : 'text-slate-500 hover:text-indigo-700'
@@ -410,9 +410,9 @@ export default function StockCardView({
                 ))}
               </div>
             ) : (
-              <div className="flex items-center gap-1.5 px-3 py-1 bg-slate-50 rounded-xl border border-slate-200/60 shrink-0 text-xs">
-                <span className="text-slate-400 font-medium">แผนก:</span>
-                <span className="font-mono font-semibold text-slate-800">
+              <div className="flex flex-wrap items-center gap-1.5 px-3 py-1 bg-slate-50 rounded-xl border border-slate-200/60 shrink-0 max-w-full text-xs">
+                <span className="text-slate-400 font-medium whitespace-nowrap">แผนก:</span>
+                <span className="font-mono font-semibold text-slate-800 min-w-0 break-words">
                   {visibleFilterDepts[0]?.name || currentRole?.department || 'PD'} ({visibleFilterDepts[0]?.code || currentRole?.department || 'PD'})
                 </span>
               </div>
@@ -441,7 +441,7 @@ export default function StockCardView({
             <button
               type="button"
               onClick={() => setShowDiscontinued(prev => !prev)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all cursor-pointer shrink-0 ${
+              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium border transition-all cursor-pointer shrink-0 whitespace-nowrap ${
                 showDiscontinued
                   ? 'bg-slate-900 text-white border-slate-900 shadow-2xs'
                   : 'bg-slate-50 text-slate-600 border-slate-200/70 hover:bg-slate-100/80'
@@ -451,7 +451,7 @@ export default function StockCardView({
               <Archive className="w-3.5 h-3.5" />
               <span>แสดงที่ปิดใช้งานแล้ว</span>
               {discontinuedCount > 0 && (
-                <span className={`px-1.5 py-0.2 rounded-full text-xs font-bold ${
+                <span className={`px-1.5 py-0.2 rounded-full text-xs font-bold tabular-nums ${
                   showDiscontinued ? 'bg-slate-700 text-slate-200' : 'bg-slate-200 text-slate-600'
                 }`}>
                   {discontinuedCount}
@@ -493,7 +493,7 @@ export default function StockCardView({
         <div className="bg-white border border-slate-200/70 rounded-2xl overflow-hidden shadow-2xs">
           <div className="overflow-x-auto max-h-[640px] custom-scrollbar relative">
             <table className="w-full text-left text-xs sm:text-sm min-w-[880px]">
-              <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/70 text-slate-400 font-semibold text-xs uppercase tracking-wider">
+              <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/70 text-slate-400 font-semibold text-xs uppercase tracking-wider whitespace-nowrap">
                 <tr>
                   <th className="py-3 pl-5 whitespace-nowrap">รหัสสินค้า</th>
                   <th className="py-3 px-4 w-2/5">รายการสินค้า</th>
@@ -561,7 +561,7 @@ export default function StockCardView({
                               <button
                                 type="button"
                                 onClick={() => setRemarkProduct(prod)}
-                                className="inline-flex items-center gap-1 text-xs font-medium px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
+                                className="inline-flex items-center gap-1 text-xs font-medium whitespace-nowrap px-1.5 py-0.2 rounded bg-amber-50 text-amber-700 border border-amber-200 hover:bg-amber-100 transition-colors cursor-pointer"
                                 title={`คลิกเพื่อดูหมายเหตุ: ${prod.remark}`}
                               >
                                 <FileText className="w-2.5 h-2.5 text-amber-600" />
@@ -570,13 +570,13 @@ export default function StockCardView({
                             )}
                           </div>
 
-                          <div className="flex items-center gap-1.5 mt-1 text-slate-400 text-xs">
+                          <div className="flex flex-wrap items-center gap-x-1.5 gap-y-0.5 mt-1 text-slate-400 text-xs">
                             <span className="inline-flex items-center gap-1 text-slate-500 font-normal">
                               <MapPin className="w-3 h-3 text-slate-400 shrink-0" />
-                              <span>{prod.locationName || 'ไม่ระบุจุดเก็บ'}</span>
+                              <span className="min-w-0 break-words">{prod.locationName || 'ไม่ระบุจุดเก็บ'}</span>
                             </span>
                             {rate > 1 && (
-                              <span>• 1 {pUnit} = {rate} {sUnit}</span>
+                              <span className="whitespace-nowrap">• 1 {pUnit} = {rate} {sUnit}</span>
                             )}
                           </div>
                         </td>
@@ -713,9 +713,9 @@ export default function StockCardView({
       {/* ── 5. Tab 2: ROP Analytics (Modern Tech Spec style) ── */}
       {activeTab === 'rop-analysis' && (
         <div className="space-y-3">
-          <div className="flex items-center gap-2 px-4 py-3 bg-slate-50 border border-slate-200/70 rounded-2xl text-xs text-slate-600">
+          <div className="flex items-start gap-2 px-4 py-3 bg-slate-50 border border-slate-200/70 rounded-2xl text-xs text-slate-600">
             <Sparkles className="w-4 h-4 text-indigo-500 shrink-0" />
-            <span>
+            <span className="min-w-0 break-words">
               <strong>สูตรคำนวณ:</strong> ROP แนะนำ = (ใช้เฉลี่ยต่อวัน × Lead Time) + Safety Stock (คำนวณจากประวัติการเบิกออก 30 วันล่าสุด)
             </span>
           </div>
@@ -723,7 +723,7 @@ export default function StockCardView({
           <div className="bg-white rounded-2xl overflow-hidden border border-slate-200/70 shadow-2xs">
             <div className="overflow-x-auto max-h-[580px] custom-scrollbar relative">
               <table className="w-full text-left text-xs sm:text-sm min-w-[800px]">
-                <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/70 text-slate-400 font-semibold text-xs uppercase tracking-wider">
+                <thead className="sticky top-0 z-20 bg-slate-50/95 backdrop-blur-xs border-b border-slate-200/70 text-slate-400 font-semibold text-xs uppercase tracking-wider whitespace-nowrap">
                   <tr>
                     <th className="py-3 pl-5">รหัส & รายการสินค้า</th>
                     <th className="py-3 px-4 text-right">คงเหลือ</th>
@@ -739,26 +739,26 @@ export default function StockCardView({
                 <tbody className="divide-y divide-slate-100 bg-white">
                   {paginatedRopAnalytics.map(item => (
                     <tr key={item.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="py-3 pl-5 whitespace-nowrap">
-                        <div className="font-mono text-xs text-slate-500">{item.code}</div>
-                        <div className="font-medium text-slate-900 text-xs sm:text-sm">{item.name}</div>
+                      <td className="py-3 pl-5 min-w-[200px] max-w-xs">
+                        <div className="font-mono text-xs text-slate-500 break-all">{item.code}</div>
+                        <div className="font-medium text-slate-900 text-xs sm:text-sm break-words">{item.name}</div>
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900 tabular-nums">
+                      <td className="py-3 px-4 text-right font-mono font-semibold text-slate-900 tabular-nums whitespace-nowrap">
                         {item.stockBalance} <span className="font-sans font-normal text-slate-400 text-xs">{item.unit}</span>
                       </td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-600 tabular-nums">
+                      <td className="py-3 px-4 text-right font-mono text-slate-600 tabular-nums whitespace-nowrap">
                         {item.totalOut30Days} <span className="font-sans font-normal text-slate-400 text-xs">{item.unit}</span>
                       </td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-600 tabular-nums">
+                      <td className="py-3 px-4 text-right font-mono text-slate-600 tabular-nums whitespace-nowrap">
                         {item.avgDailyUsage}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-600 tabular-nums">
+                      <td className="py-3 px-4 text-right font-mono text-slate-600 tabular-nums whitespace-nowrap">
                         {item.leadTimeDays || 7} วัน
                       </td>
-                      <td className="py-3 px-4 text-right font-mono text-slate-600 tabular-nums">
+                      <td className="py-3 px-4 text-right font-mono text-slate-600 tabular-nums whitespace-nowrap">
                         {item.reorderPoint}
                       </td>
-                      <td className="py-3 px-4 text-right font-mono font-semibold text-indigo-600 tabular-nums">
+                      <td className="py-3 px-4 text-right font-mono font-semibold text-indigo-600 tabular-nums whitespace-nowrap">
                         {item.suggestedROP}
                       </td>
                       <td className="py-3 px-4 text-center whitespace-nowrap">
@@ -776,7 +776,7 @@ export default function StockCardView({
                         {item.isRopUnderSuggested && !isOnlinePurchaser ? (
                           <button
                             onClick={() => handleApplyROP(item, item.suggestedROP)}
-                            className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium transition-all cursor-pointer"
+                            className="px-2.5 py-1 bg-slate-900 hover:bg-slate-800 text-white rounded-lg text-xs font-medium whitespace-nowrap transition-all cursor-pointer"
                           >
                             ใช้ค่า {item.suggestedROP}
                           </button>

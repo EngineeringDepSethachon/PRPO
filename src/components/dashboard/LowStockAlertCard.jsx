@@ -11,9 +11,9 @@ export default function LowStockAlertCard({
       {/* Header Bar */}
       <div className="flex items-center justify-between pb-3 border-b border-rose-100 mb-3 gap-2">
         <div className="min-w-0">
-          <div className="flex items-center gap-1.5 text-xs font-bold text-rose-900">
+          <div className="flex items-center gap-1.5 min-w-0 text-xs font-bold text-rose-900">
             <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse shrink-0"></span>
-            <span className="truncate">สินค้าใกล้หมด ({lowStockItems.length} รายการ)</span>
+            <span className="truncate min-w-0">สินค้าใกล้หมด ({lowStockItems.length} รายการ)</span>
           </div>
           <p className="text-xs text-slate-500 truncate">คงเหลือต่ำกว่าจุดสั่งซื้อซ้ำ (ROP)</p>
         </div>
@@ -23,7 +23,7 @@ export default function LowStockAlertCard({
           <button
             type="button"
             onClick={onBatchQuickPR}
-            className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold rounded-lg shadow-2xs transition-all flex items-center gap-1 shrink-0 cursor-pointer"
+            className="px-2.5 py-1.5 bg-rose-600 hover:bg-rose-700 active:scale-95 text-white text-xs font-bold rounded-lg shadow-2xs transition-all flex items-center gap-1 shrink-0 whitespace-nowrap cursor-pointer"
             title="สร้างใบขอซื้อ (PR) รวมสินค้าที่ต้องสั่งซื้อซ้ำทั้งหมดในทันที"
           >
             <span>⚡</span>
@@ -55,9 +55,9 @@ export default function LowStockAlertCard({
                 >
                   {item.name || 'สินค้าไม่มีชื่อ'}
                 </div>
-                <div className="flex items-center gap-2 mt-0.5 text-xs font-mono">
-                  <span className="text-slate-400 font-normal">{item.sku || item.code || '-'}</span>
-                  <span className="text-rose-600 font-semibold font-sans">
+                <div className="flex items-center gap-x-2 gap-y-0 flex-wrap mt-0.5 text-xs font-mono">
+                  <span className="text-slate-400 font-normal whitespace-nowrap">{item.sku || item.code || '-'}</span>
+                  <span className="text-rose-600 font-semibold font-sans break-words min-w-0">
                     เหลือ {Number(item.currentStock ?? item.stock ?? 0).toLocaleString()} / ROP: {Number(item.rop ?? item.reorderPoint ?? 0).toLocaleString()} {item.unit || 'ชิ้น'}
                   </span>
                 </div>
@@ -65,7 +65,7 @@ export default function LowStockAlertCard({
               <button
                 type="button"
                 onClick={() => onSingleQuickPR && onSingleQuickPR(item)}
-                className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200 hover:border-rose-200 text-xs font-bold transition-all shrink-0 cursor-pointer"
+                className="px-2 py-1 rounded-lg bg-slate-100 hover:bg-rose-50 text-slate-700 hover:text-rose-700 border border-slate-200 hover:border-rose-200 text-xs font-bold transition-all shrink-0 whitespace-nowrap cursor-pointer"
                 title={`เปิด PR ด่วนสำหรับ ${item.name}`}
               >
                 + ขอซื้อ

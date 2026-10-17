@@ -114,19 +114,19 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
       <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-slate-200 flex flex-col max-h-[90vh] overflow-hidden">
         
         {/* Header */}
-        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between shrink-0">
-          <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center">
+        <div className="px-6 py-4 bg-slate-900 text-white flex items-center justify-between gap-3 shrink-0">
+          <div className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-xl bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 flex items-center justify-center shrink-0">
               <Receipt className="w-5 h-5" />
             </div>
-            <div>
-              <h3 className="text-base font-bold tracking-tight text-white flex items-center gap-2">
+            <div className="min-w-0">
+              <h3 className="text-base font-bold tracking-tight text-white flex items-center gap-2 flex-wrap leading-normal break-words">
                 บันทึกยอดซื้อจริง & ปิดยอด (Online Settlement)
                 <span className="text-xs font-mono font-normal text-emerald-400 bg-emerald-950/60 px-2 py-0.5 rounded border border-emerald-500/30">
                   {po.poNo || po.id}
                 </span>
               </h3>
-              <p className="text-xs text-slate-400 mt-0.5">
+              <p className="text-xs text-slate-400 mt-0.5 leading-normal break-words">
                 ปรับปรุงยอดชำระจริงจากสลิป/ใบเสร็จ คืนเงินงบประมาณส่วนต่าง และคำนวณราคาทุนสต็อกอัตโนมัติ
               </p>
             </div>
@@ -134,7 +134,7 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
           <button
             type="button"
             onClick={onClose}
-            className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer"
+            className="w-8 h-8 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 flex items-center justify-center transition-colors cursor-pointer shrink-0"
           >
             <X className="w-5 h-5" />
           </button>
@@ -148,13 +148,13 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
             
             {/* Approved Baseline */}
             <div className="p-4 rounded-xl bg-slate-50 border border-slate-200">
-              <div className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mb-1">
+              <div className="text-xs font-medium text-slate-500 flex items-center gap-1.5 mb-1 leading-normal break-words">
                 <span>ยอดที่อนุมัติเดิม (Approved Grand Total)</span>
               </div>
               <div className="text-2xl font-black font-mono text-slate-800">
                 ฿{originalTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
               </div>
-              <div className="text-xs text-slate-400 mt-1 flex items-center gap-1">
+              <div className="text-xs text-slate-400 mt-1 flex items-center gap-1 flex-wrap leading-normal">
                 <span>ฝ่าย: {po.department || 'PD'}</span>
                 <span>•</span>
                 <span>{po.purchaseChannel === 'ONLINE' ? 'สั่งซื้อออนไลน์' : 'จัดซื้อ'}</span>
@@ -163,9 +163,9 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
 
             {/* Actual Amount Input */}
             <div className="p-4 rounded-xl bg-emerald-50/50 border border-emerald-200">
-              <div className="text-xs font-bold text-emerald-800 flex items-center justify-between mb-1">
-                <span>ยอดชำระจริง / สลิปโอน (Actual Paid) *</span>
-                <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold">
+              <div className="text-xs font-bold text-emerald-800 flex items-center justify-between flex-wrap gap-x-2 gap-y-1 mb-1 leading-normal">
+                <span className="min-w-0 break-words">ยอดชำระจริง / สลิปโอน (Actual Paid) *</span>
+                <span className="text-xs bg-emerald-100 text-emerald-700 px-1.5 py-0.5 rounded font-bold whitespace-nowrap">
                   บาท (THB)
                 </span>
               </div>
@@ -193,7 +193,7 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
                 ? 'bg-amber-50/90 border-amber-200 text-amber-900'
                 : 'bg-slate-50 border-slate-200 text-slate-700'
           }`}>
-            <div className="mt-0.5">
+            <div className="mt-0.5 shrink-0">
               {savingsAmount > 0 ? (
                 <TrendingDown className="w-5 h-5 text-emerald-600" />
               ) : savingsAmount < 0 ? (
@@ -202,12 +202,12 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
                 <CheckCircle2 className="w-5 h-5 text-slate-500" />
               )}
             </div>
-            <div className="flex-1 text-xs leading-relaxed">
+            <div className="flex-1 min-w-0 break-words text-xs leading-relaxed">
               {savingsAmount > 0 ? (
                 <>
-                  <div className="font-bold text-sm text-emerald-800 flex items-center gap-1.5">
-                    <span>ประหยัดงบประมาณ: ฿{savingsAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
-                    <span className="text-xs bg-emerald-600 text-white font-semibold px-2 py-0.5 rounded-full">
+                  <div className="font-bold text-sm text-emerald-800 flex items-center gap-1.5 flex-wrap">
+                    <span className="min-w-0 break-words">ประหยัดงบประมาณ: ฿{savingsAmount.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                    <span className="text-xs bg-emerald-600 text-white font-semibold px-2 py-0.5 rounded-full whitespace-nowrap">
                       คืนงบประมาณอัตโนมัติ
                     </span>
                   </div>
@@ -234,24 +234,24 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
 
           {/* Line Items Pricing Valuation Table */}
           <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5">
-                <Package className="w-3.5 h-3.5 text-slate-500" />
+            <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-1">
+              <span className="text-xs font-bold text-slate-700 uppercase tracking-wider flex items-center gap-1.5 leading-normal min-w-0">
+                <Package className="w-3.5 h-3.5 text-slate-500 shrink-0" />
                 การกระจายต้นทุนเข้าพัสดุ (Inventory Valuation)
               </span>
-              <span className="text-xs text-slate-400">
+              <span className="text-xs text-slate-400 leading-normal">
                 สัดส่วนต้นทุน: {(costRatio * 100).toFixed(1)}% ของราคาประเมิน
               </span>
             </div>
 
-            <div className="border border-slate-200 rounded-xl overflow-hidden shadow-2xs">
-              <table className="w-full text-left text-xs">
+            <div className="border border-slate-200 rounded-xl overflow-x-auto shadow-2xs">
+              <table className="w-full min-w-[32rem] text-left text-xs">
                 <thead className="bg-slate-100/80 border-b border-slate-200 text-slate-600 font-semibold">
                   <tr>
-                    <th className="py-2 px-3">รายการ</th>
-                    <th className="py-2 px-2 text-center w-16">จำนวน</th>
-                    <th className="py-2 px-2 text-right w-24">ราคาเดิม/หน่วย</th>
-                    <th className="py-2 px-3 text-right w-32">ราคาทุนจริง/หน่วย</th>
+                    <th className="py-2 px-3 whitespace-nowrap">รายการ</th>
+                    <th className="py-2 px-2 text-center w-16 whitespace-nowrap">จำนวน</th>
+                    <th className="py-2 px-2 text-right w-24 whitespace-nowrap">ราคาเดิม/หน่วย</th>
+                    <th className="py-2 px-3 text-right w-32 whitespace-nowrap">ราคาทุนจริง/หน่วย</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -265,20 +265,20 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
                     return (
                       <tr key={item.id || idx} className="hover:bg-slate-50/70">
                         <td className="py-2 px-3">
-                          <div className="font-medium text-slate-800 truncate max-w-[220px]" title={item.name}>
+                          <div className="font-medium text-slate-800 leading-normal break-words max-w-[220px]" title={item.name}>
                             {item.name}
                           </div>
-                          <div className="text-xs font-mono text-slate-400">
+                          <div className="text-xs font-mono text-slate-400 truncate max-w-[220px]">
                             {item.code || '-'}
                           </div>
                         </td>
-                        <td className="py-2 px-2 text-center font-mono text-slate-700">
+                        <td className="py-2 px-2 text-center font-mono text-slate-700 whitespace-nowrap">
                           {item.qty || 1} {item.unit || ''}
                         </td>
-                        <td className="py-2 px-2 text-right font-mono text-slate-500">
+                        <td className="py-2 px-2 text-right font-mono text-slate-500 whitespace-nowrap">
                           ฿{basePrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
                         </td>
-                        <td className="py-2 px-3 text-right">
+                        <td className="py-2 px-3 text-right whitespace-nowrap">
                           <div className="flex items-center justify-end gap-1 font-mono font-bold text-emerald-700">
                             <span>฿</span>
                             <input
@@ -303,7 +303,7 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
           {/* Proof URL & Note */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1 leading-normal break-words">
                 ลิงก์หลักฐาน / สลิปโอนเงิน (Proof URL)
               </label>
               <div className="relative">
@@ -329,7 +329,7 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-700 mb-1">
+              <label className="block text-xs font-semibold text-slate-700 mb-1 leading-normal break-words">
                 หมายเหตุการปิดยอด (Settlement Note)
               </label>
               <input
@@ -344,12 +344,12 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
         </form>
 
         {/* Sticky Footer */}
-        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between shrink-0">
+        <div className="px-6 py-3.5 bg-slate-50 border-t border-slate-200 flex items-center justify-between flex-wrap gap-2 shrink-0">
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200/70 rounded-xl transition-colors cursor-pointer"
+            className="px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-200/70 rounded-xl transition-colors cursor-pointer whitespace-nowrap shrink-0"
           >
             ยกเลิก
           </button>
@@ -358,9 +358,9 @@ export default function POSettlementModal({ po, currentUser, onClose, onSuccess 
             type="button"
             onClick={handleSubmit}
             disabled={isSubmitting}
-            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-sm"
+            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:bg-slate-300 disabled:cursor-not-allowed text-white text-xs font-bold rounded-xl flex items-center gap-2 cursor-pointer transition-all shadow-sm whitespace-nowrap shrink-0"
           >
-            <ShieldCheck className="w-4 h-4" />
+            <ShieldCheck className="w-4 h-4 shrink-0" />
             <span>{isSubmitting ? 'กำลังบันทึก...' : 'ยืนยันปิดยอดจ่ายจริง'}</span>
           </button>
         </div>

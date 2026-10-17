@@ -148,7 +148,7 @@ export default function UsageUnitCRUDModal({
 
   return createPortal(
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-xs animate-fade-in print:hidden">
-      <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200/80 overflow-hidden text-slate-800 animate-zoom-in">
+      <div className="w-full max-w-lg rounded-3xl bg-white shadow-2xl border border-slate-200/80 overflow-y-auto max-h-[calc(100vh-2rem)] text-slate-800 animate-zoom-in">
         
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-100 bg-white flex items-center justify-between gap-4">
@@ -157,10 +157,10 @@ export default function UsageUnitCRUDModal({
               <DoorClosed className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <h3 className="font-bold text-slate-900 text-base tracking-tight">
+              <h3 className="font-bold text-slate-900 text-base tracking-tight break-words">
                 {isEdit ? 'แก้ไขหน่วยเบิกใช้งาน / ห้อง' : 'เพิ่มหน่วยเบิกใช้งานใหม่'}
               </h3>
-              <p className="text-xs text-slate-500 font-normal truncate mt-0.5">
+              <p className="text-xs text-slate-500 font-normal break-words mt-0.5">
                 กำหนดห้องหรือพื้นที่ใช้งานสำหรับตัดสต็อกตามแผนก
               </p>
             </div>
@@ -180,24 +180,24 @@ export default function UsageUnitCRUDModal({
           {error && (
             <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-2.5 text-xs text-rose-700">
               <AlertCircle className="w-4 h-4 shrink-0 text-rose-600" />
-              <span>{error}</span>
+              <span className="min-w-0 break-words">{error}</span>
             </div>
           )}
 
           {/* Department Selection */}
           <div className="space-y-1.5">
             <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-              <Building2 className="w-3.5 h-3.5 text-slate-500" />
+              <Building2 className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <span>แผนกที่ใช้งาน (Department Scope)</span>
               <span className="text-rose-500">*</span>
             </label>
             {isSingleLockedDept ? (
-              <div className="h-10 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-3.5 text-xs font-semibold flex items-center justify-between shadow-2xs select-none">
-                <div className="flex items-center gap-2">
+              <div className="h-10 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-3.5 text-xs font-semibold flex items-center justify-between gap-2 shadow-2xs select-none">
+                <div className="flex items-center gap-2 min-w-0">
                   <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
-                  <span>{selectableDepts[0]?.name} ({selectableDepts[0]?.code})</span>
+                  <span className="truncate">{selectableDepts[0]?.name} ({selectableDepts[0]?.code})</span>
                 </div>
-                <span className="px-2 py-0.5 rounded-md text-xs font-bold border bg-indigo-50 text-indigo-700 border-indigo-200">
+                <span className="shrink-0 whitespace-nowrap px-2 py-0.5 rounded-md text-xs font-bold border bg-indigo-50 text-indigo-700 border-indigo-200">
                   {selectableDepts[0]?.code}
                 </span>
               </div>
@@ -229,14 +229,14 @@ export default function UsageUnitCRUDModal({
                           if (matchedPreset) setSelectedPreset(matchedPreset);
                         }
                       }}
-                      className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all flex items-center justify-center gap-2 cursor-pointer ${
+                      className={`py-2 px-3 rounded-xl border text-xs font-bold text-left max-w-full transition-all flex items-center justify-center gap-2 cursor-pointer ${
                         isSelected
                           ? 'bg-blue-50 border-blue-500 text-blue-700 shadow-xs ring-2 ring-blue-500/20'
                           : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
                       }`}
                     >
                       <span className={`w-2 h-2 rounded-full shrink-0 ${dotColorClass}`} />
-                      <span>{d.name} ({d.code})</span>
+                      <span className="min-w-0 break-words">{d.name} ({d.code})</span>
                     </button>
                   );
                 })}
@@ -246,13 +246,13 @@ export default function UsageUnitCRUDModal({
 
           {/* Name Input */}
           <div className="space-y-1.5">
-            <label className="text-xs font-semibold text-slate-700 flex items-center justify-between">
-              <span className="flex items-center gap-1">
+            <label className="text-xs font-semibold text-slate-700 flex items-center justify-between gap-2">
+              <span className="flex items-center gap-1 min-w-0">
                 <span>ชื่อหน่วยเบิก / ห้องใช้งาน</span>
                 <span className="text-rose-500">*</span>
               </span>
               {name.trim() && (
-                <span className={`text-xs font-mono ${isNameDuplicate ? 'text-rose-500 font-bold' : 'text-slate-400'}`}>
+                <span className={`text-xs font-mono whitespace-nowrap shrink-0 ${isNameDuplicate ? 'text-rose-500 font-bold' : 'text-slate-400'}`}>
                   {isNameDuplicate ? 'ชื่อนี้มีอยู่แล้ว' : 'ใช้ชื่อนี้ได้'}
                 </span>
               )}
@@ -273,7 +273,7 @@ export default function UsageUnitCRUDModal({
           {/* Color Palette Picker */}
           <div className="space-y-2">
             <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-              <Palette className="w-3.5 h-3.5 text-slate-500" />
+              <Palette className="w-3.5 h-3.5 text-slate-500 shrink-0" />
               <span>สีแท็กชิป (Tag Color)</span>
             </label>
             <div className="flex flex-wrap gap-2">
@@ -284,13 +284,13 @@ export default function UsageUnitCRUDModal({
                     key={preset.id}
                     type="button"
                     onClick={() => setSelectedPreset(preset)}
-                    className={`px-3 py-1.5 rounded-xl text-xs font-medium border flex items-center gap-2 transition-all cursor-pointer ${
+                    className={`px-3 py-1.5 rounded-xl text-xs font-medium whitespace-nowrap border flex items-center gap-2 transition-all cursor-pointer ${
                       isSelected
                         ? 'bg-slate-900 text-white border-slate-900 shadow-xs ring-2 ring-indigo-500/20'
                         : `${preset.color} hover:shadow-2xs`
                     }`}
                   >
-                    <span className={`w-2.5 h-2.5 rounded-full ${isSelected ? 'bg-white' : preset.dot}`} />
+                    <span className={`w-2.5 h-2.5 rounded-full shrink-0 ${isSelected ? 'bg-white' : preset.dot}`} />
                     <span>{preset.label}</span>
                   </button>
                 );
@@ -315,9 +315,9 @@ export default function UsageUnitCRUDModal({
             <div className="space-y-1.5">
               <label className="text-xs font-semibold text-slate-700">ตัวอย่างชิปแสดงผล</label>
               <div className="p-2 bg-slate-50 rounded-xl border border-slate-200 flex items-center justify-center">
-                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-xl text-xs font-bold border ${selectedPreset.color}`}>
-                  <span className={`w-2 h-2 rounded-full ${selectedPreset.dot}`} />
-                  <span>{name.trim() || 'ตัวอย่างชื่อห้อง'}</span>
+                <span className={`inline-flex items-center gap-1.5 max-w-full px-3 py-1 rounded-xl text-xs font-bold border ${selectedPreset.color}`}>
+                  <span className={`w-2 h-2 rounded-full shrink-0 ${selectedPreset.dot}`} />
+                  <span className="min-w-0 break-words">{name.trim() || 'ตัวอย่างชื่อห้อง'}</span>
                 </span>
               </div>
             </div>
@@ -328,14 +328,14 @@ export default function UsageUnitCRUDModal({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer"
+              className="px-4 py-2 text-xs font-semibold text-slate-600 hover:text-slate-800 hover:bg-slate-100 rounded-xl transition-all cursor-pointer whitespace-nowrap shrink-0"
             >
               ยกเลิก
             </button>
             <button
               type="submit"
               disabled={isSaving || isNameDuplicate || !name.trim()}
-              className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95"
+              className="px-5 py-2 text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed rounded-xl transition-all flex items-center gap-1.5 shadow-sm cursor-pointer active:scale-95 whitespace-nowrap shrink-0"
             >
               <Check className="w-3.5 h-3.5" />
               <span>{isSaving ? 'กำลังบันทึก...' : isEdit ? 'บันทึกการแก้ไข' : 'เพิ่มหน่วยเบิก'}</span>

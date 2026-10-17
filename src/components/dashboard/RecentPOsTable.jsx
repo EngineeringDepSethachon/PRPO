@@ -10,13 +10,13 @@ export default function RecentPOsTable({ pos = [], onNavigate, onOpenPO }) {
   return (
     <div className="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-2xs">
       {/* Header Bar */}
-      <div className="flex items-center justify-between mb-4">
-        <div className="flex items-center gap-2 font-bold text-slate-800 text-sm">
+      <div className="flex items-center justify-between gap-2 mb-4">
+        <div className="flex items-center gap-2 flex-wrap min-w-0 font-bold text-slate-800 text-sm">
           <span className="p-1.5 rounded-lg bg-emerald-50 text-emerald-600 text-base leading-none">🛒</span>
           <span>ใบสั่งซื้อล่าสุด</span>
           <span className="text-xs font-normal text-slate-400 font-sans hidden sm:inline">(Recent POs)</span>
           {recentPOs.length > 0 && (
-            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50/80 px-2 py-0.5 rounded-full border border-emerald-100/60 ml-1">
+            <span className="text-xs font-semibold text-emerald-700 bg-emerald-50/80 px-2 py-0.5 leading-normal whitespace-nowrap rounded-full border border-emerald-100/60 ml-1">
               {recentPOs.length} รายการ
             </span>
           )}
@@ -24,7 +24,7 @@ export default function RecentPOsTable({ pos = [], onNavigate, onOpenPO }) {
         <button
           type="button"
           onClick={() => onNavigate && onNavigate('po-list')}
-          className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-1 cursor-pointer"
+          className="text-xs font-semibold text-emerald-600 hover:text-emerald-700 transition-colors flex items-center gap-1 cursor-pointer whitespace-nowrap shrink-0"
         >
           <span>ดูทั้งหมด</span>
           <ArrowRight className="w-3.5 h-3.5" />
@@ -74,11 +74,11 @@ export default function RecentPOsTable({ pos = [], onNavigate, onOpenPO }) {
                 {/* Left: PO Meta & Vendor */}
                 <div className="min-w-0 flex-1 space-y-0.5">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-mono font-bold text-xs sm:text-sm text-slate-900 group-hover:text-emerald-600 transition-colors">
+                    <span className="font-mono font-bold text-xs sm:text-sm text-slate-900 group-hover:text-emerald-600 transition-colors whitespace-nowrap">
                       {po.poNo}
                     </span>
                     <span
-                      className={`text-xs font-bold px-2 py-0.5 rounded-md border ${
+                      className={`text-xs font-bold px-2 py-0.5 leading-normal whitespace-nowrap rounded-md border ${
                         po.department === 'PD'
                           ? 'bg-blue-50 text-blue-700 border-blue-200'
                           : 'bg-amber-50 text-amber-700 border-amber-200'
@@ -87,7 +87,7 @@ export default function RecentPOsTable({ pos = [], onNavigate, onOpenPO }) {
                       {po.department}
                     </span>
                     {po.prNo && (
-                      <span className="text-xs text-slate-400 font-mono">
+                      <span className="text-xs text-slate-400 font-mono whitespace-nowrap">
                         (อ้างอิง {po.prNo})
                       </span>
                     )}
@@ -98,24 +98,24 @@ export default function RecentPOsTable({ pos = [], onNavigate, onOpenPO }) {
                     ) : (
                       <Building2 className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                     )}
-                    <span className="truncate">{vendorDisplay}</span>
+                    <span className="truncate min-w-0">{vendorDisplay}</span>
                   </p>
                 </div>
 
                 {/* Right: Amount & Status */}
-                <div className="flex items-center gap-2 shrink-0 text-right">
-                  <div>
-                    <div className="font-mono font-bold text-xs sm:text-sm text-slate-900 tabular-nums">
+                <div className="flex items-center gap-2 shrink-0 max-w-[55%] sm:max-w-none text-right">
+                  <div className="min-w-0">
+                    <div className="font-mono font-bold text-xs sm:text-sm text-slate-900 tabular-nums whitespace-nowrap">
                       ฿{(po.grandTotal || po.subtotal || 0).toLocaleString()}
                     </div>
                     <span
-                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold border mt-0.5 ${statusInfo.color}`}
+                      className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-xs font-semibold leading-normal max-w-full border mt-0.5 ${statusInfo.color}`}
                     >
-                      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 animate-pulse"></span>
-                      <span>{statusInfo.label}</span>
+                      <span className="w-1.5 h-1.5 rounded-full bg-current opacity-80 animate-pulse shrink-0"></span>
+                      <span className="min-w-0 break-words text-left">{statusInfo.label}</span>
                     </span>
                   </div>
-                  <ChevronRight className="w-4 h-4 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
+                  <ChevronRight className="w-4 h-4 shrink-0 text-slate-300 group-hover:text-emerald-600 group-hover:translate-x-0.5 transition-all" />
                 </div>
               </div>
             );
@@ -125,9 +125,9 @@ export default function RecentPOsTable({ pos = [], onNavigate, onOpenPO }) {
 
       {/* Footer Total */}
       {recentPOs.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium">
+        <div className="mt-3 pt-3 border-t border-slate-100 flex items-center justify-between text-xs text-slate-500 font-medium gap-2">
           <span>รวม {recentPOs.length} รายการล่าสุด</span>
-          <span className="font-mono font-bold text-slate-900 tabular-nums">
+          <span className="font-mono font-bold text-slate-900 tabular-nums whitespace-nowrap">
             ยอดรวม ฿{recentPOTotal.toLocaleString()}
           </span>
         </div>

@@ -189,14 +189,14 @@ export default function VendorCRUDModal({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="font-bold text-slate-900 text-base tracking-tight">
+                <h3 className="font-bold text-slate-900 text-base tracking-tight break-words">
                   {editVendor ? 'แก้ไขข้อมูลผู้จัดจำหน่าย / คู่ค้า' : 'เพิ่มผู้จัดจำหน่ายใหม่'}
                 </h3>
-                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200">
+                <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-slate-100 text-slate-700 border border-slate-200 max-w-full break-words">
                   {dept === 'ALL' ? 'ใช้ร่วมกันทุกแผนก (ALL)' : (deptObj ? `${deptObj.name} (${deptObj.code})` : `แผนก ${dept}`)}
                 </span>
               </div>
-              <p className="text-xs text-slate-500 font-normal truncate mt-0.5">
+              <p className="text-xs text-slate-500 font-normal break-words mt-0.5">
                 {editVendor ? `รหัสคู่ค้า: ${editVendor.code} • ${editVendor.name}` : 'กำหนดข้อมูลรายละเอียดคู่ค้า ผู้ติดต่อ และที่อยู่สำหรับออก PO'}
               </p>
             </div>
@@ -218,18 +218,18 @@ export default function VendorCRUDModal({
             
             {/* Section 1: ข้อมูลบริษัท & รหัสคู่ค้า */}
             <div className="bg-slate-50/70 border border-slate-200/60 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-200/60">
-                <Building2 className="w-4 h-4 text-indigo-600" />
-                <span>1. ข้อมูลบริษัทคู่ค้า (Company Details)</span>
+              <div className="flex items-start gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-200/60">
+                <Building2 className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span className="min-w-0 break-words">1. ข้อมูลบริษัทคู่ค้า (Company Details)</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-1.5">
                     <label className="text-xs font-semibold text-slate-700">
                       รหัสผู้ขาย (Vendor Code) <span className="text-rose-500">*</span>
                     </label>
-                    <div className="flex items-center gap-2">
+                    <div className="flex flex-wrap items-center gap-2">
                       {!editVendor && (
                         <button
                           type="button"
@@ -237,7 +237,7 @@ export default function VendorCRUDModal({
                             const next = generateNextVendorCode(allVendors, currentDeptScope);
                             setVendorCode(next);
                           }}
-                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                          className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
                           title="รันรหัสผู้ขายอัตโนมัติตามแผนก"
                         >
                           <Sparkles className="w-3 h-3 text-amber-500" />
@@ -245,7 +245,7 @@ export default function VendorCRUDModal({
                         </button>
                       )}
                       {isVendorCodeDuplicate && (
-                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1 animate-pulse">
+                        <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1 animate-pulse whitespace-nowrap">
                           <AlertTriangle className="w-3 h-3 text-rose-500" /> รหัสซ้ำ!
                         </span>
                       )}
@@ -272,7 +272,7 @@ export default function VendorCRUDModal({
                     />
                   </div>
                   {isVendorCodeDuplicate && (
-                    <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1 font-medium">
+                    <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1 font-medium break-words">
                       <span>⚠️</span> รหัสนี้ถูกใช้งานแล้วในแผนก {currentDeptScope} {duplicateVendor ? `(${duplicateVendor.name})` : ''}
                     </p>
                   )}
@@ -285,7 +285,7 @@ export default function VendorCRUDModal({
                   {lockedDept ? (
                     <div className="h-11 border border-indigo-200 bg-indigo-50/80 text-indigo-800 rounded-xl px-3.5 text-xs font-bold flex items-center gap-2">
                       <Building2 className="w-4 h-4 shrink-0" />
-                      <span>{deptObj ? `เฉพาะ${deptObj.name} (${deptObj.code})` : `เฉพาะแผนก ${lockedDept}`}</span>
+                      <span className="min-w-0 truncate">{deptObj ? `เฉพาะ${deptObj.name} (${deptObj.code})` : `เฉพาะแผนก ${lockedDept}`}</span>
                     </div>
                   ) : (
                     <div className="relative">
@@ -340,9 +340,9 @@ export default function VendorCRUDModal({
 
             {/* Section 2: ผู้ติดต่อ & ที่อยู่ */}
             <div className="bg-slate-50/70 border border-slate-200/60 rounded-2xl p-5 space-y-4">
-              <div className="flex items-center gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-200/60">
-                <User className="w-4 h-4 text-indigo-600" />
-                <span>2. ข้อมูลการติดต่อ & ที่อยู่ (Contact & Billing Address)</span>
+              <div className="flex items-start gap-2 text-xs font-bold text-slate-800 uppercase tracking-wider pb-2 border-b border-slate-200/60">
+                <User className="w-4 h-4 text-indigo-600 shrink-0" />
+                <span className="min-w-0 break-words">2. ข้อมูลการติดต่อ & ที่อยู่ (Contact & Billing Address)</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -400,15 +400,15 @@ export default function VendorCRUDModal({
         </div>
 
         {/* ── 3. Sticky Action Footer (Non-scrollable) ── */}
-        <div className="shrink-0 px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-3 sticky bottom-0 z-20">
-          <span className="text-xs text-slate-500 font-medium">
+        <div className="shrink-0 px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 sticky bottom-0 z-20">
+          <span className="text-xs text-slate-500 font-medium min-w-0 break-words">
             <span className="text-rose-500 font-bold">*</span> จำเป็นต้องระบุข้อมูล
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-auto">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all cursor-pointer"
+              className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0"
             >
               ยกเลิก
             </button>
@@ -416,7 +416,7 @@ export default function VendorCRUDModal({
               type="submit"
               form="vendor-form"
               disabled={isSaving || isVendorCodeDuplicate || !String(vendorCode || '').trim()}
-              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
             >
               <Check className="w-4 h-4" />
               <span>{isSaving ? 'กำลังบันทึก...' : (editVendor ? 'บันทึกการแก้ไข' : 'เพิ่มผู้ขายใหม่')}</span>

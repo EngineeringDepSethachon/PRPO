@@ -544,17 +544,17 @@ export default function StockMovementTable({
         <div className="bg-white rounded-3xl border border-slate-200/90 shadow-2xl p-6 sm:p-7 max-w-6xl w-full text-slate-800 space-y-4 my-8 animate-zoom-in">
           
           {/* Header */}
-          <div className="flex items-center justify-between border-b border-slate-100 pb-4">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shadow-2xs">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-4">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-50 text-indigo-600 border border-indigo-100 flex items-center justify-center shadow-2xs shrink-0">
                 <History className="w-5 h-5" />
               </div>
-              <div>
+              <div className="min-w-0">
                 <h3 className="text-base sm:text-lg font-bold text-slate-900 flex items-center gap-2">
-                  <span>ประวัติการเคลื่อนไหวสินค้า (Stock Movement Log)</span>
+                  <span className="min-w-0 break-words">ประวัติการเคลื่อนไหวสินค้า (Stock Movement Log)</span>
                 </h3>
                 <div className="text-xs text-slate-500 mt-0.5 flex items-center gap-2 flex-wrap">
-                  <span className="font-mono font-semibold">[{selectedProduct.code}] {selectedProduct.name}</span>
+                  <span className="font-mono font-semibold min-w-0 break-words">[{selectedProduct.code}] {selectedProduct.name}</span>
                   <span>•</span>
                   <span>คงเหลือ: <span className="font-bold text-indigo-600 font-mono tabular-nums">{selectedProduct.stockBalance}</span> {selectedProduct.stockUnit || selectedProduct.baseUom || selectedProduct.unit || 'ชิ้น'}</span>
                   {Number(selectedProduct.conversionRate || selectedProduct.conversionRatio) > 1 && (selectedProduct.purchaseUnit || selectedProduct.purchaseUom) && (
@@ -568,16 +568,16 @@ export default function StockMovementTable({
                   {selectedProduct.locationName && (
                     <>
                       <span>•</span>
-                      <span className="inline-flex items-center gap-1 text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
-                        <MapPin className="w-3 h-3 text-indigo-600" />
-                        <span>{selectedProduct.locationName}</span>
+                      <span className="inline-flex items-center gap-1 max-w-full text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md border border-slate-200">
+                        <MapPin className="w-3 h-3 text-indigo-600 shrink-0" />
+                        <span className="min-w-0 break-words">{selectedProduct.locationName}</span>
                       </span>
                     </>
                   )}
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ml-auto shrink-0">
               <button
                 type="button"
                 disabled={isRecalculating}
@@ -606,7 +606,7 @@ export default function StockMovementTable({
                     setIsRecalculating(false);
                   }
                 }}
-                className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100 bg-white transition-colors cursor-pointer text-xs font-bold flex items-center gap-1.5 shadow-2xs hover:shadow-xs disabled:opacity-50"
+                className="text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-3 py-1.5 rounded-xl border border-indigo-100 bg-white transition-colors cursor-pointer text-xs font-bold flex items-center gap-1.5 whitespace-nowrap shadow-2xs hover:shadow-xs disabled:opacity-50"
                 title="ระบบจะล้างค่าต้นทุนเฉลี่ยเก่า และคำนวณใหม่ทั้งหมดตามประวัติรับเข้าจริง (ตัดแถวขยะออก)"
               >
                 <RefreshCw className={`w-3.5 h-3.5 ${isRecalculating ? 'animate-spin' : ''}`} />
@@ -614,7 +614,7 @@ export default function StockMovementTable({
               </button>
               <button 
                 onClick={onClose} 
-                className="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer" 
+                className="text-slate-400 hover:text-slate-700 p-2 rounded-xl hover:bg-slate-100 transition-colors cursor-pointer shrink-0" 
                 title="ปิด"
               >
                 <X className="w-5 h-5" />
@@ -625,13 +625,13 @@ export default function StockMovementTable({
           {/* Filters & Search Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             {/* Left: Type Filter */}
-            <div className="flex items-center gap-2">
-              <span className="text-xs font-bold text-slate-500 mr-1 uppercase tracking-wider">ประเภท:</span>
-              <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-slate-500 mr-1 uppercase tracking-wider whitespace-nowrap">ประเภท:</span>
+              <div className="flex flex-wrap items-center gap-1 bg-slate-100/80 p-1 rounded-xl">
                 <button
                   type="button"
                   onClick={() => { setFilterType('ALL'); setCurrentPage(1); }}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                     filterType === 'ALL' ? 'bg-white text-slate-900 shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -640,7 +640,7 @@ export default function StockMovementTable({
                 <button
                   type="button"
                   onClick={() => { setFilterType('IN'); setCurrentPage(1); }}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                     filterType === 'IN' || filterType === '+IN' ? 'bg-emerald-600 text-white shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -649,7 +649,7 @@ export default function StockMovementTable({
                 <button
                   type="button"
                   onClick={() => { setFilterType('OUT'); setCurrentPage(1); }}
-                  className={`px-3 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  className={`px-3 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                     filterType === 'OUT' || filterType === '-OUT' ? 'bg-rose-600 text-white shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -661,14 +661,14 @@ export default function StockMovementTable({
             {/* Right: Time Period Filter & Search */}
             <div className="flex items-center gap-2 flex-wrap">
               {/* Filter ช่วงเวลา: 3 เดือนล่าสุด (Default) / ทั้งหมด */}
-              <div className="flex items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/40">
+              <div className="flex flex-wrap items-center gap-1 bg-slate-100/80 p-1 rounded-xl border border-slate-200/40">
                 <div className="flex items-center gap-1 pl-1.5 pr-1 text-slate-400">
                   <Calendar className="w-3.5 h-3.5 text-indigo-500" />
                 </div>
                 <button
                   type="button"
                   onClick={() => { setTimeFilter('3M'); setCurrentPage(1); }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                     timeFilter === '3M' ? 'bg-indigo-600 text-white shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -677,7 +677,7 @@ export default function StockMovementTable({
                 <button
                   type="button"
                   onClick={() => { setTimeFilter('ALL'); setCurrentPage(1); }}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
                     timeFilter === 'ALL' ? 'bg-indigo-600 text-white shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
@@ -936,12 +936,12 @@ export default function StockMovementTable({
           {/* Pagination & Summary Bar */}
           <div className="flex flex-col sm:flex-row items-center justify-between gap-3 px-1 pt-1 text-xs text-slate-500 select-none">
             {/* Left: Item Range Summary & Page Size selector */}
-            <div className="flex items-center gap-3">
-              <span>
+            <div className="flex flex-wrap items-center justify-center gap-x-3 gap-y-1.5">
+              <span className="tabular-nums">
                 แสดง <span className="font-mono font-semibold text-slate-800">{sortedLogs.length === 0 ? 0 : (safeCurrentPage - 1) * pageSize + 1}</span> - <span className="font-mono font-semibold text-slate-800">{Math.min(safeCurrentPage * pageSize, sortedLogs.length)}</span> จากทั้งหมด <span className="font-mono font-semibold text-slate-800">{sortedLogs.length}</span> รายการ
               </span>
               <div className="flex items-center gap-1.5 pl-2 border-l border-slate-200">
-                <span className="text-xs text-slate-400">แสดงหน้าละ:</span>
+                <span className="text-xs text-slate-400 whitespace-nowrap">แสดงหน้าละ:</span>
                 <select
                   value={pageSize}
                   onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}
@@ -956,7 +956,7 @@ export default function StockMovementTable({
 
             {/* Right: Page Navigation Buttons < 1 2 3 > */}
             {totalPages > 1 && (
-              <div className="flex items-center gap-1">
+              <div className="flex flex-wrap items-center justify-center gap-1">
                 <button
                   type="button"
                   disabled={safeCurrentPage === 1}
@@ -1000,11 +1000,11 @@ export default function StockMovementTable({
           </div>
 
           {/* Footer */}
-          <div className="pt-2 flex items-center justify-between text-xs text-slate-400 border-t border-slate-100">
-            <span>หมายเหตุ: รายการรับเข้า (+IN) แสดงราคาซื้อจริงตามเอกสารจัดซื้อ ส่วนรายการเบิกจ่าย (-OUT) แสดงมูลค่าต้นทุนเฉลี่ย ณ วันและเวลาที่ทำรายการ</span>
+          <div className="pt-2 flex items-center justify-between gap-3 text-xs text-slate-400 border-t border-slate-100">
+            <span className="min-w-0 break-words">หมายเหตุ: รายการรับเข้า (+IN) แสดงราคาซื้อจริงตามเอกสารจัดซื้อ ส่วนรายการเบิกจ่าย (-OUT) แสดงมูลค่าต้นทุนเฉลี่ย ณ วันและเวลาที่ทำรายการ</span>
             <button
               onClick={onClose}
-              className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer"
+              className="px-5 py-2 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-semibold shadow-xs transition-all cursor-pointer whitespace-nowrap shrink-0"
             >
               ปิดหน้าต่าง
             </button>
@@ -1020,21 +1020,21 @@ export default function StockMovementTable({
                 className="bg-white rounded-2xl p-5 max-w-md w-full shadow-2xl border border-slate-200 animate-zoom-in"
                 onClick={(e) => e.stopPropagation()}
               >
-                <div className="flex items-center justify-between pb-2.5 border-b border-slate-100">
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center">
+                <div className="flex items-center justify-between gap-2 pb-2.5 border-b border-slate-100">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <div className="w-7 h-7 rounded-lg bg-indigo-50 text-indigo-600 flex items-center justify-center shrink-0">
                       <FileText className="w-4 h-4" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <h4 className="text-sm font-bold text-slate-900">หมายเหตุ / บันทึก</h4>
-                      <div className="text-xs text-slate-400 font-mono">
+                      <div className="text-xs text-slate-400 font-mono break-all">
                         เอกสาร: {activeNoteModal.docNo} • {formatIsoForDisplay(activeNoteModal.date)}
                       </div>
                     </div>
                   </div>
                   <button
                     onClick={() => setActiveNoteModal(null)}
-                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer"
+                    className="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 cursor-pointer shrink-0"
                   >
                     <X className="w-4 h-4" />
                   </button>

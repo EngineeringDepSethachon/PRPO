@@ -1258,13 +1258,13 @@ export default function ReceivingModal({
       <div className="bg-white w-full max-w-4xl rounded-xl shadow-2xl border border-slate-200/90 flex flex-col max-h-[92vh] overflow-hidden">
         
         {/* ── 1. MODAL HEADER ── */}
-        <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between shrink-0 border-b border-slate-800">
+        <div className="px-5 py-3.5 bg-slate-900 text-white flex items-center justify-between flex-wrap gap-x-3 gap-y-2 shrink-0 border-b border-slate-800">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             {handleBackToPO && (
               <button
                 type="button"
                 onClick={handleBackToPO}
-                className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white mr-1 sm:mr-3 px-2.5 py-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer shrink-0 border border-slate-700/80 shadow-2xs"
+                className="flex items-center gap-1.5 text-xs font-semibold text-slate-300 hover:text-white mr-1 sm:mr-3 px-2.5 py-1.5 rounded-lg hover:bg-slate-800 transition-colors cursor-pointer shrink-0 border border-slate-700/80 shadow-2xs whitespace-nowrap"
                 title="กลับไปที่หน้าต่างใบสั่งซื้อ (PO)"
               >
                 <ArrowLeft className="w-3.5 h-3.5" />
@@ -1276,14 +1276,14 @@ export default function ReceivingModal({
             </div>
             <div className="min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
-                <h3 className="text-base sm:text-lg font-bold text-white tracking-tight truncate">
+                <h3 className="text-base sm:text-lg font-bold text-white tracking-tight leading-normal break-words min-w-0">
                   ตรวจรับพัสดุเข้าคลัง (Goods Receipt / GRN)
                 </h3>
-                <span className="font-mono text-xs sm:text-sm bg-slate-800 text-emerald-400 px-2.5 py-0.5 rounded font-semibold border border-slate-700 shrink-0">
+                <span className="font-mono text-xs sm:text-sm bg-slate-800 text-emerald-400 px-2.5 py-0.5 rounded font-semibold border border-slate-700 shrink-0 max-w-full truncate">
                   {targetPO.poNo || targetPO.id}
                 </span>
               </div>
-              <p className="text-xs sm:text-sm text-slate-400 mt-0.5 truncate">
+              <p className="text-xs sm:text-sm text-slate-400 mt-0.5 leading-normal break-words">
                 ผู้ขาย: <span className="text-slate-200 font-semibold">{targetPO.vendorName || targetPO.vendor || '-'}</span> • แผนก: <span className="text-slate-200 font-semibold">{targetPO.department}</span>
               </p>
             </div>
@@ -1293,7 +1293,7 @@ export default function ReceivingModal({
             <button
               type="button"
               onClick={handleFillAllComplete}
-              className="text-xs font-semibold text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200/80 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shrink-0 shadow-2xs cursor-pointer"
+              className="text-xs font-semibold text-emerald-700 bg-emerald-50/80 hover:bg-emerald-100/80 border border-emerald-200/80 px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 shrink-0 shadow-2xs cursor-pointer whitespace-nowrap"
               title="กรอกจำนวนตรวจรับเต็มจำนวนที่ค้างรับทั้งหมด"
             >
               <span>⚡ กรอกรับครบทุกรายการ</span>
@@ -1301,7 +1301,7 @@ export default function ReceivingModal({
             <button
               type="button"
               onClick={onClose}
-              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer"
+              className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
             >
               <X className="w-5 h-5" />
             </button>
@@ -1315,7 +1315,7 @@ export default function ReceivingModal({
           {isFullyAccounted && (
             <div className="bg-emerald-50/90 border border-emerald-200 rounded-xl p-3 flex items-start gap-2.5 text-xs text-emerald-900 shadow-2xs">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-              <div>
+              <div className="min-w-0 break-words leading-normal">
                 <div className="font-bold text-emerald-800">สินค้าทุกรายการได้รับการตรวจรับหรือเคลมชดเชยครบถ้วนแล้ว (100% Accounted)</div>
                 <div className="text-emerald-700 text-xs mt-0.5">
                   รายการสินค้าในใบสั่งซื้อนี้รับเข้าคลังครบถ้วนหรือได้รับการชดเชยเงินคืนแล้ว สามารถกดปุ่ม &quot;ยืนยันปิดงานใบสั่งซื้อ (Finalize PO)&quot; ด้านล่างเพื่อบันทึกปิดงานสมบูรณ์
@@ -1328,10 +1328,10 @@ export default function ReceivingModal({
           {targetPO.settlementStatus === 'SETTLED' && (
             <div className="bg-emerald-50/90 border border-emerald-300 rounded-xl p-3 flex items-start gap-2.5 text-xs text-emerald-950 shadow-2xs">
               <Receipt className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <div className="font-bold text-emerald-900 flex items-center justify-between">
+              <div className="flex-1 min-w-0 break-words leading-normal">
+                <div className="font-bold text-emerald-900 flex items-center justify-between flex-wrap gap-x-3 gap-y-0.5">
                   <span>ใบสั่งซื้อนี้ปิดยอดจ่ายจริงแล้ว (Online Settled)</span>
-                  <span className="font-mono text-emerald-800 font-black">
+                  <span className="font-mono text-emerald-800 font-black whitespace-nowrap">
                     จ่ายจริง: ฿{Number(targetPO.actualTotalAmount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                   </span>
                 </div>
@@ -1345,12 +1345,12 @@ export default function ReceivingModal({
 
           {/* ── Line-Items Clean Compact Table ── */}
           <div className="bg-white rounded-xl border border-slate-200 shadow-2xs overflow-hidden">
-            <div className="bg-slate-50/90 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between text-xs">
-              <span className="font-bold text-slate-800 flex items-center gap-1.5">
-                <Package className="w-4 h-4 text-slate-500" />
+            <div className="bg-slate-50/90 px-4 py-2.5 border-b border-slate-200 flex items-center justify-between flex-wrap gap-x-3 gap-y-1 text-xs">
+              <span className="font-bold text-slate-800 flex items-center gap-1.5 min-w-0 leading-normal">
+                <Package className="w-4 h-4 text-slate-500 shrink-0" />
                 <span>รายการสินค้าที่ตรวจรับ ({computedItems.length} รายการ)</span>
               </span>
-              <span className="text-xs text-slate-500 font-mono">
+              <span className="text-xs text-slate-500 font-mono whitespace-nowrap">
                 รอบตรวจรับที่ <strong className="font-bold text-slate-800">{currentRound}</strong>
               </span>
             </div>
@@ -1360,8 +1360,8 @@ export default function ReceivingModal({
                 <thead>
                   <tr className="bg-slate-100/80 border-b border-slate-200 text-xs font-semibold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                     <th className="w-5/12 min-w-[220px] py-2.5 px-4 text-left">สินค้า</th>
-                    <th className="w-36 min-w-[130px] py-2.5 px-3 text-center">รอตรวจรับ (รอบนี้)</th>
-                    <th className="w-24 py-2.5 px-3 text-center">รับดี (เข้าคลัง)</th>
+                    <th className="w-36 min-w-[130px] py-2.5 px-3 text-center whitespace-normal leading-normal">รอตรวจรับ (รอบนี้)</th>
+                    <th className="w-24 py-2.5 px-3 text-center whitespace-normal leading-normal">รับดี (เข้าคลัง)</th>
                     <th className="w-24 py-2.5 px-3 text-center">ชำรุด (NG)</th>
                     <th className="w-20 py-2.5 px-3 text-center">ขาดส่ง</th>
                     <th className="w-48 py-2.5 px-4 text-right">สถานะ / การจัดการ</th>
@@ -1408,7 +1408,7 @@ export default function ReceivingModal({
                                 <span className="font-mono text-xs font-bold text-slate-600 bg-slate-100 px-2 py-0.5 rounded border border-slate-200 shrink-0">
                                   {item.code || `ITEM-${idx + 1}`}
                                 </span>
-                                <span className="text-sm font-bold text-slate-800 leading-snug" title={item.name}>
+                                <span className="text-sm font-bold text-slate-800 leading-normal break-words min-w-0" title={item.name}>
                                   {item.name}
                                 </span>
                               </div>
@@ -1426,9 +1426,9 @@ export default function ReceivingModal({
                                 )}
                               </div>
                               {item.isOverLimit && (
-                                <div className="text-xs text-rose-700 font-semibold flex items-center gap-1 mt-0.5">
-                                  <span>⚠</span>
-                                  <span>จำนวนรวมเกินยอดค้างรับ ({item.remainingToReceive} {item.pUnit}) — ระบบจะ clamp อัตโนมัติ</span>
+                                <div className="text-xs text-rose-700 font-semibold flex items-start gap-1 mt-0.5 leading-normal">
+                                  <span className="shrink-0">⚠</span>
+                                  <span className="min-w-0 break-words">จำนวนรวมเกินยอดค้างรับ ({item.remainingToReceive} {item.pUnit}) — ระบบจะ clamp อัตโนมัติ</span>
                                 </div>
                               )}
                             </div>
@@ -1523,11 +1523,11 @@ export default function ReceivingModal({
                           <div className="flex flex-col items-end gap-1.5 w-full">
                             {item.isRowLocked ? (
                               item.refunded > 0 ? (
-                                <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200/80 whitespace-nowrap">
+                                <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200/80 whitespace-normal text-center leading-normal max-w-full">
                                   💰 ได้รับเงินคืนแล้ว ฿{item.refundAmountFormatted}
                                 </span>
                               ) : (
-                                <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 whitespace-nowrap">
+                                <span className="inline-flex items-center justify-center px-2.5 py-1 rounded-full text-xs font-medium bg-slate-100 text-slate-600 border border-slate-200 whitespace-normal text-center leading-normal max-w-full">
                                   <Check className="w-3.5 h-3.5 text-emerald-600 shrink-0 mr-1" />
                                   ตรวจรับครบแล้วในรอบก่อน
                                 </span>
@@ -1543,7 +1543,7 @@ export default function ReceivingModal({
                                     <span>ขาด {shortageQty}</span>
                                   </span>
                                 </div>
-                                <span className="text-xs text-slate-400 mt-0.5 inline-block whitespace-nowrap">
+                                <span className="text-xs text-slate-400 mt-0.5 inline-block text-right leading-normal break-words max-w-full">
                                   ↳ {isOnlinePurchase ? 'ส่งต่องานให้จัดซื้อออนไลน์ประสานงานร้านค้า' : 'ผู้สั่งซื้อดำเนินการประสานงานเคลมกับร้านค้าด้วยตนเอง'}
                                 </span>
                               </>
@@ -1555,7 +1555,7 @@ export default function ReceivingModal({
                                     <span>ชำรุด {currentDamageInput} {item.pUnit}</span>
                                   </span>
                                 </div>
-                                <span className="text-xs text-slate-400 mt-0.5 inline-block whitespace-nowrap">
+                                <span className="text-xs text-slate-400 mt-0.5 inline-block text-right leading-normal break-words max-w-full">
                                   ↳ {isOnlinePurchase ? 'ส่งต่องานให้จัดซื้อออนไลน์ประสานงานร้านค้า' : 'ผู้สั่งซื้อดำเนินการประสานงานเคลมกับร้านค้าด้วยตนเอง'}
                                 </span>
                               </>
@@ -1566,7 +1566,7 @@ export default function ReceivingModal({
                                     <span>ขาด {shortageQty} {item.pUnit}</span>
                                   </span>
                                 </div>
-                                <span className="text-xs text-slate-400 mt-0.5 inline-block whitespace-nowrap">
+                                <span className="text-xs text-slate-400 mt-0.5 inline-block text-right leading-normal break-words max-w-full">
                                   ↳ {isOnlinePurchase ? 'ส่งต่องานให้จัดซื้อออนไลน์ประสานงานร้านค้า' : 'ผู้สั่งซื้อดำเนินการประสานงานเคลมกับร้านค้าด้วยตนเอง'}
                                 </span>
                               </>
@@ -1594,19 +1594,19 @@ export default function ReceivingModal({
                                   placeholder="ระบุอาการชำรุด เช่น แตกหัก, ฉีกขาด..."
                                   value={item.defectNote || ''}
                                   onChange={(e) => handleDefectNoteChange(item.key, e.target.value)}
-                                  className="w-full h-9 px-3 text-sm bg-white border border-rose-200 rounded-lg text-rose-900 placeholder:text-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-rose-400 shadow-xs"
+                                  className="w-full min-h-9 px-3 text-sm leading-normal bg-white border border-rose-200 rounded-lg text-rose-900 placeholder:text-rose-300 focus:outline-none focus:ring-2 focus:ring-rose-400 focus:border-rose-400 shadow-xs"
                                 />
                               </div>
-                              <div className="shrink-0 flex items-center gap-3">
-                                <span className="text-xs text-rose-500 font-medium">
+                              <div className="shrink-0 flex items-center flex-wrap gap-x-3 gap-y-2 max-w-full">
+                                <span className="text-xs text-rose-500 font-medium leading-normal break-words min-w-0">
                                   * จำเป็นต้องระบุอาการและแนบรูปเพื่อส่งเรื่องเคลม
                                 </span>
                                 <button
                                   type="button"
                                   onClick={() => fileInputRef.current?.click()}
-                                  className="h-9 px-3 bg-white hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-all shadow-xs"
+                                  className="h-9 px-3 bg-white hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-lg text-xs font-bold cursor-pointer flex items-center gap-1.5 transition-all shadow-xs whitespace-nowrap shrink-0"
                                 >
-                                  <Camera className="w-4 h-4" />
+                                  <Camera className="w-4 h-4 shrink-0" />
                                   <span>ถ่ายรูป / แนบหลักฐาน</span>
                                   {attachments.length > 0 && (
                                     <span className="ml-1 px-1.5 py-0.5 bg-rose-600 text-white rounded-full text-xs">
@@ -1631,8 +1631,8 @@ export default function ReceivingModal({
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-stretch">
             {/* Note */}
             <div className="bg-white rounded-xl border border-slate-200 p-3.5 space-y-2 shadow-2xs flex flex-col h-full">
-              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 shrink-0">
-                <FileText className="w-4 h-4 text-slate-500" />
+              <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 shrink-0 leading-normal">
+                <FileText className="w-4 h-4 text-slate-500 shrink-0" />
                 <span>หมายเหตุการตรวจรับ</span>
               </label>
               <textarea
@@ -1645,12 +1645,12 @@ export default function ReceivingModal({
 
             {/* Attachments */}
             <div className="bg-white rounded-xl border border-slate-200 p-3.5 space-y-2 shadow-2xs flex flex-col justify-between h-full">
-              <div className="flex items-center justify-between shrink-0">
-                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5">
-                  <Camera className="w-4 h-4 text-slate-500" />
+              <div className="flex items-center justify-between flex-wrap gap-x-3 gap-y-1.5 shrink-0">
+                <label className="text-xs font-bold text-slate-700 flex items-center gap-1.5 min-w-0 leading-normal">
+                  <Camera className="w-4 h-4 text-slate-500 shrink-0" />
                   <span>ภาพถ่ายพัสดุ / ใบปะหน้ากล่อง</span>
                 </label>
-                <label className="h-7 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-md text-xs sm:text-sm font-medium cursor-pointer flex items-center gap-1.5 transition-all">
+                <label className="h-7 px-2.5 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200 rounded-md text-xs sm:text-sm font-medium cursor-pointer flex items-center gap-1.5 transition-all whitespace-nowrap shrink-0">
                   <UploadCloud className="w-3.5 h-3.5 text-slate-600" />
                   <span>{isUploading ? 'กำลังแนบ...' : '+ เพิ่มไฟล์'}</span>
                   <input
@@ -1666,7 +1666,7 @@ export default function ReceivingModal({
               </div>
 
               {attachments.length === 0 ? (
-                <div className="flex-1 min-h-[88px] border border-dashed border-slate-200 rounded-lg flex items-center justify-center text-slate-400 text-xs sm:text-sm gap-2 bg-slate-50/50">
+                <div className="flex-1 min-h-[88px] border border-dashed border-slate-200 rounded-lg flex items-center justify-center text-slate-400 text-xs sm:text-sm gap-2 bg-slate-50/50 leading-normal text-center px-2">
                   <Camera className="w-4 h-4 text-slate-300" />
                   <span>ยังไม่มีรูปถ่ายหรือเอกสารแนบ</span>
                 </div>
@@ -1717,12 +1717,12 @@ export default function ReceivingModal({
 
           {/* ── Summary Status Banner ── */}
           {summary.isFullyAccepted ? (
-            <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50/80 text-emerald-800 text-xs font-medium mb-4">
-              <div className="flex items-center gap-2">
-                <span className="text-emerald-600 font-bold">✓</span>
-                <span>ตรวจรับครบถ้วนสมบูรณ์ — บันทึกรับเข้าสต็อกและปิดเอกสาร PO</span>
+            <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-xl border border-emerald-200 bg-emerald-50/80 text-emerald-800 text-xs font-medium mb-4 leading-normal">
+              <div className="flex items-center gap-2 min-w-0">
+                <span className="text-emerald-600 font-bold shrink-0">✓</span>
+                <span className="min-w-0 break-words">ตรวจรับครบถ้วนสมบูรณ์ — บันทึกรับเข้าสต็อกและปิดเอกสาร PO</span>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto font-mono">
+              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto font-mono whitespace-nowrap">
                 <span className="text-emerald-700">รับเข้าสต็อก:</span>
                 <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-bold text-xs">
                   {totalAcceptedQty} รายการ
@@ -1731,12 +1731,12 @@ export default function ReceivingModal({
             </div>
           ) : summary.isClaimRequired ? (
             <div className="w-full flex flex-col gap-3 px-4 py-3.5 rounded-xl border border-amber-200 bg-amber-50/80 mb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-amber-800 text-xs font-medium">
-                <div className="flex items-center gap-2">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-amber-800 text-xs font-medium leading-normal">
+                <div className="flex items-center gap-2 min-w-0">
                   <AlertTriangle className="w-4 h-4 text-amber-600 shrink-0" />
-                  <span>พบสินค้าขาดส่งหรือชำรุด — {isOnlinePurchase ? 'บันทึกเฉพาะยอดสมบูรณ์เข้าคลัง และส่งเรื่องเคลมไปยังฝ่ายจัดซื้อ' : 'ระบุแนวทางการเคลมและจัดการผลลัพธ์ด้วยตนเอง'}</span>
+                  <span className="min-w-0 break-words">พบสินค้าขาดส่งหรือชำรุด — {isOnlinePurchase ? 'บันทึกเฉพาะยอดสมบูรณ์เข้าคลัง และส่งเรื่องเคลมไปยังฝ่ายจัดซื้อ' : 'ระบุแนวทางการเคลมและจัดการผลลัพธ์ด้วยตนเอง'}</span>
                 </div>
-                <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto font-mono text-xs">
+                <div className="flex items-center justify-end flex-wrap gap-1.5 shrink-0 max-w-full self-end sm:self-auto font-mono text-xs">
                   <span className="text-slate-700">รับเข้าสต็อก:</span>
                   <span className="px-2 py-0.5 rounded-md bg-emerald-100 text-emerald-900 font-bold text-xs">
                     {totalAcceptedQty} รายการ
@@ -1756,8 +1756,8 @@ export default function ReceivingModal({
               
               {!isOnlinePurchase && (
                 <div className="mt-2 bg-white/60 border border-amber-200/60 rounded-lg p-3.5 animate-fade-in shadow-2xs">
-                  <h4 className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5">
-                    <span className="w-1.5 h-4 bg-amber-500 rounded-full inline-block"></span>
+                  <h4 className="text-xs font-bold text-slate-800 mb-2 flex items-center gap-1.5 leading-normal">
+                    <span className="w-1.5 h-4 bg-amber-500 rounded-full inline-block shrink-0"></span>
                     จัดการผลเคลมกับร้านค้า (Inline Claim Resolution)
                   </h4>
                   <div className="space-y-2">
@@ -1770,7 +1770,7 @@ export default function ReceivingModal({
                         onChange={() => setInlineClaimAction('PENDING')}
                         className="mt-0.5" 
                       />
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0 break-words leading-normal">
                         <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">บันทึกปัญหาไว้ก่อน (รอประสานงานร้านค้า)</p>
                         <p className="text-xs text-slate-500">บันทึกรับดีเข้าคลัง และนำงานไปพักไว้ที่เมนู "ต้องดำเนินการ" เพื่อกลับมาบันทึกผลเจรจาในภายหลัง</p>
                       </div>
@@ -1785,11 +1785,11 @@ export default function ReceivingModal({
                         onChange={() => setInlineClaimAction('REPLACEMENT')}
                         className="mt-0.5" 
                       />
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0 break-words leading-normal">
                         <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">ส่งสินค้าใหม่ทดแทน (Replacement)</p>
                         <p className="text-xs text-slate-500">ร้านค้ายินยอมส่งของมาทดแทนส่วนที่ขาด/ชำรุด งานจะแสดงปุ่ม "ตรวจรับรอบ 2" ทันที</p>
                         {inlineClaimAction === 'REPLACEMENT' && (
-                          <div className="mt-2 flex items-center gap-2 animate-fade-in">
+                          <div className="mt-2 flex items-center flex-wrap gap-2 animate-fade-in">
                             <span className="text-xs font-semibold text-slate-600">วันที่คาดว่าจะได้รับ:</span>
                             <input type="date" value={inlineExpectedDelivery} onChange={e => setInlineExpectedDelivery(e.target.value)} className="text-xs px-2 py-1 border border-slate-200 rounded-md outline-none focus:border-indigo-400" />
                           </div>
@@ -1806,11 +1806,11 @@ export default function ReceivingModal({
                         onChange={() => setInlineClaimAction('REFUND')}
                         className="mt-0.5" 
                       />
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0 break-words leading-normal">
                         <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">ได้รับเงินคืน / ปรับปรุงยอด (Refund)</p>
                         <p className="text-xs text-slate-500">ร้านค้าคืนเงินสำหรับส่วนที่ชำรุด/ขาด ระบบจะปิด PO และส่งยอดเงินคืนเข้าสมุดบัญชีงบประมาณ</p>
                         {inlineClaimAction === 'REFUND' && (
-                          <div className="mt-2 flex items-center gap-2 animate-fade-in">
+                          <div className="mt-2 flex items-center flex-wrap gap-2 animate-fade-in">
                             <span className="text-xs font-semibold text-slate-600">ยอดเงินคืน (บาท):</span>
                             <input type="number" min="0" step="0.01" placeholder="ระบุจำนวนเงินคืน" value={inlineRefundAmount} onChange={e => setInlineRefundAmount(e.target.value)} className="text-xs px-2 py-1 border border-slate-200 rounded-md outline-none focus:border-indigo-400 w-32" />
                           </div>
@@ -1827,7 +1827,7 @@ export default function ReceivingModal({
                         onChange={() => setInlineClaimAction('WRITE_OFF')}
                         className="mt-0.5" 
                       />
-                      <div className="flex-1">
+                      <div className="flex-1 min-w-0 break-words leading-normal">
                         <p className="text-xs font-bold text-slate-700 group-hover:text-indigo-700">ยอมรับสภาพ / ใช้งานตามจริง (Write-off)</p>
                         <p className="text-xs text-slate-500">ไม่สามารถเรียกร้องอะไรได้อีก ปิดงาน PO ตามสภาพความเป็นจริงที่ได้รับ</p>
                       </div>
@@ -1843,12 +1843,12 @@ export default function ReceivingModal({
               )}
             </div>
           ) : (
-            <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50/80 text-indigo-800 text-xs font-medium mb-4">
-              <div className="flex items-center gap-2">
+            <div className="w-full flex flex-col sm:flex-row sm:items-center justify-between gap-2 px-4 py-2.5 rounded-xl border border-indigo-200 bg-indigo-50/80 text-indigo-800 text-xs font-medium mb-4 leading-normal">
+              <div className="flex items-center gap-2 min-w-0">
                 <Truck className="w-4 h-4 text-indigo-600 shrink-0" />
-                <span>พัสดุทยอยส่ง — บันทึกรับรอบที่ {currentRound} และรอพัสดุส่งรอบถัดไป</span>
+                <span className="min-w-0 break-words">พัสดุทยอยส่ง — บันทึกรับรอบที่ {currentRound} และรอพัสดุส่งรอบถัดไป</span>
               </div>
-              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto font-mono">
+              <div className="flex items-center gap-1.5 shrink-0 self-end sm:self-auto font-mono whitespace-nowrap">
                 <span className="text-indigo-700">รับเข้าสต็อก:</span>
                 <span className="px-2 py-0.5 rounded-md bg-indigo-100 text-indigo-900 font-bold text-xs">
                   {totalAcceptedQty} รายการ
@@ -1860,12 +1860,12 @@ export default function ReceivingModal({
         </div>
 
         {/* ── 4. MODAL FOOTER (Dynamic Action Button & Color Psychology) ── */}
-        <div className="px-5 py-3.5 bg-slate-100/90 border-t border-slate-200 flex items-center justify-between shrink-0">
+        <div className="px-5 py-3.5 bg-slate-100/90 border-t border-slate-200 flex items-center justify-between flex-wrap gap-2 shrink-0">
           <button
             type="button"
             onClick={onClose}
             disabled={isSubmitting}
-            className="text-slate-600 hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs"
+            className="text-slate-600 hover:bg-slate-100 border border-slate-200 px-4 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer shadow-2xs whitespace-nowrap shrink-0 w-full sm:w-auto"
           >
             ยกเลิกและย้อนกลับ
           </button>
@@ -1874,13 +1874,13 @@ export default function ReceivingModal({
             <button
               type="button"
               disabled
-              className="h-9 px-5 rounded-lg text-slate-500 text-xs sm:text-sm font-bold bg-slate-200 cursor-not-allowed flex items-center gap-2"
+              className="h-9 px-5 rounded-lg text-slate-500 text-xs sm:text-sm font-bold bg-slate-200 cursor-not-allowed flex items-center justify-center gap-2 whitespace-nowrap shrink-0 w-full sm:w-auto"
             >
               <span>กำลังบันทึกตรวจรับ...</span>
             </button>
           ) : TERMINAL_RECEIVE_STATUSES.includes(String(targetPO?.status || '').toUpperCase()) ? (
             /* ป้องกันการกดรับของซ้ำ (Double-Receipt Guard) */
-            <div className="h-9 px-4 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-2 shadow-2xs">
+            <div className="min-h-9 px-4 py-1.5 rounded-lg bg-emerald-50 text-emerald-800 border border-emerald-200 text-xs font-bold flex items-center gap-2 shadow-2xs leading-normal min-w-0">
               <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>เอกสารนี้ตรวจรับเข้าคลังครบเรียบร้อยแล้ว (ปิด PO แล้ว)</span>
             </div>
@@ -1890,9 +1890,9 @@ export default function ReceivingModal({
               type="button"
               onClick={handleConfirmReceiving}
               disabled={isSubmitting || isUploading}
-              className="h-9 px-5 rounded-lg text-white text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-98 transition-all flex items-center gap-2 shadow-xs cursor-pointer"
+              className="h-9 px-5 rounded-lg text-white text-xs sm:text-sm font-bold bg-emerald-600 hover:bg-emerald-700 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer whitespace-nowrap shrink-0 w-full sm:w-auto"
             >
-              <CheckCircle2 className="w-4 h-4" />
+              <CheckCircle2 className="w-4 h-4 shrink-0" />
               <span>ยืนยันรับเข้าคลังสมบูรณ์ (ปิดงาน PO)</span>
             </button>
           ) : summary.isClaimRequired ? (
@@ -1901,9 +1901,9 @@ export default function ReceivingModal({
               type="button"
               onClick={handleConfirmReceiving}
               disabled={isSubmitting || isUploading || (!isOnlinePurchase && inlineClaimAction === 'REFUND' && (!inlineRefundAmount || Number(inlineRefundAmount) <= 0))}
-              className={`h-9 px-5 rounded-lg text-white text-xs sm:text-sm font-bold active:scale-98 transition-all flex items-center gap-2 shadow-xs cursor-pointer ${(!isOnlinePurchase && inlineClaimAction === 'REFUND' && (!inlineRefundAmount || Number(inlineRefundAmount) <= 0)) ? 'bg-slate-300 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'}`}
+              className={`h-9 px-5 rounded-lg text-white text-xs sm:text-sm font-bold active:scale-98 transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer whitespace-nowrap shrink-0 w-full sm:w-auto ${(!isOnlinePurchase && inlineClaimAction === 'REFUND' && (!inlineRefundAmount || Number(inlineRefundAmount) <= 0)) ? 'bg-slate-300 cursor-not-allowed' : 'bg-amber-600 hover:bg-amber-700'}`}
             >
-              <AlertTriangle className="w-4 h-4" />
+              <AlertTriangle className="w-4 h-4 shrink-0" />
               <span>
                 {isOnlinePurchase 
                   ? '⚠️ บันทึกรับเข้าคลัง & ส่งเรื่องเคลม' 
@@ -1920,9 +1920,9 @@ export default function ReceivingModal({
               type="button"
               onClick={handleConfirmReceiving}
               disabled={isSubmitting || isUploading}
-              className="h-9 px-5 rounded-lg text-white text-xs sm:text-sm font-bold bg-indigo-600 hover:bg-indigo-700 active:scale-98 transition-all flex items-center gap-2 shadow-xs cursor-pointer"
+              className="h-9 px-5 rounded-lg text-white text-xs sm:text-sm font-bold bg-indigo-600 hover:bg-indigo-700 active:scale-98 transition-all flex items-center justify-center gap-2 shadow-xs cursor-pointer whitespace-nowrap shrink-0 w-full sm:w-auto"
             >
-              <Truck className="w-4 h-4" />
+              <Truck className="w-4 h-4 shrink-0" />
               <span>📦 ยืนยันรับพัสดุ (รอบที่ {currentRound})</span>
             </button>
           )}

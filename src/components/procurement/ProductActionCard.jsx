@@ -175,7 +175,7 @@ export default function ProductActionCard({
         </div>
 
         <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500">
-          <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono font-semibold">{shownCode}</span>
+          <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono font-semibold max-w-full truncate">{shownCode}</span>
           <span>หน่วย: {unit}</span>
         </div>
 
@@ -184,12 +184,12 @@ export default function ProductActionCard({
         {badges && <div className="flex items-center gap-1.5 flex-wrap font-sans empty:hidden">{badges}</div>}
 
         <div className="flex flex-col gap-0.5">
-          <div className="text-sm text-slate-600">
+          <div className="text-sm text-slate-600 leading-normal break-words">
             {qtyText}{' '}
             <span className="text-lg font-bold text-indigo-700 tabular-nums" data-testid="product-card-qty">{formatNumber(qty)}</span>{' '}
             <span className="font-semibold text-slate-700">{unit}</span>
           </div>
-          <div className="text-sm text-slate-600">
+          <div className="text-sm text-slate-600 leading-normal break-words">
             {priceText}{' '}
             <span className="text-lg font-bold text-emerald-700 tabular-nums" data-testid="product-card-price">{formatBaht(price)}</span>
           </div>
@@ -203,7 +203,7 @@ export default function ProductActionCard({
                 target="_blank"
                 rel="noopener noreferrer"
                 data-testid="product-card-cta"
-                className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1"
+                className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-4 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-sm transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-400 focus:ring-offset-1 whitespace-nowrap shrink-0"
               >
                 เปิดลิงก์ร้านค้าออนไลน์ ↗
               </a>
@@ -211,9 +211,9 @@ export default function ProductActionCard({
                 type="button"
                 onClick={handleCopyLink}
                 data-testid="product-card-copy"
-                className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold cursor-pointer transition-colors"
+                className="inline-flex items-center justify-center gap-1.5 min-h-[44px] px-3 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 text-sm font-semibold cursor-pointer transition-colors whitespace-nowrap shrink-0"
               >
-                {copied ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4" />}
+                {copied ? <Check className="w-4 h-4 text-emerald-600 shrink-0" /> : <Copy className="w-4 h-4 shrink-0" />}
                 {copied ? 'คัดลอกแล้ว' : 'คัดลอกลิงก์'}
               </button>
               <span
@@ -232,7 +232,7 @@ export default function ProductActionCard({
                 aria-label="ลิงก์สินค้า (กดเลือกเพื่อคัดลอกเอง)"
                 onFocus={(e) => e.currentTarget.select()}
                 onClick={(e) => e.currentTarget.select()}
-                className="w-full h-9 px-2 text-xs font-mono rounded-lg border border-slate-300 bg-slate-50 text-slate-700"
+                className="w-full min-h-9 px-2 text-xs font-mono rounded-lg border border-slate-300 bg-slate-50 text-slate-700"
               />
             )}
           </div>

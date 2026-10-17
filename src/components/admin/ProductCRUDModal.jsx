@@ -297,25 +297,25 @@ export default function ProductCRUDModal({
               </div>
               <div className="min-w-0">
                 <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-bold text-slate-900 text-lg tracking-tight">
+                  <h3 className="font-bold text-slate-900 text-lg tracking-tight break-words">
                     {editProd ? 'แก้ไขข้อมูลสินค้า Master Data' : 'เพิ่มสินค้าใหม่ใน Master Data'}
                   </h3>
-                  <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border ${deptBadgeClass}`}>
+                  <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full border whitespace-nowrap ${deptBadgeClass}`}>
                     {isQC ? 'ฝ่ายควบคุมคุณภาพ (QC)' : 'ฝ่ายผลิต (PD)'}
                   </span>
                 </div>
                 <div className="flex items-center gap-2 mt-0.5 flex-wrap">
                   {editProd ? (
                     <>
-                      <span className="font-mono text-xs font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200/80">
+                      <span className="font-mono text-xs font-semibold bg-slate-100 text-slate-700 px-2 py-0.5 rounded-md border border-slate-200/80 break-all">
                         {editProd.code}
                       </span>
-                      <span className="text-xs text-slate-500 truncate max-w-md">
+                      <span className="text-xs text-slate-500 min-w-0 break-words max-w-md">
                         {editProd.name}
                       </span>
                     </>
                   ) : (
-                    <span className="text-xs text-slate-500">
+                    <span className="text-xs text-slate-500 break-words">
                       กำหนดข้อมูลสเปกสินค้า หน่วยนับ ราคา และจุดสั่งซื้อ ROP
                     </span>
                   )}
@@ -340,19 +340,19 @@ export default function ProductCRUDModal({
               {/* ── SECTION 1: ข้อมูลพื้นฐานสินค้า ── */}
               <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs">
                 <div className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase tracking-wider pb-2 border-b border-slate-200/60">
-                  <Tag className="w-4 h-4 text-indigo-600" />
-                  <span>1. ข้อมูลพื้นฐานสินค้า (Basic Product Specs)</span>
+                  <Tag className="w-4 h-4 text-indigo-600 shrink-0" />
+                  <span className="min-w-0 break-words">1. ข้อมูลพื้นฐานสินค้า (Basic Product Specs)</span>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {/* SKU / Item Code */}
                   <div>
-                    <div className="flex items-center justify-between mb-1.5">
+                    <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-1.5">
                       <label className="text-xs font-semibold text-slate-700 flex items-center gap-1">
                         <span>รหัสสินค้า (SKU / Item Code)</span>
                         <span className="text-rose-500">*</span>
                       </label>
-                      <div className="flex items-center gap-2">
+                      <div className="flex flex-wrap items-center gap-2">
                         {!isEditMode && (
                           <button
                             type="button"
@@ -360,7 +360,7 @@ export default function ProductCRUDModal({
                               const next = generateNextProductCode(allProducts, currentDept);
                               setItemCode(next);
                             }}
-                            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                            className="text-xs font-semibold text-indigo-600 hover:text-indigo-800 hover:underline flex items-center gap-1 cursor-pointer transition-colors whitespace-nowrap"
                             title="รันรหัสสินค้าอัตโนมัติตามแผนก"
                           >
                             <Sparkles className="w-3 h-3 text-amber-500" />
@@ -368,7 +368,7 @@ export default function ProductCRUDModal({
                           </button>
                         )}
                         {isSkuDuplicate && (
-                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1 animate-pulse">
+                          <span className="text-xs font-bold px-2 py-0.5 rounded-full bg-rose-50 text-rose-700 border border-rose-200 flex items-center gap-1 animate-pulse whitespace-nowrap">
                             <AlertTriangle className="w-3 h-3 text-rose-500" /> รหัสซ้ำ!
                           </span>
                         )}
@@ -395,7 +395,7 @@ export default function ProductCRUDModal({
                       />
                     </div>
                     {isSkuDuplicate && (
-                      <p className="mt-1.5 text-xs text-rose-600 flex items-center gap-1 font-medium">
+                      <p className="mt-1.5 text-xs text-rose-600 flex flex-wrap items-center gap-x-1 font-medium break-words">
                         <span>⚠️ รหัสนี้ถูกใช้งานแล้วในแผนก {currentDept}</span>
                         {duplicateItem && <span className="text-xs text-rose-500 font-normal">({duplicateItem.name})</span>}
                       </p>
@@ -408,17 +408,17 @@ export default function ProductCRUDModal({
                       แผนกเจ้าของสต็อก (Department) <span className="text-rose-500">*</span>
                     </label>
                     {lockedCategory ? (
-                      <div className="h-10 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-3.5 text-xs font-semibold flex items-center justify-between shadow-2xs select-none">
-                        <div className="flex items-center gap-2">
+                      <div className="h-10 bg-slate-50 border border-slate-200 text-slate-700 rounded-xl px-3.5 text-xs font-semibold flex items-center justify-between gap-2 shadow-2xs select-none">
+                        <div className="flex items-center gap-2 min-w-0">
                           <Building2 className="w-4 h-4 text-slate-400 shrink-0" />
-                          <span>
+                          <span className="truncate">
                             {(() => {
                               const d = deptList.find(item => item.code === lockedCategory || item.id === lockedCategory);
                               return d ? `${d.name} (${d.code})` : lockedCategory;
                             })()}
                           </span>
                         </div>
-                        <span className="px-2 py-0.5 rounded-md text-xs font-bold border bg-indigo-50 text-indigo-700 border-indigo-200">
+                        <span className="shrink-0 whitespace-nowrap px-2 py-0.5 rounded-md text-xs font-bold border bg-indigo-50 text-indigo-700 border-indigo-200">
                           {lockedCategory}
                         </span>
                       </div>
@@ -431,7 +431,7 @@ export default function ProductCRUDModal({
                               key={d.code || d.id}
                               type="button"
                               onClick={() => setCategory(d.code || d.id)}
-                              className={`py-2 px-3 rounded-xl border text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                              className={`py-2 px-3 rounded-xl border text-xs font-bold text-left max-w-full transition-all cursor-pointer flex items-center gap-1.5 ${
                                 isSelected
                                   ? (d.code === 'PD' ? 'bg-blue-50 border-blue-300 text-blue-700 shadow-2xs ring-1 ring-blue-500/20' :
                                      d.code === 'QC' ? 'bg-amber-50 border-amber-300 text-amber-700 shadow-2xs ring-1 ring-amber-500/20' :
@@ -446,7 +446,7 @@ export default function ProductCRUDModal({
                                 d.code === 'PUR' ? 'bg-purple-500' :
                                 d.code === 'ENG' ? 'bg-cyan-500' : 'bg-slate-400'
                               }`} />
-                              <span>{d.name} ({d.code})</span>
+                              <span className="min-w-0 break-words">{d.name} ({d.code})</span>
                             </button>
                           );
                         })}
@@ -487,15 +487,15 @@ export default function ProductCRUDModal({
 
                 {/* Storage Location Selector */}
                 <div>
-                  <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 mb-1.5">
                     <label className="text-xs font-semibold text-slate-700 flex items-center gap-1.5">
-                      <MapPin className="w-3.5 h-3.5 text-indigo-600" />
+                      <MapPin className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
                       <span>จุดจัดเก็บสินค้า (Storage Location)</span>
                     </label>
                     <button
                       type="button"
                       onClick={() => setShowCreateLocModal(true)}
-                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-2 py-0.5 rounded-lg cursor-pointer transition-colors"
+                      className="inline-flex items-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-700 hover:bg-indigo-50 px-2 py-0.5 rounded-lg cursor-pointer transition-colors whitespace-nowrap shrink-0"
                     >
                       <Plus className="w-3.5 h-3.5" />
                       <span>เพิ่มจุดเก็บใหม่</span>
@@ -525,12 +525,12 @@ export default function ProductCRUDModal({
 
               {/* ── SECTION 2: ระบบแปลงหน่วยนับ (Unit Conversion System) ── */}
               <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    <Repeat className="w-4 h-4 text-indigo-600" />
-                    <span>2. ระบบแปลงหน่วยนับ (Unit Conversion)</span>
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 pb-2 border-b border-slate-200/60">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase tracking-wider min-w-0">
+                    <Repeat className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span className="min-w-0 break-words">2. ระบบแปลงหน่วยนับ (Unit Conversion)</span>
                   </div>
-                  <span className="text-xs text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full font-semibold border border-indigo-100">
+                  <span className="text-xs text-indigo-600 bg-indigo-50 px-2.5 py-0.5 rounded-full font-semibold border border-indigo-100 whitespace-nowrap">
                     รองรับหน่วยซื้อ & ตัดสต็อกย่อย
                   </span>
                 </div>
@@ -555,7 +555,7 @@ export default function ProductCRUDModal({
                           key={u}
                           type="button"
                           onClick={() => setPurchaseUnit(u)}
-                          className={`px-2 py-0.5 text-xs rounded-lg border transition-all cursor-pointer ${
+                          className={`px-2 py-0.5 text-xs rounded-lg border whitespace-nowrap transition-all cursor-pointer ${
                             purchaseUnit === u
                               ? 'bg-indigo-600 text-white font-bold border-indigo-600 shadow-2xs'
                               : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50/50'
@@ -586,7 +586,7 @@ export default function ProductCRUDModal({
                           key={u}
                           type="button"
                           onClick={() => setStockUnit(u)}
-                          className={`px-2 py-0.5 text-xs rounded-lg border transition-all cursor-pointer ${
+                          className={`px-2 py-0.5 text-xs rounded-lg border whitespace-nowrap transition-all cursor-pointer ${
                             stockUnit === u
                               ? 'bg-indigo-600 text-white font-bold border-indigo-600 shadow-2xs'
                               : 'bg-white border-slate-200 text-slate-600 hover:border-indigo-300 hover:bg-indigo-50/50'
@@ -619,17 +619,17 @@ export default function ProductCRUDModal({
 
                   {/* Formula Capsule */}
                   <div className="sm:col-span-2">
-                    <div className="bg-white border border-slate-200/80 rounded-xl py-2 px-4 text-center font-mono text-xs font-bold text-indigo-900 shadow-2xs flex items-center justify-center gap-2">
-                      <span className="text-slate-500 font-sans font-medium text-xs">สูตรแปลง:</span>
-                      <span>1 {purchaseUnit || 'หน่วยซื้อ'} = {conversionRate || 1} {stockUnit || 'หน่วยสต็อก'}</span>
+                    <div className="bg-white border border-slate-200/80 rounded-xl py-2 px-4 text-center font-mono text-xs font-bold text-indigo-900 shadow-2xs flex flex-wrap items-center justify-center gap-x-2 gap-y-0.5">
+                      <span className="text-slate-500 font-sans font-medium text-xs whitespace-nowrap">สูตรแปลง:</span>
+                      <span className="min-w-0 break-words">1 {purchaseUnit || 'หน่วยซื้อ'} = {conversionRate || 1} {stockUnit || 'หน่วยสต็อก'}</span>
                     </div>
                   </div>
                 </div>
 
                 {/* Live Preview Callout */}
-                <div className="p-3 bg-white rounded-xl border border-indigo-100 shadow-2xs flex items-center gap-2 text-xs">
+                <div className="p-3 bg-white rounded-xl border border-indigo-100 shadow-2xs flex items-start gap-2 text-xs">
                   <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
-                  <div className="text-slate-600">
+                  <div className="text-slate-600 min-w-0 break-words">
                     สั่งซื้อ <span className="font-mono font-bold text-slate-900">1 {purchaseUnit || 'หน่วยซื้อ'}</span> ระบบจะรับเข้าสต็อก <span className="font-mono font-bold text-emerald-700">{conversionRate || 1} {stockUnit || 'หน่วยสต็อก'}</span> อัตโนมัติ
                   </div>
                 </div>
@@ -637,13 +637,13 @@ export default function ProductCRUDModal({
 
               {/* ── SECTION 3: ราคา & จุดสั่งซื้อ (Price & ROP) ── */}
               <div className="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-4 sm:p-5 space-y-4 shadow-2xs">
-                <div className="flex items-center justify-between pb-2 border-b border-slate-200/60">
-                  <div className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase tracking-wider">
-                    <Boxes className="w-4 h-4 text-indigo-600" />
-                    <span>3. ราคาประเมิน & การควบคุมสต็อก (Pricing & ROP Control)</span>
+                <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 pb-2 border-b border-slate-200/60">
+                  <div className="flex items-center gap-2 text-xs font-bold text-slate-600 uppercase tracking-wider min-w-0">
+                    <Boxes className="w-4 h-4 text-indigo-600 shrink-0" />
+                    <span className="min-w-0 break-words">3. ราคาประเมิน & การควบคุมสต็อก (Pricing & ROP Control)</span>
                   </div>
                   {editProd && (
-                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 font-mono">
+                    <span className="text-xs font-bold text-emerald-700 bg-emerald-50 px-2.5 py-0.5 rounded-full border border-emerald-200 font-mono tabular-nums break-words">
                       คงเหลือในคลัง: {editProd.stockBalance} {editProd.stockUnit || editProd.unit}
                     </span>
                   )}
@@ -703,12 +703,12 @@ export default function ProductCRUDModal({
                 {/* Initial Stock (Only on creation) */}
                 {!editProd && (
                   <div className="p-4 rounded-xl bg-white border border-slate-200 shadow-2xs flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                    <div>
+                    <div className="min-w-0">
                       <span className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
-                        <Sparkles className="w-4 h-4 text-indigo-600" />
+                        <Sparkles className="w-4 h-4 text-indigo-600 shrink-0" />
                         จำนวนสต็อกเริ่มต้น (Opening Stock Balance)
                       </span>
-                      <p className="text-xs text-slate-500 mt-0.5">
+                      <p className="text-xs text-slate-500 mt-0.5 break-words">
                         ระบุจำนวนคงเหลือในคลังจริงเริ่มต้น (หน่วย: {stockUnit || 'หน่วยสต็อก'})
                       </p>
                     </div>
@@ -731,15 +731,15 @@ export default function ProductCRUDModal({
           </div>
 
           {/* ── 3. Sticky Action Footer (Non-scrollable) ── */}
-          <div className="shrink-0 px-6 py-4 bg-slate-50/80 border-t border-slate-200/80 flex items-center justify-between sticky bottom-0 z-20">
-            <span className="text-xs text-slate-400 font-medium">
+          <div className="shrink-0 px-6 py-4 bg-slate-50/80 border-t border-slate-200/80 flex flex-wrap items-center justify-between gap-3 sticky bottom-0 z-20">
+            <span className="text-xs text-slate-400 font-medium min-w-0 break-words">
               <span className="text-rose-500 font-bold">*</span> จำเป็นต้องระบุข้อมูล
             </span>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 ml-auto">
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer"
+                className="px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-200/60 rounded-xl transition-colors cursor-pointer whitespace-nowrap shrink-0"
               >
                 ยกเลิก
               </button>
@@ -747,7 +747,7 @@ export default function ProductCRUDModal({
                 type="submit"
                 form="product-form"
                 disabled={isSaving || isSkuDuplicate || !String(itemCode || '').trim()}
-                className="px-5 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                className="px-5 py-2 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 shadow-xs rounded-xl flex items-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
               >
                 <Check className="w-4 h-4" />
                 <span>{isSaving ? 'กำลังบันทึก...' : (isEditMode ? 'บันทึกการแก้ไข' : 'บันทึกสินค้าใหม่')}</span>

@@ -439,12 +439,12 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
     <div className="w-full space-y-4 animate-fade-in pb-10 font-sans">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-        <div>
+        <div className="min-w-0">
           <h2 className="text-xl sm:text-2xl font-bold text-slate-900 flex items-center gap-2.5 tracking-tight">
-            <div className="w-9 h-9 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-2xs">
+            <div className="w-9 h-9 bg-indigo-600 text-white rounded-xl flex items-center justify-center shadow-2xs shrink-0">
               <ShoppingCart className="w-4 h-4" />
             </div>
-            <span>งานจัดซื้อออนไลน์ (Online Procurement Hub)</span>
+            <span className="min-w-0 break-words">งานจัดซื้อออนไลน์ (Online Procurement Hub)</span>
           </h2>
           <p className="text-xs text-slate-500 mt-1 font-normal">
             ศูนย์จัดการคำสั่งซื้อผ่าน Shopee / Lazada / ร้านค้าออนไลน์ — บันทึกราคาจริงและตรวจสอบสถานะคำสั่งซื้อ
@@ -455,12 +455,12 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
         <div className="flex items-center gap-2 shrink-0 self-start sm:self-auto">
           <div className="flex items-center gap-3 px-3 py-1.5 bg-white rounded-xl border border-slate-200/80 shadow-2xs">
             <div className="text-right">
-              <span className="text-xs uppercase font-bold text-slate-400 block tracking-wider">มูลค่าคำขอในมือ</span>
-              <span className="font-mono font-bold text-slate-800 text-sm">
+              <span className="text-xs uppercase font-bold text-slate-400 block tracking-wider whitespace-nowrap">มูลค่าคำขอในมือ</span>
+              <span className="font-mono font-bold text-slate-800 text-sm whitespace-nowrap">
                 ฿{metrics.totalAmount.toLocaleString()}
               </span>
             </div>
-            <div className="w-8 h-8 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-mono text-xs font-bold">
+            <div className="w-8 h-8 shrink-0 rounded-lg bg-indigo-50 text-indigo-700 flex items-center justify-center font-mono text-xs font-bold">
               {metrics.total}
             </div>
           </div>
@@ -475,7 +475,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
           <button
             type="button"
             onClick={() => setActiveTab('PENDING')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'PENDING'
                 ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80 font-bold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
@@ -494,7 +494,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
           <button
             type="button"
             onClick={() => setActiveTab('ORDERED')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'ORDERED'
                 ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80 font-bold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
@@ -513,7 +513,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
           <button
             type="button"
             onClick={() => setActiveTab('CLAIM')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'CLAIM'
                 ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80 font-bold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
@@ -522,7 +522,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
             <AlertTriangle className={`w-3.5 h-3.5 ${activeTab === 'CLAIM' || metrics.claim > 0 ? 'text-rose-600' : 'text-slate-400'}`} />
             <span>รอเคลม</span>
             {metrics.claim > 0 && (
-              <span className="inline-flex items-center bg-rose-500 text-white font-bold px-2 py-0.5 rounded-full text-xs animate-pulse">
+              <span className="inline-flex items-center bg-rose-500 text-white font-bold px-2 py-0.5 leading-normal rounded-full text-xs animate-pulse">
                 <span className="relative flex h-2 w-2 mr-1">
                   <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-rose-400 opacity-75"></span>
                   <span className="relative inline-flex rounded-full h-2 w-2 bg-rose-500"></span>
@@ -536,7 +536,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
           <button
             type="button"
             onClick={() => setActiveTab('CLOSED')}
-            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'CLOSED'
                 ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80 font-bold'
                 : 'text-slate-600 hover:text-slate-900 hover:bg-white/60 font-medium'
@@ -555,7 +555,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
           <button
             type="button"
             onClick={() => setActiveTab('ALL')}
-            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap ${
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs transition-all cursor-pointer whitespace-nowrap shrink-0 ${
               activeTab === 'ALL'
                 ? 'bg-white text-slate-900 shadow-2xs border border-slate-200/80 font-bold'
                 : 'text-slate-500 hover:text-slate-800 hover:bg-white/60 font-medium'
@@ -606,7 +606,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
         <div className="space-y-3">
           {/* Month Selector Toolbar */}
           <div className="flex flex-wrap items-center justify-between gap-3 bg-white p-2.5 rounded-2xl border border-slate-200/80 shadow-xs">
-            <div className="flex items-center gap-2 flex-wrap">
+            <div className="flex items-center gap-2 flex-wrap min-w-0">
               {/* Month Navigation Pill: [ < ] [ 📅 กันยายน 2569 ▾ ] [ > ] */}
               <div className="flex items-center bg-slate-100/90 border border-slate-200/80 rounded-xl p-0.5 shadow-2xs">
                 <button
@@ -618,7 +618,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
                   <ChevronLeft className="w-4 h-4" />
                 </button>
                 <div className="relative flex items-center px-2.5 py-1 gap-1.5 font-medium text-xs text-slate-800 cursor-pointer">
-                  <span>📅 {formatThaiMonth(selectedMonth)} ▾</span>
+                  <span className="whitespace-nowrap">📅 {formatThaiMonth(selectedMonth)} ▾</span>
                   <select
                     value={selectedMonth}
                     onChange={(e) => setSelectedMonth(e.target.value)}
@@ -642,11 +642,11 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
               </div>
 
               {/* Quick Chips: [ เดือนนี้ ] [ เดือนก่อนหน้า ] [ ทั้งหมดในปีนี้ ] */}
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center flex-wrap gap-1.5">
                 <button
                   type="button"
                   onClick={() => setSelectedMonth(thisMonthYM)}
-                  className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 text-xs leading-normal whitespace-nowrap rounded-lg border transition-all cursor-pointer ${
                     selectedMonth === thisMonthYM
                       ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-bold shadow-2xs'
                       : 'bg-white border-slate-200/80 text-slate-600 hover:bg-slate-50'
@@ -657,7 +657,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
                 <button
                   type="button"
                   onClick={() => setSelectedMonth(getPrevMonth(thisMonthYM))}
-                  className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 text-xs leading-normal whitespace-nowrap rounded-lg border transition-all cursor-pointer ${
                     selectedMonth === getPrevMonth(thisMonthYM)
                       ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-bold shadow-2xs'
                       : 'bg-white border-slate-200/80 text-slate-600 hover:bg-slate-50'
@@ -668,7 +668,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
                 <button
                   type="button"
                   onClick={() => setSelectedMonth('ALL_YEAR')}
-                  className={`px-2.5 py-1 text-xs rounded-lg border transition-all cursor-pointer ${
+                  className={`px-2.5 py-1 text-xs leading-normal whitespace-nowrap rounded-lg border transition-all cursor-pointer ${
                     selectedMonth === 'ALL_YEAR'
                       ? 'bg-indigo-50 border-indigo-200 text-indigo-700 font-bold shadow-2xs'
                       : 'bg-white border-slate-200/80 text-slate-600 hover:bg-slate-50'
@@ -695,7 +695,7 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
               {completedKPIs.totalRefunds > 0 && (
                 <>
                   <span className="text-slate-300">|</span>
-                  <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 rounded-full font-semibold">
+                  <span className="text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-0.5 leading-normal break-words rounded-full font-semibold">
                     💰 ได้รับเงินคืนเข้าแผนก: +฿{formatMoney(completedKPIs.totalRefunds)}
                   </span>
                 </>
@@ -770,24 +770,24 @@ export default function OnlineTaskView({ currentRole, onRefresh }) {
           <div className="text-slate-500">
             แสดง {Math.min((completedPage - 1) * PAGE_SIZE + 1, filteredTasks.length)} - {Math.min(completedPage * PAGE_SIZE, filteredTasks.length)} จากทั้งหมด {filteredTasks.length} รายการ
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center flex-wrap justify-center gap-2">
             <button
               type="button"
               disabled={completedPage <= 1}
               onClick={() => setCompletedPage(prev => Math.max(1, prev - 1))}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors font-medium flex items-center gap-1"
+              className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors font-medium flex items-center gap-1 whitespace-nowrap shrink-0"
             >
               <ChevronLeft className="w-3.5 h-3.5" />
               <span>ก่อนหน้า</span>
             </button>
-            <span className="text-slate-600 font-medium px-2">
+            <span className="text-slate-600 font-medium px-2 whitespace-nowrap">
               หน้า <strong className="font-mono text-slate-800">{completedPage}</strong> จาก <strong className="font-mono text-slate-800">{totalPages}</strong>
             </span>
             <button
               type="button"
               disabled={completedPage >= totalPages}
               onClick={() => setCompletedPage(prev => Math.min(totalPages, prev + 1))}
-              className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors font-medium flex items-center gap-1"
+              className="px-3 py-1.5 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer transition-colors font-medium flex items-center gap-1 whitespace-nowrap shrink-0"
             >
               <span>ถัดไป</span>
               <ChevronRight className="w-3.5 h-3.5" />

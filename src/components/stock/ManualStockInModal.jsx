@@ -123,10 +123,10 @@ export default function ManualStockInModal({ products = [], currentRole, onClose
               <PackagePlus className="w-5 h-5" />
             </div>
             <div className="min-w-0">
-              <h3 className="font-bold text-slate-900 text-base tracking-tight">
+              <h3 className="font-bold text-slate-900 text-base tracking-tight break-words">
                 รับสินค้าเข้าคลัง (Manual Stock-In)
               </h3>
-              <p className="text-xs text-slate-500 font-normal truncate mt-0.5">
+              <p className="text-xs text-slate-500 font-normal break-words mt-0.5">
                 บันทึกประวัติ Audit Log และเพิ่มจำนวนคงเหลือในคลังโดยตรง
               </p>
             </div>
@@ -147,7 +147,7 @@ export default function ManualStockInModal({ products = [], currentRole, onClose
             {error && (
               <div className="p-3 bg-rose-50 border border-rose-200 rounded-2xl flex items-center gap-2 text-rose-700 text-xs font-semibold">
                 <AlertCircle className="w-4 h-4 shrink-0" />
-                <span>{error}</span>
+                <span className="min-w-0 break-words">{error}</span>
               </div>
             )}
 
@@ -165,11 +165,11 @@ export default function ManualStockInModal({ products = [], currentRole, onClose
                 />
                 {selectedProduct && (
                   <div className="mt-2.5 p-3 bg-white border border-slate-200/80 rounded-xl flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs shadow-2xs">
-                    <div className="flex items-center gap-1.5 text-slate-600">
+                    <div className="flex items-center gap-1.5 text-slate-600 min-w-0">
                       <MapPin className="w-3.5 h-3.5 text-indigo-600 shrink-0" />
-                      <span>จุดจัดเก็บ: <b className="text-slate-900 font-semibold">{selectedProduct.locationName || 'ไม่ระบุจุดจัดเก็บ'}</b></span>
+                      <span className="min-w-0 break-words">จุดจัดเก็บ: <b className="text-slate-900 font-semibold">{selectedProduct.locationName || 'ไม่ระบุจุดจัดเก็บ'}</b></span>
                     </div>
-                    <div className="font-mono">
+                    <div className="font-mono break-words">
                       <span className="text-slate-500 font-sans">ยอดคงเหลือ: </span>
                       <span className="font-bold text-slate-900 tabular-nums">
                         {selectedProduct.stockBalance || 0} {selectedProduct.stockUnit || selectedProduct.unit || 'ชิ้น'}
@@ -191,11 +191,11 @@ export default function ManualStockInModal({ products = [], currentRole, onClose
                     placeholder="ระบุจำนวนที่รับเข้า..."
                     value={qty}
                     onChange={e => setQty(e.target.value)}
-                    className="w-full h-11 px-3.5 bg-white border border-slate-200 rounded-xl text-sm font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-2xs"
+                    className="w-full h-11 pl-3.5 pr-16 bg-white border border-slate-200 rounded-xl text-sm font-mono font-bold tabular-nums text-slate-900 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all shadow-2xs"
                     required
                   />
                   {selectedProduct && (
-                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 text-xs font-medium text-slate-400">
+                    <span className="absolute right-3.5 top-1/2 -translate-y-1/2 max-w-[3.5rem] truncate text-xs font-medium text-slate-400">
                       {selectedProduct.stockUnit || selectedProduct.unit || 'ชิ้น'}
                     </span>
                   )}
@@ -234,15 +234,15 @@ export default function ManualStockInModal({ products = [], currentRole, onClose
         </div>
 
         {/* ── 3. Sticky Action Footer (Non-scrollable) ── */}
-        <div className="shrink-0 px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex items-center justify-between gap-3 sticky bottom-0 z-20">
-          <span className="text-xs text-slate-500 font-medium">
+        <div className="shrink-0 px-6 py-4 bg-slate-50/80 border-t border-slate-100 flex flex-wrap items-center justify-between gap-3 sticky bottom-0 z-20">
+          <span className="text-xs text-slate-500 font-medium min-w-0 break-words">
             <span className="text-rose-500 font-bold">*</span> จำเป็นต้องระบุข้อมูล
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 ml-auto">
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all cursor-pointer"
+              className="px-4 py-2.5 rounded-xl border border-slate-200 bg-white text-slate-700 hover:bg-slate-50 text-xs font-bold transition-all cursor-pointer whitespace-nowrap shrink-0"
             >
               ยกเลิก
             </button>
@@ -250,7 +250,7 @@ export default function ManualStockInModal({ products = [], currentRole, onClose
               type="submit"
               form="manual-stockin-form"
               disabled={saving}
-              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-5 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold shadow-sm transition-all flex items-center gap-2 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap shrink-0"
             >
               <Check className="w-4 h-4" />
               <span>{saving ? 'กำลังบันทึก...' : 'ยืนยันรับเข้าสต็อก'}</span>

@@ -262,42 +262,42 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
     <div className="w-full space-y-6 pb-12 animate-in fade-in duration-300">
       {/* ── Page Header & Stats Summary ── */}
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4 bg-white p-6 rounded-3xl border border-slate-200/80 shadow-xs">
-        <div className="flex items-start gap-4">
+        <div className="flex items-start gap-4 min-w-0">
           <div className="w-12 h-12 rounded-2xl bg-indigo-50 border border-indigo-100 flex items-center justify-center text-indigo-600 shadow-inner shrink-0">
             <ShieldCheck className="w-6 h-6" />
           </div>
-          <div>
-            <div className="flex items-center gap-2.5">
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-x-2.5 gap-y-1">
+              <h1 className="text-xl font-bold text-slate-900 tracking-tight break-words min-w-0">
                 บันทึกประวัติระบบ (Audit Logs)
               </h1>
-              <span className="text-xs font-semibold bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
+              <span className="text-xs font-semibold whitespace-nowrap bg-emerald-50 text-emerald-700 border border-emerald-200 px-2 py-0.5 rounded-full">
                 Security & Compliance
               </span>
             </div>
-            <p className="text-xs text-slate-500 mt-1 max-w-2xl">
+            <p className="text-xs text-slate-500 mt-1 max-w-2xl break-words">
               ศูนย์รวมบันทึกกิจกรรมความปลอดภัย ตรวจสอบย้อนหลังทุกการทำรายการ (PR/PO, คลังสินค้า, ข้อมูลหลัก, และบทบาทผู้ใช้งาน)
             </p>
           </div>
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-wrap items-center gap-2 shrink-0">
+        <div className="flex flex-wrap items-center gap-2 min-w-0 lg:shrink-0">
           <button
             type="button"
             onClick={handleTriggerReset}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
+            className="inline-flex items-center gap-2 max-w-full px-3 py-1.5 text-xs font-bold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 rounded-lg transition-colors cursor-pointer"
             title="ล้างข้อมูลธุรกรรมทั้งหมด"
           >
-            <Trash2 className="w-3.5 h-3.5 text-rose-500" />
-            <span>ล้างประวัติธุรกรรมจำลอง (Reset Mock Transactions)</span>
+            <Trash2 className="w-3.5 h-3.5 text-rose-500 shrink-0" />
+            <span className="min-w-0 break-words text-left">ล้างประวัติธุรกรรมจำลอง (Reset Mock Transactions)</span>
           </button>
 
           <button
             type="button"
             onClick={loadLogs}
             disabled={isLoading}
-            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 shadow-2xs transition-all cursor-pointer"
+            className="px-3 py-1.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-50 text-slate-700 text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shrink-0 shadow-2xs transition-all cursor-pointer"
             title="รีเฟรชข้อมูล"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${isLoading ? 'animate-spin text-indigo-600' : ''}`} />
@@ -307,7 +307,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
           <button
             type="button"
             onClick={handleExport}
-            className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 shadow-sm shadow-indigo-600/20 transition-all cursor-pointer"
+            className="px-3.5 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold flex items-center gap-1.5 whitespace-nowrap shrink-0 shadow-sm shadow-indigo-600/20 transition-all cursor-pointer"
             title="ดาวน์โหลด Audit Report (.CSV)"
           >
             <Download className="w-3.5 h-3.5" />
@@ -319,54 +319,54 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
       {/* ── KPI Stat Summary Cards ── */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-3.5">
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">บันทึกทั้งหมด</span>
-            <span className="w-7 h-7 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
+          <div className="flex items-center justify-between gap-2">
+            <span className="min-w-0 break-words text-xs font-medium text-slate-500">บันทึกทั้งหมด</span>
+            <span className="w-7 h-7 shrink-0 rounded-lg bg-slate-100 flex items-center justify-center text-slate-600">
               <FileText className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black font-mono text-slate-900">{stats.total}</span>
-            <span className="text-xs text-slate-400 font-medium">รายการ</span>
+            <span className="min-w-0 break-all tabular-nums text-2xl font-black font-mono text-slate-900">{stats.total}</span>
+            <span className="text-xs text-slate-400 font-medium whitespace-nowrap">รายการ</span>
           </div>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">จัดซื้อ (PR / PO)</span>
-            <span className="w-7 h-7 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
+          <div className="flex items-center justify-between gap-2">
+            <span className="min-w-0 break-words text-xs font-medium text-slate-500">จัดซื้อ (PR / PO)</span>
+            <span className="w-7 h-7 shrink-0 rounded-lg bg-blue-50 flex items-center justify-center text-blue-600">
               <Layers className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black font-mono text-blue-600">{stats.purchaseCount}</span>
-            <span className="text-xs text-slate-400 font-medium">กิจกรรม</span>
+            <span className="min-w-0 break-all tabular-nums text-2xl font-black font-mono text-blue-600">{stats.purchaseCount}</span>
+            <span className="text-xs text-slate-400 font-medium whitespace-nowrap">กิจกรรม</span>
           </div>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">คลังพัสดุ & เบิกจ่าย</span>
-            <span className="w-7 h-7 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600">
+          <div className="flex items-center justify-between gap-2">
+            <span className="min-w-0 break-words text-xs font-medium text-slate-500">คลังพัสดุ & เบิกจ่าย</span>
+            <span className="w-7 h-7 shrink-0 rounded-lg bg-teal-50 flex items-center justify-center text-teal-600">
               <Clock className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black font-mono text-teal-600">{stats.inventoryCount}</span>
-            <span className="text-xs text-slate-400 font-medium">กิจกรรม</span>
+            <span className="min-w-0 break-all tabular-nums text-2xl font-black font-mono text-teal-600">{stats.inventoryCount}</span>
+            <span className="text-xs text-slate-400 font-medium whitespace-nowrap">กิจกรรม</span>
           </div>
         </div>
 
         <div className="bg-white p-4 rounded-2xl border border-slate-200/80 shadow-2xs">
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-medium text-slate-500">Master & บทบาทสิทธิ์</span>
-            <span className="w-7 h-7 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+          <div className="flex items-center justify-between gap-2">
+            <span className="min-w-0 break-words text-xs font-medium text-slate-500">Master & บทบาทสิทธิ์</span>
+            <span className="w-7 h-7 shrink-0 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
               <ShieldCheck className="w-4 h-4" />
             </span>
           </div>
           <div className="mt-2 flex items-baseline gap-2">
-            <span className="text-2xl font-black font-mono text-purple-600">{stats.masterRbacCount}</span>
-            <span className="text-xs text-slate-400 font-medium">กิจกรรม</span>
+            <span className="min-w-0 break-all tabular-nums text-2xl font-black font-mono text-purple-600">{stats.masterRbacCount}</span>
+            <span className="text-xs text-slate-400 font-medium whitespace-nowrap">กิจกรรม</span>
           </div>
         </div>
       </div>
@@ -430,7 +430,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
         <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-3 pt-2 border-t border-slate-100">
           {/* Module Pills */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
-            <span className="text-xs font-semibold text-slate-400 mr-1 uppercase tracking-wider">หมวดหมู่:</span>
+            <span className="text-xs font-semibold text-slate-400 mr-1 uppercase tracking-wider whitespace-nowrap shrink-0">หมวดหมู่:</span>
             {['ALL', 'PURCHASE', 'INVENTORY', 'MASTER', 'RBAC'].map((modKey) => {
               const active = selectedModule === modKey;
               return (
@@ -438,7 +438,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
                   key={modKey}
                   type="button"
                   onClick={() => setSelectedModule(modKey)}
-                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                     active 
                       ? 'bg-slate-900 text-white shadow-xs' 
                       : 'bg-slate-100 hover:bg-slate-200/70 text-slate-600'
@@ -452,7 +452,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
 
           {/* Time Range Filter */}
           <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-            <span className="text-xs font-semibold text-slate-400 mr-1 uppercase tracking-wider">ช่วงเวลา:</span>
+            <span className="text-xs font-semibold text-slate-400 mr-1 uppercase tracking-wider whitespace-nowrap shrink-0">ช่วงเวลา:</span>
             {[
               { id: 'ALL', label: 'ทั้งหมด' },
               { id: 'TODAY', label: 'วันนี้' },
@@ -464,7 +464,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
                 key={t.id}
                 type="button"
                 onClick={() => setTimeRange(t.id)}
-                className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all cursor-pointer ${
+                className={`px-2.5 py-1 rounded-lg text-xs font-medium whitespace-nowrap shrink-0 transition-all cursor-pointer ${
                   timeRange === t.id
                     ? 'bg-indigo-600 text-white shadow-2xs font-semibold'
                     : 'bg-slate-50 hover:bg-slate-100 text-slate-600 border border-slate-200/60'
@@ -505,7 +505,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse">
             <thead>
-              <tr className="bg-slate-50/80 border-b border-slate-200/80 text-xs font-bold text-slate-500 uppercase tracking-wider">
+              <tr className="bg-slate-50/80 border-b border-slate-200/80 text-xs font-bold text-slate-500 uppercase tracking-wider whitespace-nowrap">
                 <th className="py-3.5 px-4 font-mono">เวลาบันทึก</th>
                 <th className="py-3.5 px-4">ผู้ดำเนินการ</th>
                 <th className="py-3.5 px-4">หมวดหมู่</th>
@@ -605,7 +605,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
 
                       {/* 6. Summary */}
                       <td className="py-3 px-4 text-slate-700 min-w-[220px]">
-                        <p className="line-clamp-2 leading-relaxed" title={log.summary}>
+                        <p className="line-clamp-2 break-words leading-relaxed" title={log.summary}>
                           {log.summary || '-'}
                         </p>
                       </td>
@@ -657,26 +657,26 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs animate-in fade-in duration-200">
           <div className="bg-white rounded-3xl max-w-2xl w-full border border-slate-200 shadow-2xl overflow-hidden flex flex-col max-h-[85vh] animate-in zoom-in-95 duration-200">
             {/* Modal Header */}
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between bg-slate-50/70">
-              <div className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center">
+            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between gap-3 bg-slate-50/70">
+              <div className="flex items-center gap-2.5 min-w-0">
+                <div className="w-9 h-9 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center shrink-0">
                   <ShieldCheck className="w-5 h-5" />
                 </div>
-                <div>
-                  <h3 className="text-sm font-bold text-slate-900">
+                <div className="min-w-0">
+                  <h3 className="text-sm font-bold text-slate-900 break-words">
                     รายละเอียดบันทึกการเปลี่ยนแปลง (Visual Diff)
                   </h3>
-                  <p className="text-xs font-mono text-slate-400">
+                  <p className="text-xs font-mono text-slate-400 break-all">
                     ID: {selectedDiffLog.id}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 shrink-0">
                 <button
                   type="button"
                   onClick={() => handleCopyDiff(selectedDiffLog)}
-                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-white text-slate-600 text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer"
+                  className="px-2.5 py-1.5 rounded-xl border border-slate-200 hover:bg-white text-slate-600 text-xs font-semibold flex items-center gap-1 whitespace-nowrap transition-all cursor-pointer"
                   title="คัดลอก JSON"
                 >
                   {copiedId === selectedDiffLog.id ? (
@@ -708,13 +708,13 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-slate-50 p-3.5 rounded-2xl border border-slate-200/80 text-xs">
                 <div>
                   <span className="text-xs uppercase font-bold text-slate-400">วันและเวลา</span>
-                  <p className="font-mono font-medium text-slate-700 mt-0.5">
+                  <p className="font-mono font-medium text-slate-700 mt-0.5 break-words">
                     {formatLocalTimestamp(selectedDiffLog.timestamp || selectedDiffLog.createdAt || selectedDiffLog.timeFormatted)}
                   </p>
                 </div>
                 <div>
                   <span className="text-xs uppercase font-bold text-slate-400">เอกสารอ้างอิง</span>
-                  <p className="font-mono font-bold text-indigo-700 mt-0.5">
+                  <p className="font-mono font-bold text-indigo-700 mt-0.5 break-all">
                     {selectedDiffLog.targetRef || '-'}
                   </p>
                 </div>
@@ -731,7 +731,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
                   <p className="font-semibold text-slate-800 mt-0.5 truncate">
                     {selectedDiffLog.actor?.name || 'System'}
                   </p>
-                  <span className="text-xs text-slate-400">
+                  <span className="text-xs text-slate-400 break-words">
                     {selectedDiffLog.actor?.role} ({selectedDiffLog.actor?.department || 'ALL'})
                   </span>
                 </div>
@@ -740,19 +740,19 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
               {/* Summary description */}
               <div className="bg-indigo-50/50 border border-indigo-100 p-3.5 rounded-2xl text-xs text-indigo-950">
                 <span className="font-bold block mb-0.5">รายละเอียดสรุป:</span>
-                <p className="leading-relaxed">{selectedDiffLog.summary}</p>
+                <p className="leading-relaxed break-words">{selectedDiffLog.summary}</p>
               </div>
 
               {/* Visual Diff Table */}
               <div>
-                <h4 className="text-xs font-bold text-slate-900 mb-2.5 flex items-center gap-1.5">
-                  <FileText className="w-3.5 h-3.5 text-slate-500" />
-                  <span>การเปรียบเทียบค่าก่อนหน้าและค่าปัจจุบัน (Field Diffs)</span>
+                <h4 className="text-xs font-bold text-slate-900 mb-2.5 flex items-start gap-1.5">
+                  <FileText className="w-3.5 h-3.5 text-slate-500 shrink-0 mt-0.5" />
+                  <span className="min-w-0 break-words">การเปรียบเทียบค่าก่อนหน้าและค่าปัจจุบัน (Field Diffs)</span>
                 </h4>
 
                 {Array.isArray(selectedDiffLog.changes) && selectedDiffLog.changes.length > 0 ? (
-                  <div className="border border-slate-200 rounded-2xl overflow-hidden shadow-2xs">
-                    <table className="w-full text-xs text-left border-collapse">
+                  <div className="border border-slate-200 rounded-2xl overflow-x-auto shadow-2xs">
+                    <table className="w-full min-w-[480px] text-xs text-left border-collapse">
                       <thead>
                         <tr className="bg-slate-100/80 border-b border-slate-200 text-xs font-bold text-slate-600">
                           <th className="py-2.5 px-4 w-1/4">ข้อมูลที่มีการแก้ไข</th>
@@ -765,7 +765,7 @@ export default function AuditLogView({ currentRole, currentUser, onRefresh }) {
                         {selectedDiffLog.changes.map((change, idx) => (
                           <tr key={idx} className="hover:bg-slate-50/60">
                             {/* Field */}
-                            <td className="py-3 px-4 font-semibold text-slate-800">
+                            <td className="py-3 px-4 font-semibold text-slate-800 break-words">
                               {change.field}
                             </td>
 

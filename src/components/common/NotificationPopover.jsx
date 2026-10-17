@@ -236,16 +236,16 @@ export default function NotificationPopover(props) {
       onClick={(e) => e.stopPropagation()}
     >
       {/* 1. Header สไตล์คลีน พร้อมปุ่ม Action ที่ชัดเจน */}
-      <div className="p-4 pb-3 border-b border-slate-100 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs">
+      <div className="p-4 pb-3 border-b border-slate-100 flex items-center justify-between gap-2">
+        <div className="flex items-center gap-2.5 min-w-0">
+          <div className="w-8 h-8 rounded-xl bg-slate-900 text-white flex items-center justify-center shadow-xs shrink-0">
             <Bell size={15} strokeWidth={2} />
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h3 className="text-sm font-bold text-slate-900 tracking-tight">การแจ้งเตือน</h3>
+              <h3 className="text-sm font-bold text-slate-900 tracking-tight whitespace-nowrap">การแจ้งเตือน</h3>
               {unreadCount > 0 && (
-                <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-indigo-500 text-white shadow-xs font-mono">
+                <span className="px-2 py-0.5 leading-normal whitespace-nowrap rounded-full text-xs font-bold bg-indigo-500 text-white shadow-xs font-mono">
                   {unreadCount}
                 </span>
               )}
@@ -253,12 +253,12 @@ export default function NotificationPopover(props) {
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex items-center gap-1.5 shrink-0">
           <button
             type="button"
             onClick={handleMarkAll}
             disabled={notifications.length === 0}
-            className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer active:scale-95 ${
+            className={`group flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-semibold transition-all cursor-pointer active:scale-95 whitespace-nowrap shrink-0 ${
               unreadCount > 0
                 ? 'text-indigo-600 bg-indigo-50 hover:bg-indigo-100 hover:text-indigo-700 border border-indigo-200/80 shadow-2xs'
                 : 'text-slate-500 bg-slate-100 hover:bg-slate-200/70 border border-slate-200/80'
@@ -272,7 +272,7 @@ export default function NotificationPopover(props) {
             <button 
               type="button"
               onClick={onClose}
-              className="w-7 h-7 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer"
+              className="w-7 h-7 rounded-full text-slate-400 hover:text-slate-700 hover:bg-slate-100 flex items-center justify-center transition-colors cursor-pointer shrink-0"
               title="ปิดหน้าต่าง"
             >
               <X size={15} strokeWidth={2} />
@@ -287,7 +287,7 @@ export default function NotificationPopover(props) {
           <button
             type="button"
             onClick={() => setActiveTab('all')}
-            className={`py-1.5 rounded-lg transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-1.5 rounded-lg transition-all duration-150 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
               activeTab === 'all'
                 ? 'bg-white text-slate-900 shadow-xs font-bold'
                 : 'text-slate-500 hover:text-slate-800'
@@ -301,7 +301,7 @@ export default function NotificationPopover(props) {
           <button
             type="button"
             onClick={() => setActiveTab('unread')}
-            className={`py-1.5 rounded-lg transition-all duration-150 flex items-center justify-center gap-1.5 cursor-pointer ${
+            className={`py-1.5 rounded-lg transition-all duration-150 flex items-center justify-center gap-1.5 whitespace-nowrap cursor-pointer ${
               activeTab === 'unread'
                 ? 'bg-white text-slate-900 shadow-xs font-bold'
                 : 'text-slate-500 hover:text-slate-800'
@@ -361,29 +361,29 @@ export default function NotificationPopover(props) {
 
                 {/* Content Box */}
                 <div className="flex-1 min-w-0 pr-2">
-                  <div className="flex items-center gap-2 mb-1">
-                    <span className={`px-2 py-0.5 rounded-md text-xs font-bold border ${visual.badge}`}>
+                  <div className="flex items-center flex-wrap gap-x-2 gap-y-1 mb-1">
+                    <span className={`px-2 py-0.5 leading-normal whitespace-nowrap rounded-md text-xs font-bold border ${visual.badge}`}>
                       {visual.label}
                     </span>
                     {cleanDocNo && (
-                      <span className="text-xs font-mono font-medium text-slate-400">
+                      <span className="text-xs font-mono font-medium text-slate-400 whitespace-nowrap">
                         {cleanDocNo}
                       </span>
                     )}
-                    <span className="text-xs text-slate-400 ml-auto flex items-center gap-1 shrink-0">
+                    <span className="text-xs text-slate-400 ml-auto flex items-center gap-1 shrink-0 whitespace-nowrap">
                       <Clock size={11} />
                       {formatNotificationTime(item.timestamp || item.createdAt || item.time)}
                     </span>
                   </div>
 
                   {/* Title */}
-                  <h4 className={`text-xs leading-snug line-clamp-1 ${itemUnread ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>
+                  <h4 className={`text-xs leading-snug line-clamp-1 break-words ${itemUnread ? 'font-bold text-slate-900' : 'font-medium text-slate-700'}`}>
                     {cleanTitle}
                   </h4>
 
                   {/* Clean Non-repeating Description (No 'undefined') */}
                   {displayMessage && (
-                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2 leading-relaxed">
+                    <p className="text-xs text-slate-500 mt-0.5 line-clamp-2 break-words leading-relaxed">
                       {displayMessage}
                     </p>
                   )}
