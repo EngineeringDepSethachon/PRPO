@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { 
-  Package, ExternalLink, Copy, Check, 
+  ExternalLink, Copy, Check,
   Store, AlertTriangle, ArrowRight, FileText, CheckCircle2,
   Clock, ChevronDown, ChevronUp, Paperclip, Eye, Download,
   Image as ImageIcon, X, Truck, Calendar
@@ -19,11 +19,10 @@ import { isOrderPending, isOrderInClaim, isOrderClosed } from '../../context/Onl
 import ImageLightboxModal from '../../components/common/ImageLightboxModal';
 import { getFallbackAttachmentsForCode } from '../../services/workflowEngine';
 import AttachmentViewerModal from '../../components/common/AttachmentViewerModal';
-import AttachmentThumbnail from '../../components/common/AttachmentThumbnail';
 import { formatCurrency } from '../../utils/formatters.js';
 import ProxiedImg from '../../components/common/ProxiedImg';
 import LoadingOverlay from '../../components/common/LoadingOverlay.jsx';
-import ProductRemarkNote from '../../components/common/ProductRemarkNote';
+import ProductActionCard from '../../components/procurement/ProductActionCard';
 
 const formatMoney = (n) => formatCurrency(n);
 
@@ -2296,81 +2295,34 @@ export default function OnlineOrderCard({
                     const origQty = Number(currentItem.originalPurchaseQty ?? currentItem.qty ?? currentItem.purchaseQty ?? 1);
 
                     return (
-                      <React.Fragment key={currentItem.id || resolvedIdx}>
-                      <div
-                        className="flex items-center justify-between px-3.5 py-1.5 sm:py-2 bg-white hover:bg-slate-50/70 transition-colors gap-3 min-h-[44px] flex-wrap sm:flex-nowrap"
-                      >
-                        {/* ฝั่งซ้าย: [รูปภาพสินค้า] [รหัส SKU] [ชื่อสินค้า ↗] [Subtext อ้างอิง PR เดิม] */}
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          {/* Item Thumbnail */}
-                          {itemImages.length > 0 ? (
-                            <div 
-                              className="flex items-center -space-x-1 shrink-0 group/stack"
-                              title={`คลิกเพื่อดูรูปภาพขยาย (${itemImages.length} รูป)`}
-                            >
-                              {itemImages.slice(0, 2).map((img, imgIdx) => (
-                                <AttachmentThumbnail
-                                  key={imgIdx}
-                                  img={img}
-                                  imgIdx={imgIdx}
-                                  onClick={() => openLightbox(itemImages, imgIdx, currentItem.name)}
-                                  sizeClass="w-8 h-8"
-                                />
-                              ))}
-                              {itemImages.length > 2 && (
-                                <button
-                                  type="button"
-                                  onClick={() => openLightbox(itemImages, 2, currentItem.name)}
-                                  className="w-8 h-8 rounded-lg bg-slate-800/90 hover:bg-indigo-600 text-white text-[10px] font-mono font-bold flex items-center justify-center border border-white shadow-2xs shrink-0 cursor-pointer transition-transform duration-150 hover:scale-110 hover:z-10 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                >
-                                  +{itemImages.length - 2}
-                                </button>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="w-8 h-8 rounded-lg bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
-                              <Package className="w-4 h-4" />
-                            </div>
-                          )}
-
-                          <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-600 font-mono text-[11px] font-semibold shrink-0">
-                            {currentItem.code || currentItem.sku || 'ITEM'}
-                          </span>
-
-                          <div className="flex items-center gap-1.5 min-w-0 flex-wrap sm:flex-nowrap">
-                            <span className="text-xs font-semibold text-slate-800 truncate max-w-[220px] sm:max-w-md" title={currentItem.name}>
-                              {currentItem.name}
-                            </span>
-                            {rawUrl && (
-                              <a
-                                href={sanitizeExternalUrl(rawUrl)}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="text-indigo-600 hover:text-indigo-800 bg-indigo-50/70 hover:bg-indigo-100 p-1 rounded text-xs font-medium shrink-0 inline-flex items-center gap-0.5 transition-colors"
-                                title="เปิดลิงก์สินค้าจริง"
-                              >
-                                <ExternalLink className="w-3 h-3" />
-                              </a>
+                      <ProductActionCard
+                        key={currentItem.id || resolvedIdx}
+                        item={currentItem}
+                        products={productMaster}
+                        url={rawUrl}
+                        platform={currentItem.storePlatform || currentItem.platform}
+                        code={currentItem.code || currentItem.sku || 'ITEM'}
+                        qty={origQty}
+                        unit={pUnit}
+                        price={origPrice}
+                        images={itemImages}
+                        onOpenImage={openLightbox}
+                        nameExtra={
+                          <button
+                            type="button"
+                            onClick={() => handleCopyText(currentItem.name, 'item')}
+                            className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors cursor-pointer shrink-0"
+                            title="คัดลอกชื่อสินค้า"
+                          >
+                            {copiedCode === currentItem.name ? (
+                              <Check className="w-3.5 h-3.5 text-emerald-600" />
+                            ) : (
+                              <Copy className="w-3.5 h-3.5" />
                             )}
-                            <button
-                              type="button"
-                              onClick={() => handleCopyText(currentItem.name, 'item')}
-                              className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors cursor-pointer shrink-0"
-                              title="คัดลอกชื่อสินค้า"
-                            >
-                              {copiedCode === currentItem.name ? (
-                                <Check className="w-3 h-3 text-emerald-600" />
-                              ) : (
-                                <Copy className="w-3 h-3" />
-                              )}
-                            </button>
-                            <span className="text-[11px] text-slate-400 font-mono shrink-0">
-                              (PR: {origQty} {pUnit} @ ฿{formatMoney(origPrice)})
-                            </span>
-                          </div>
-                        </div>
-
-                        {/* ฝั่งขวา (ชุดกรอกข้อมูลจริงแบบ Compact): [สเต็ปเปอร์จำนวน] [หน่วยนับ] [ช่องราคาต่อหน่วย] [ราคารวมบรรทัด] */}
+                          </button>
+                        }
+                      >
+                        {/* ชุดกรอกข้อมูลจริงแบบ Compact: [สเต็ปเปอร์จำนวน] [หน่วยนับ] [ช่องราคารวม] [ค่าเฉลี่ยต่อหน่วย] */}
                         <div className="flex items-center gap-2 sm:gap-2.5 shrink-0 ml-auto">
                           {/* จำนวนจริง: สเต็ปเปอร์ขนาดกะทัดรัด h-8 w-22 p-0.5 border border-slate-200 rounded-lg bg-slate-50 */}
                           <div className="h-8 w-22 p-0.5 border border-slate-200 rounded-lg bg-slate-50 flex items-center justify-between shrink-0">
@@ -2446,10 +2398,7 @@ export default function OnlineOrderCard({
                             )}
                           </div>
                         </div>
-                      </div>
-                      {/* FR-02: หมายเหตุ/สเปกของสินค้า ใต้แถวสินค้า (แถวแก้ไขได้) */}
-                      <ProductRemarkNote item={currentItem} products={productMaster} className="!border-t-0 mx-3.5 mb-1.5 -mt-1" />
-                      </React.Fragment>
+                      </ProductActionCard>
                     );
                   })}
                 </div>
@@ -2491,69 +2440,31 @@ export default function OnlineOrderCard({
                     const rawUrl = getProductUrl(currentItem);
                     
                     return (
-                      <React.Fragment key={currentItem.id || resolvedIdx}>
-                      <div className="py-1.5 px-3 bg-white hover:bg-slate-50/70 transition-colors flex items-center justify-between gap-2.5 min-h-[36px] text-xs">
-                        {/* ฝั่งซ้าย: [Img] [รหัส] ชื่อสินค้า ↗ */}
-                        <div className="flex items-center gap-2 min-w-0 flex-1">
-                          {/* Item Thumbnail (28x28) */}
-                          {itemImages.length > 0 ? (
-                            <div 
-                              className="flex items-center -space-x-1 shrink-0 group/stack"
-                              title={`คลิกเพื่อดูรูปภาพขยาย (${itemImages.length} รูป)`}
-                            >
-                              {itemImages.slice(0, 2).map((img, imgIdx) => (
-                                <AttachmentThumbnail
-                                  key={imgIdx}
-                                  img={img}
-                                  imgIdx={imgIdx}
-                                  onClick={() => openLightbox(itemImages, imgIdx, currentItem.name)}
-                                  sizeClass="w-7 h-7"
-                                />
-                              ))}
-                              {itemImages.length > 2 && (
-                                <button
-                                  type="button"
-                                  onClick={() => openLightbox(itemImages, 2, currentItem.name)}
-                                  className="w-7 h-7 rounded-md bg-slate-800/90 hover:bg-indigo-600 text-white text-[9px] font-mono font-bold flex items-center justify-center border border-white shadow-2xs shrink-0 cursor-pointer transition-transform duration-150 hover:scale-110 hover:z-10 focus:outline-none focus:ring-1 focus:ring-indigo-500"
-                                >
-                                  +{itemImages.length - 2}
-                                </button>
-                              )}
-                            </div>
-                          ) : (
-                            <div className="w-7 h-7 rounded-md bg-slate-100 border border-slate-200 flex items-center justify-center text-slate-400 shrink-0">
-                              <Package className="w-3.5 h-3.5" />
-                            </div>
-                          )}
-
-                          <span className="px-1.5 py-0.5 rounded bg-slate-100 text-slate-700 font-mono text-[11px] font-semibold shrink-0">
-                            {currentItem.sku || currentItem.code || 'ITEM'}
-                          </span>
-
-                          <span className="text-xs font-semibold text-slate-800 truncate max-w-[180px] sm:max-w-xs md:max-w-md" title={currentItem.name}>
-                            {currentItem.name}
-                          </span>
-
-                          {rawUrl && (
-                            <a
-                              href={sanitizeExternalUrl(rawUrl)}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="text-xs text-indigo-600 hover:text-indigo-800 inline-flex items-center gap-0.5 shrink-0"
-                              title="เปิดลิงก์สินค้าจริง"
-                            >
-                              <ExternalLink className="w-3 h-3" />
-                            </a>
-                          )}
-
+                      <ProductActionCard
+                        key={currentItem.id || resolvedIdx}
+                        readOnly
+                        item={currentItem}
+                        products={productMaster}
+                        url={rawUrl}
+                        platform={currentItem.storePlatform || currentItem.platform}
+                        code={currentItem.sku || currentItem.code || 'ITEM'}
+                        qty={pQty}
+                        unit={pUnit}
+                        price={price}
+                        images={itemImages}
+                        onOpenImage={openLightbox}
+                        nameExtra={
                           <button
+                            type="button"
                             onClick={() => handleCopyText(currentItem.name, 'item')}
-                            className="p-0.5 text-slate-400 hover:text-slate-600 rounded transition-colors cursor-pointer shrink-0"
+                            className="p-1 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded transition-colors cursor-pointer shrink-0"
                             title="คัดลอกชื่อสินค้า"
                           >
-                            {copiedCode === currentItem.name ? <Check className="w-3 h-3 text-emerald-600" /> : <Copy className="w-3 h-3" />}
+                            {copiedCode === currentItem.name ? <Check className="w-3.5 h-3.5 text-emerald-600" /> : <Copy className="w-3.5 h-3.5" />}
                           </button>
-
+                        }
+                        badges={
+                          <>
                           {currentItem.orderRefNo && (
                             <span className="text-[10px] text-purple-700 font-bold bg-purple-50 px-1.5 py-0.2 rounded border border-purple-200 shrink-0">
                               Ref: {currentItem.orderRefNo}
@@ -2613,8 +2524,9 @@ export default function OnlineOrderCard({
 
                             return null;
                           })()}
-                        </div>
-
+                          </>
+                        }
+                      >
                         {/* Col 3: ฝั่งขวา Monospace Equation */}
                         {isClaimOrder && (() => {
                           const itemMetrics = calculateDisputeMetrics(currentItem, po?.status, poHasGRN);
@@ -2651,10 +2563,7 @@ export default function OnlineOrderCard({
                             </strong>
                           </div>
                         )}
-                      </div>
-                      {/* FR-02: หมายเหตุ/สเปกของสินค้า ใต้แถวสินค้า (แถวอ่านอย่างเดียว) */}
-                      <ProductRemarkNote item={currentItem} products={productMaster} className="!border-t-0 mx-3 mb-1 -mt-0.5" />
-                      </React.Fragment>
+                      </ProductActionCard>
                     );
                   })}
                 </div>
@@ -3193,10 +3102,10 @@ export default function OnlineOrderCard({
 
                       {doc.url && (
                         <a
-                          href={doc.url}
+                          href={/^(blob:|data:(image\/|application\/pdf))/i.test(doc.url) ? doc.url : sanitizeExternalUrl(doc.url)}
                           download={doc.name || 'document'}
                           target="_blank"
-                          rel="noreferrer"
+                          rel="noopener noreferrer"
                           onClick={(e) => {
                             // cloudflare mode : a Drive file is downloaded through GET /api/files/:id (driveFileIdOf is null in other modes)
                             if (!driveFileIdOf(doc)) return;

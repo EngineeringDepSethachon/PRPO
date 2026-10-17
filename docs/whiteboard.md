@@ -6,9 +6,11 @@
 - progress = จำนวน [x] / ทั้งหมด (server คำนวณ)
 -->
 # ไวท์บอร์ด Migrate Team
-อัปเดต: 2026-10-17 10:00
+อัปเดต: 2026-10-17 (v1.1.0 ขึ้น main)
 
 ## ✅ ตัดสินใจแล้ว
+
+- [2026-10-17] **v1.1.0 ขึ้น production แล้ว** (tag v1.1.0, bundle index-CZlVd6OO.js, backup prpo-db-20261017-v1.0.0.sql): FR-02 หมายเหตุสินค้า + FR-01 role BUFFER/PENDING_BUFFER + PR write hardening (kla 4 รอบ) ; วิธี build release ที่สะอาด: git worktree C:\Users\Admin\prpo-release (node_modules เป็น junction) checkout tag แล้ว build:cf + deploy ; กำลังทำ v1.2.0 (M11 การ์ดงานออนไลน์: A2/A3 เสร็จ QA ผ่าน รอ kla ลิงก์ภายนอก) ; v1.3.0 (M12) เตรียม codemod แล้วยังไม่รัน
 
 - [2026-10-17] Fable อนุมัติเปิด Phase 3 (cmvc242gq1f336) ลำดับ v1.1.0 → v1.2.0 → v1.3.0 ; เงื่อนไข: server เลือก PENDING_BUFFER/REVIEWED เอง + recompute ยอด + productUrl http/https, ตัด isBuffer จาก reviewer/จัดสรรงบ, ที่ PENDING_BUFFER แก้ได้เฉพาะพี่สุ+admin, เทสต์ cf_rbac ครบ actor×สถานะ, ไล่ทุกจุด enumerate สถานะ, remark แสดงเป็น text, FR-04 screenshot ก่อน/หลัง ; GAS ไม่รองรับ PENDING_BUFFER (ไม่ใช่ production แล้ว) ; รายละเอียด docs/plan.md
 

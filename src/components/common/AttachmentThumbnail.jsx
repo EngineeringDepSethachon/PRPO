@@ -16,6 +16,9 @@ export default function AttachmentThumbnail({ img, imgIdx, onClick, sizeClass = 
   const finalAlt = altText || defaultName;
   const finalTitle = title || defaultName;
 
+  // sizeClass ใหญ่ (w-20 ขึ้นไป เช่น การ์ดสินค้า w-24/w-28) : ไอคอน fallback ขยายตาม มุมโค้งใหญ่ขึ้น ไม่ขยาย hover ; ขนาดเล็กเหมือนเดิมทุกประการ
+  const isLarge = /(^|\s)(?:[a-z]+:)?w-(?:20|24|28|32|36|40|44|48)(?=\s|$)/.test(sizeClass);
+
   if (hasError || !resolvedThumb) {
     const isSmall = sizeClass.includes('w-8') || sizeClass.includes('w-7') || sizeClass.includes('w-6');
     return (
@@ -23,11 +26,11 @@ export default function AttachmentThumbnail({ img, imgIdx, onClick, sizeClass = 
         type="button"
         onClick={onClick}
         title={finalTitle}
-        className={`relative ${sizeClass} rounded-lg border border-slate-200 bg-slate-100 flex flex-col items-center justify-center p-1 hover:bg-slate-200 transition-colors shrink-0 overflow-hidden text-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer group/thumb`}
+        className={`relative ${sizeClass} ${isLarge ? 'rounded-xl' : 'rounded-lg'} border border-slate-200 bg-slate-100 flex flex-col items-center justify-center p-1 hover:bg-slate-200 transition-colors shrink-0 overflow-hidden text-slate-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer group/thumb`}
       >
-        <Paperclip className={`${isSmall ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-slate-400 shrink-0`} />
+        <Paperclip className={`${isLarge ? 'w-8 h-8' : isSmall ? 'w-3.5 h-3.5' : 'w-4 h-4'} text-slate-400 shrink-0`} />
         {!isSmall && (
-          <span className="text-[8px] font-mono text-slate-500 truncate max-w-full px-0.5 mt-0.5 leading-tight">
+          <span className={`${isLarge ? 'text-[10px] mt-1' : 'text-[8px] mt-0.5'} font-mono text-slate-500 truncate max-w-full px-0.5 leading-tight`}>
             {defaultName}
           </span>
         )}
@@ -39,7 +42,7 @@ export default function AttachmentThumbnail({ img, imgIdx, onClick, sizeClass = 
     <button
       type="button"
       onClick={onClick}
-      className={`relative ${sizeClass} rounded-lg border border-slate-200 shadow-2xs overflow-hidden bg-slate-100 transition-transform duration-150 hover:scale-110 hover:z-10 cursor-pointer shrink-0 focus:outline-none focus:ring-1 focus:ring-indigo-500 group/thumb`}
+      className={`relative ${sizeClass} ${isLarge ? 'rounded-xl' : 'rounded-lg'} border border-slate-200 shadow-2xs overflow-hidden bg-slate-100 transition-transform duration-150 ${isLarge ? '' : 'hover:scale-110 hover:z-10'} cursor-pointer shrink-0 focus:outline-none focus:ring-1 focus:ring-indigo-500 group/thumb`}
       title={finalTitle}
     >
       <img

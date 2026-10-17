@@ -120,12 +120,15 @@ describe('QA FR-02 source check', () => {
     for (const f of files) expect(read(...f)).not.toContain('dangerouslySetInnerHTML');
   });
 
-  it('OnlineOrderCard : key ของ list อยู่ที่ React.Fragment ทั้งสองแถว และ ProductRemarkNote อยู่ใน Fragment', () => {
+  // M11 A2: แถวสินค้าใน OnlineOrderCard เปลี่ยนเป็น ProductActionCard (key ที่การ์ด ; หมายเหตุอยู่ในการ์ด ไม่ซ้ำสองที่)
+  it('OnlineOrderCard : key ของ list อยู่ที่ ProductActionCard ทั้งสองแถว และหมายเหตุ render ในการ์ดที่เดียว', () => {
     const src = read('src', 'views', 'procurement', 'OnlineOrderCard.jsx');
-    const frags = src.match(/<React\.Fragment key=\{currentItem\.id \|\| resolvedIdx\}>/g) || [];
-    expect(frags.length).toBe(2);
-    const notes = src.match(/<ProductRemarkNote item=\{currentItem\}/g) || [];
-    expect(notes.length).toBe(2);
+    const cards = src.match(/<ProductActionCard\s+key=\{currentItem\.id \|\| resolvedIdx\}/g) || [];
+    expect(cards.length).toBe(2);
+    expect(src).not.toContain('<ProductRemarkNote');
+    const card = read('src', 'components', 'procurement', 'ProductActionCard.jsx');
+    expect(card.match(/<ProductRemarkNote item=\{item\}/g) || []).toHaveLength(1);
+    expect(card).not.toContain('dangerouslySetInnerHTML');
   });
 
   it('PRCreateView : ไม่แสดงกล่องหมายเหตุกับรายการ Non-Catalog (isCustom)', () => {
